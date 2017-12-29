@@ -2,6 +2,7 @@
 # pybna is a Python module that uses networkx to implement the
 # connectivity logic developed in the BNA.
 ###################################################################
+import os
 import networkx as nx
 import psycopg2
 import pandas as pd
@@ -43,36 +44,72 @@ class pyBNA:
         # Add destinations
 
     def listScenarios(self):
-        """Lists the current stored scenarios"""
+        """Prints the current stored scenarios
+
+        Return: None
+        """
         for k, v in self.scenarios:
             print(v)
 
-    def scenarioNameAvailable(self,name):
-        """Checks the scenarios for whether a scenario by the given name exists"""
+    def checkScenarioName(self,name,raiseError=True):
+        """Checks the scenarios for whether a scenario by the given name exists.
+        If raiseError is true then raise an error if a match is found.
+        Returns true if the check is passed.
+
+        Return: Boolean
+        """
         if name in scenarios:
-            return False
+            if raiseError:
+                raise KeyError('A scenario named %s already exists' % name)
+            else:
+                return False
         else:
             return True
 
     def addScenarioExisting(self,scenario):
-        """Register a pre-existing scenario object with this pyBNA"""
-        # check if name is OK
-        if not scenarioNameAvailable(scenario.name):
-            raise KeyError('A scenario named %s already exists' % scenario.name)
-        else:
+        """Register a pre-existing scenario object with this pyBNA
+
+        Return: None
+        """
+        if self.checkScenarioName(scenario.name):
             self.scenarios[scenario.name] = scenario
 
     def addScenarioNew(self, name, notes, maxStress, edgeTable, nodeTable,
                     edgeIdCol=None, fromNodeCol=None, toNodeCol=None,
                     nodeIdCol=None):
-        """Creates a new scenario and registers it"""
-        # check if name is OK
-        if not scenarioNameAvailable(name):
-            raise KeyError('A scenario named %s already exists' % name)
-        else:
+        """Creates a new scenario and registers it
+
+        Return: None
+        """
+        if self.checkScenarioName(name)
             self.scenarios[name] = Scenario(name, notes, self.conn, maxStress,
                 edgeTable, nodeTable, edgeIdCol, fromNodeCol, toNodeCol, nodeIdCol
             )
+
+    def addScenarioPickle(self, path, name=None):
+        """Unpickles a saved scenario and registers it. If name is None uses
+        the scenario's given name. Else use the given name and update the scenario
+        name.
+
+        Return: None
+        """
+        # check if name is specified and is OK
+        if name:
+            self.checkScenarioName(name)
+
+        if not os.path.isfile(path):
+            raise FileNotFoundError("No file found at %s" % path)
+        try:
+            scenario = pickle.load(open(path,"rb"))
+        except pickle.UnpicklingError:
+            raise pickle.UnpicklingError("Could not restore %s. Is this file a valid scenario pickle?" % path)
+        except IOError:
+            raise FileNotFoundError("No file found at %s" % path)
+
+        if self.checkScenarioName(scenario.name):
+            self.scenarios[scenario.name] = scenario
+
+
 
     def _addBlocks(self,censusTable):
         """Add census blocks to BNA."""
