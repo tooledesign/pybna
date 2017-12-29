@@ -2,38 +2,82 @@
 # pybna is a Python module that uses networkx to implement the
 # connectivity logic developed in the BNA.
 ###################################################################
-import network as nx
+import networkx as nx
 import psycopg2
 import pandas as pd
 
-from routing import network
+from scenario import Scenario
 
 
-def build_network(conn, tableName=None):
-    """
-    Returns a networkx graph built from edges and nodes stored in the
-    database at the given connection. Assumes the standard naming
-    conventions of the BNA tool, unless tableName is given, which is
-    used to indicate the table to use in place of the standard
-    neighborhood_ways table.
-    """
+class pyBNA:
+    """Collection of BNA scenarios and attendant functions."""
 
-class BNA():
-    """A BNA to analyze."""
-    def __init__(self):
-        # Create network
+    def __init__(self,host,db,user,password,censusTable=None):
+        """Connects to the BNA database
+
+        kwargs:
+        host -- hostname or address
+        db -- name of database on server
+        user -- username to connect to database
+        password -- password to connect to database
+        censusTable -- name of table of census blocks (if None use neighborhood_census_blocks, the BNA default)
+
+        return: None
+        """
+
+        # set up db connection
+        db_connection_string = " ".join([
+            "dbname=" + db,
+            "user=" + user,
+            "host=" + host,
+            "password=" + password
+        ])
+        self.conn = psycopg2.connect(db_connection_string)
+
+        # Create dictionary to hold scenario networks
+        self.scenarios = dict()
 
         # Add census blocks
-        self.blocks
+        self.blocks = None
+
         # Add destinations
 
-    def _buildNetwork(self):
-        """Build a routing.network."""
-        pass
+    def listScenarios(self):
+        """Lists the current stored scenarios"""
+        for k, v in self.scenarios:
+            print(v)
 
-    def _addBlocks(self):
+    def scenarioNameAvailable(self,name):
+        """Checks the scenarios for whether a scenario by the given name exists"""
+        if name in scenarios:
+            return False
+        else:
+            return True
+
+    def addScenarioExisting(self,scenario):
+        """Register a pre-existing scenario object with this pyBNA"""
+        # check if name is OK
+        if not scenarioNameAvailable(scenario.name):
+            raise KeyError('A scenario named %s already exists' % scenario.name)
+        else:
+            self.scenarios[scenario.name] = scenario
+
+    def addScenarioNew(self, name, notes, maxStress, edgeTable, nodeTable,
+                    edgeIdCol=None, fromNodeCol=None, toNodeCol=None,
+                    nodeIdCol=None):
+        """Creates a new scenario and registers it"""
+        # check if name is OK
+        if not scenarioNameAvailable(name):
+            raise KeyError('A scenario named %s already exists' % name)
+        else:
+            self.scenarios[name] = Scenario(name, notes, self.conn, maxStress,
+                edgeTable, nodeTable, edgeIdCol, fromNodeCol, toNodeCol, nodeIdCol
+            )
+
+    def _addBlocks(self,censusTable):
         """Add census blocks to BNA."""
         pass
+        # create geopandas object to hold blocks
 
     def _addDestinations(self):
         """Add generic destinations."""
