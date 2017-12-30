@@ -13,7 +13,7 @@ from scenario import Scenario
 class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
-    def __init__(self,host,db,user,password,censusTable=None):
+    def __init__(self,host,db,user,password,censusTable=None,verbose=False):
         """Connects to the BNA database
 
         kwargs:
@@ -25,6 +25,7 @@ class pyBNA:
 
         return: None
         """
+        self.verbose = verbose
 
         # set up db connection
         db_connection_string = " ".join([
@@ -48,7 +49,7 @@ class pyBNA:
 
         Return: None
         """
-        for k, v in self.scenarios:
+        for k, v in self.scenarios.iteritems():
             print(v)
 
     def checkScenarioName(self,name,raiseError=True):
@@ -58,7 +59,9 @@ class pyBNA:
 
         Return: Boolean
         """
-        if name in scenarios:
+        if self.verbose:
+            print("Checking name %s" % name)
+        if name in self.scenarios:
             if raiseError:
                 raise KeyError('A scenario named %s already exists' % name)
             else:
@@ -72,18 +75,23 @@ class pyBNA:
         Return: None
         """
         if self.checkScenarioName(scenario.name):
+            if self.verbose:
+                print("Adding scenario %s" % scenario)
             self.scenarios[scenario.name] = scenario
 
     def addScenarioNew(self, name, notes, maxStress, edgeTable, nodeTable,
-                    edgeIdCol=None, fromNodeCol=None, toNodeCol=None,
-                    nodeIdCol=None):
+                    edgeIdCol=None, fromNodeCol=None, toNodeCol=None, nodeIdCol=None,
+                    stressCol=None, edgeCostCol=None, verbose=False):
         """Creates a new scenario and registers it
 
         Return: None
         """
-        if self.checkScenarioName(name)
+        if self.checkScenarioName(name):
+            if self.verbose:
+                print("Creating scenario %s" % name)
             self.scenarios[name] = Scenario(name, notes, self.conn, maxStress,
-                edgeTable, nodeTable, edgeIdCol, fromNodeCol, toNodeCol, nodeIdCol
+                edgeTable, nodeTable, edgeIdCol, fromNodeCol, toNodeCol, nodeIdCol,
+                stressCol, edgeCostCol, self.verbose
             )
 
     def addScenarioPickle(self, path, name=None):
@@ -100,6 +108,8 @@ class pyBNA:
         if not os.path.isfile(path):
             raise FileNotFoundError("No file found at %s" % path)
         try:
+            if self.verbose:
+                print("Unpickling scenario at %s and adding" % path)
             scenario = pickle.load(open(path,"rb"))
         except pickle.UnpicklingError:
             raise pickle.UnpicklingError("Could not restore %s. Is this file a valid scenario pickle?" % path)
