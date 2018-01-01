@@ -3,7 +3,7 @@
 ###################################################################
 import networkx as nx
 import psycopg2
-from psycopg2.extensions import quote_ident
+from psycopg2 import sql
 
 def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNodeCol,
         edgeCostCol,stressCol,verbose=False):
@@ -18,17 +18,22 @@ def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNode
     # build edges
     if verbose:
         print("Retrieving edges")
-    cur.execute(' \
-        SELECT  %(fromNodeCol)s AS fnode, %(toNodeCol)s AS tnode, %(edgeIdCol)s AS id, \
-                %(edgeCostCol)s AS cost, %(stressCol)s AS stress \
-        FROM '+edgeTable+';',{
-            "fromNodeCol": quote_ident(fromNodeCol,cur),
-            "toNodeCol": quote_ident(toNodeCol,cur),
-            "edgeIdCol": quote_ident(edgeIdCol,cur),
-            "edgeCostCol": quote_ident(edgeCostCol,cur),
-            "stressCol": quote_ident(stressCol,cur)
-        }
+
+    cur.execute(
+        sql.SQL('select {} AS fnode, {} AS tnode, {} AS id, {} AS cost, {} AS stress from {};')
+            .format(
+                sql.Identifier(fromNodeCol),
+                sql.Identifier(toNodeCol),
+                sql.Identifier(edgeIdCol),
+                sql.Identifier(edgeCostCol),
+                sql.Identifier(stressCol),
+                sql.Identifier(edgeTable)
+            )
+            .as_string(cur)
     )
+
+    if verbose:
+        print(cur.query)
 
     for row in cur:
         DG.add_edge(
