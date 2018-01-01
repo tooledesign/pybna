@@ -5,8 +5,10 @@
 import os
 import networkx as nx
 import psycopg2
+from psycopg2 import sql
 from psycopg2.extensions import quote_ident
 import pandas as pd
+import geopandas as gpd
 
 from scenario import Scenario
 from destinations import Destinations
@@ -15,7 +17,7 @@ from destinations import Destinations
 class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
-    def __init__(self,host,db,user,password,censusTable=None,verbose=False):
+    def __init__(self,host,db,user,password,censusTable=None,blockIdCol=None,roadIdsCol=None,verbose=False):
         """Connects to the BNA database
 
         kwargs:
@@ -24,6 +26,8 @@ class pyBNA:
         user -- username to connect to database
         password -- password to connect to database
         censusTable -- name of table of census blocks (if None use neighborhood_census_blocks, the BNA default)
+        blockIdCol -- name of the column with census block ids in the block table (if None use blockid10, the BNA default)
+        roadIdsCol -- name of the column with road ids in the block table (if None use road_ids, the BNA default)
 
         return: None
         """
@@ -46,8 +50,14 @@ class pyBNA:
         self.destinationBlocks = set()
         self._setBNADestinations()
 
-        # Add census blocks
-        self.blocks = None
+        # Get census blocks
+        if censusTable is None:
+            censusTable = "neighborhood_census_blocks"
+        if blockIdCol is None:
+            blockIdCol = "blockid10"
+        if roadIdsCol is None:
+            roadIdsCol = "road_ids"
+        self.blocks = self._getBlocks(censusTable,blockIdCol,roadIdsCol)
 
 
     def _getPkidColumn(self,table):
@@ -137,9 +147,9 @@ class pyBNA:
                 edgeIdCol = self._getPkidColumn(edgeTable)
             if nodeIdCol is None:
                 nodeIdCol = self._getPkidColumn(nodeTable)
-            self.scenarios[name] = Scenario(name, notes, self.conn, maxStress,
-                edgeTable, nodeTable, edgeIdCol, nodeIdCol, fromNodeCol, toNodeCol,
-                stressCol, edgeCostCol, self.verbose
+            self.scenarios[name] = Scenario(name, notes, self.conn, self.blocks,
+                maxStress, edgeTable, nodeTable, edgeIdCol, nodeIdCol, fromNodeCol,
+                toNodeCol, stressCol, edgeCostCol, self.verbose
             )
 
 
@@ -170,10 +180,54 @@ class pyBNA:
 
 
 
-    def _addBlocks(self,censusTable):
-        """Add census blocks to BNA."""
-        pass
-        # create geopandas object to hold blocks
+    def _getBlocks(self,censusTable,blockIdCol,roadIdsCol):
+        """Get census blocks from BNA database
+
+        return: geopandas geodataframe
+        """
+        if self.verbose:
+            print('Getting census blocks from %s' % censusTable)
+
+        q = sql.SQL('select {} as geom, {} as blockid, {} as roadids from {};').format(
+            sql.Identifier("geom"),
+            sql.Identifier(blockIdCol),
+            sql.Identifier(roadIdsCol),
+            sql.Identifier(censusTable)
+        ).as_string(self.conn)
+
+        if self.verbose:
+            print(q)
+
+        df = gpd.GeoDataFrame.from_postgis(
+            q,
+            self.conn,
+            geom_col='geom'
+        )
+
+        df["roadids"] = df["roadids"].apply(set)
+        return df
+
+        # cur = conn.cursor()
+        #
+        # cur.execute(
+        #     sql.SQL('select {}, {} from {};')
+        #         .format(
+        #             sql.Identifier(blockIdCol),
+        #             sql.Identifier(roadIdsCol),
+        #             sql.Identifier(censusTable)
+        #         )
+        #         .as_string(cur)
+        # )
+        #
+        # if self.verbose:
+        #     print(cur.query)
+        #
+        # for row in cur:
+        #     if type(row[1]) is list:
+        #         roadIds = set(row[1])
+        #     else:
+        #         roadIds = set([row[1]])
+        #     self.blocks[row[0]] = roadIds
 
 
     def _setBNADestinations(self):

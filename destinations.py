@@ -64,19 +64,19 @@ class Destinations:
         if self.verbose:
             print(cur.query)
 
-        allBlocks = list()
+        allBlocks = set()
 
         for row in cur:
             if type(row[2]) is list:
-                blocks = row[2]
+                blocks = set(row[2])
             else:
-                blocks = [row[2]]
+                blocks = set([row[2]])
             self.destinations.append({
                 'id': row[0],
                 'name': row[1],
-                'blocks': row[2]
+                'blocks': blocks
             })
 
-            allBlocks.extend(blocks)
+            allBlocks.update(blocks)
 
         return allBlocks

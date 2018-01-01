@@ -5,6 +5,7 @@ import networkx as nx
 import psycopg2
 from psycopg2 import sql
 
+
 def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNodeCol,
         edgeCostCol,stressCol,verbose=False):
     """Builds a networkx graph from a complete network stored in the PostGIS database
@@ -58,6 +59,7 @@ def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNode
     #     )
 
     return DG
+
 
 def buildRestrictedNetwork(DG,maxStress):
     return nx.DiGraph( [ (u,v,d) for u,v,d in DG.edges(data=True) if d['stress'] <= maxStress ] )
