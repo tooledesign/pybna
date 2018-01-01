@@ -43,6 +43,7 @@ class pyBNA:
         self.destinations = dict()
 
         # Set default BNA destinations
+        self.destinationBlocks = set()
         self._setBNADestinations()
 
         # Add census blocks
@@ -177,54 +178,36 @@ class pyBNA:
 
     def _setBNADestinations(self):
         """Retrieve the generic BNA destination types and register them."""
-        # connect to pg and read id col
+        bnaDestinations = [
+            {'cat':'colleges','table':'neighborhood_colleges','uid':'id','name':'college_name'},
+            {'cat':'community_centers','table':'neighborhood_community_centers','uid':'id','name':'center_name'},
+            {'cat':'dentists','table':'neighborhood_dentists','uid':'id','name':'dentists_name'},
+            {'cat':'doctors','table':'neighborhood_doctors','uid':'id','name':'doctors_name'},
+            {'cat':'hospitals','table':'neighborhood_hospitals','uid':'id','name':'hospital_name'},
+            {'cat':'parks','table':'neighborhood_parks','uid':'id','name':'park_name'},
+            {'cat':'pharmacies','table':'neighborhood_pharmacies','uid':'id','name':'pharmacy_name'},
+            {'cat':'retail','table':'neighborhood_retail','uid':'id','name':'id'},
+            {'cat':'schools','table':'neighborhood_schools','uid':'id','name':'school_name'},
+            {'cat':'social_services','table':'neighborhood_social_services','uid':'id','name':'service_name'},
+            {'cat':'supermarkets','table':'neighborhood_supermarkets','uid':'id','name':'supermarket_name'},
+            {'cat':'transit','table':'neighborhood_transit','uid':'id','name':'transit_name'},
+            {'cat':'universities','table':'neighborhood_universities','uid':'id','name':'college_name'}
+        ]
         if self.verbose:
             print('Adding standard BNA destinations')
 
         cur = self.conn.cursor()
 
-        self.destinations['colleges'] = Destinations(
-            'colleges',self.conn,'neighborhood_colleges','id','college_name',verbose=self.verbose
-        )
-        self.destinations['community_centers'] = Destinations(
-            'community_centers',self.conn,'neighborhood_community_centers','id','center_name',verbose=self.verbose
-        )
-        self.destinations['dentists'] = Destinations(
-            'dentists',self.conn,'neighborhood_dentists','id','dentists_name',verbose=self.verbose
-        )
-        self.destinations['doctors'] = Destinations(
-            'doctors',self.conn,'neighborhood_doctors','id','doctors_name',verbose=self.verbose
-        )
-        self.destinations['hospitals'] = Destinations(
-            'hospitals',self.conn,'neighborhood_hospitals','id','hospital_name',verbose=self.verbose
-        )
-        self.destinations['parks'] = Destinations(
-            'parks',self.conn,'neighborhood_parks','id','park_name',verbose=self.verbose
-        )
-        # self.destinations['paths'] = Destinations(
-        #     'paths',self.conn,'neighborhood_paths','path_id','path_id',verbose=self.verbose
-        # )
-        self.destinations['pharmacies'] = Destinations(
-            'pharmacies',self.conn,'neighborhood_pharmacies','id','pharmacy_name',verbose=self.verbose
-        )
-        self.destinations['retail'] = Destinations(
-            'retail',self.conn,'neighborhood_retail','id','id',verbose=self.verbose
-        )
-        self.destinations['schools'] = Destinations(
-            'schools',self.conn,'neighborhood_schools','id','school_name',verbose=self.verbose
-        )
-        self.destinations['social_services'] = Destinations(
-            'social_services',self.conn,'neighborhood_social_services','id','service_name',verbose=self.verbose
-        )
-        self.destinations['supermarkets'] = Destinations(
-            'supermarkets',self.conn,'neighborhood_supermarkets','id','supermarket_name',verbose=self.verbose
-        )
-        self.destinations['transit'] = Destinations(
-            'transit',self.conn,'neighborhood_transit','id','transit_name',verbose=self.verbose
-        )
-        self.destinations['universities'] = Destinations(
-            'universities',self.conn,'neighborhood_universities','id','college_name',verbose=self.verbose
-        )
+        for d in bnaDestinations:
+            self.destinations[d['cat']] = Destinations(
+                d['cat'],self.conn,d['table'],d['uid'],d['name'],verbose=self.verbose
+            )
+            # add all the census blocks containing a destination from this category
+            # to the pyBNA index of all blocks containing a destination of any type
+            self.destinationBlocks.update(self.destinations[d['cat']].destinationBlocks)
+
+        if self.verbose:
+            print('%i census blocks are part of at least one destination' % len(self.destinationBlocks))
 
 
     def score(self):

@@ -27,10 +27,25 @@ class Destinations:
         if blocksCol is None:
             blocksCol = 'blockid10'
 
-        self._retrieve(conn,table,idCol,nameCol,blocksCol)
+        self.destinationBlocks = set(self._retrieve(conn,table,idCol,nameCol,blocksCol))
+
+
+    def __unicode__(self):
+        n = len(self.destinations)
+        return u'%s: %i destinations' % (self.category, n)
+
+
+    def __repr__(self):
+        n = len(self.destinations)
+        return r'%s: %i destinations' % (self.category, n)
 
 
     def _retrieve(self,conn,table,idCol,nameCol,blocksCol):
+        """Retrieve destinations from the database and store them in
+        this class' list of destinations
+
+        return: list of all census block ids that contain a destination in this category
+        """
         if self.verbose:
             print('Getting destinations for %s' % table)
         cur = conn.cursor()
@@ -49,6 +64,8 @@ class Destinations:
         if self.verbose:
             print(cur.query)
 
+        allBlocks = list()
+
         for row in cur:
             if type(row[2]) is list:
                 blocks = row[2]
@@ -59,3 +76,7 @@ class Destinations:
                 'name': row[1],
                 'blocks': row[2]
             })
+
+            allBlocks.extend(blocks)
+
+        return allBlocks
