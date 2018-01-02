@@ -118,20 +118,23 @@ class pyBNA:
             self.scenarios[scenario.name] = scenario
 
 
-    def addScenarioNew(self, name, notes, maxStress, edgeTable, nodeTable,
-                    edgeIdCol=None, nodeIdCol=None, fromNodeCol=None, toNodeCol=None,
-                    stressCol=None, edgeCostCol=None, verbose=False):
+    def addScenarioNew(self, name, notes, maxDist, maxStress, edgeTable, nodeTable,
+                    edgeIdCol=None, nodeIdCol=None, maxDetour=1.25,
+                    fromNodeCol='source_vert', toNodeCol='target_vert',
+                    stressCol='link_stress', edgeCostCol='link_cost', verbose=False):
         """Creates a new scenario and registers it
 
         args:
         name -- this scenario's name. a test is run to make sure there's not
             already a scenario of the same name.
         notes -- any notes to provide further information about this scenario
+        maxDist -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
         maxStress -- the highest stress rating to allow for the low stress graph
         edgeTable -- name of the table of network edges
         nodeTable -- name of the table of network nodes
         edgeIdCol -- column name for edge IDs. if None uses the primary key defined on the table.
         nodeIdCol -- column name for the node IDs. if None uses the primary key defined on the table.
+        maxDetour -- the maximum allowable detour for determining low stress connectivity (if None uses 25%, the BNA default)
         fromNodeCol -- column name for the from node in edge table (if None uses source_vert, the BNA default)
         toNodeCol -- column name for the to node in edge table (if None uses target_vert, the BNA default)
         stressCol -- column name for the stress of the edge (if None uses link_stress, the BNA default)
@@ -148,8 +151,9 @@ class pyBNA:
             if nodeIdCol is None:
                 nodeIdCol = self._getPkidColumn(nodeTable)
             self.scenarios[name] = Scenario(name, notes, self.conn, self.blocks,
-                maxStress, edgeTable, nodeTable, edgeIdCol, nodeIdCol, fromNodeCol,
-                toNodeCol, stressCol, edgeCostCol, self.verbose
+                maxDist, maxStress, edgeTable, nodeTable, edgeIdCol, nodeIdCol,
+                maxDetour, fromNodeCol, toNodeCol, stressCol, edgeCostCol,
+                self.verbose
             )
 
 

@@ -14,9 +14,9 @@ class Scenario:
     """A scenario to analyze in the BNA."""
 
     def __init__(self, name, notes, conn, blocks, maxDist, maxStress, edgeTable,
-                    nodeTable, edgeIdCol, nodeIdCol, maxDetour=1.25,
-                    fromNodeCol='source_vert', toNodeCol='target_vert',
-                    stressCol='link_stress', edgeCostCol='link_cost',
+                    nodeTable, edgeIdCol, nodeIdCol, maxDetour=None,
+                    fromNodeCol=None, toNodeCol=None,
+                    stressCol=None, edgeCostCol=None,
                     verbose=False):
         """Get already built network from PostGIS connection.
 
@@ -31,11 +31,11 @@ class Scenario:
         nodeTable -- name of the table of network nodes
         edgeIdCol -- column name for edge IDs
         nodeIdCol -- column name for the node IDs
-        maxDetour -- maximum allowable detour for determining relative connectivity (defaults to 25%)
-        fromNodeCol -- column name for the from node in edge table (if None uses source_vert, the BNA default)
-        toNodeCol -- column name for the to node in edge table (if None uses target_vert, the BNA default)
-        stressCol -- column name for the stress of the edge (if None uses link_stress, the BNA default)
-        edgeCostCol -- column name for the cost of the edge (if None uses link_cost, the BNA default)
+        maxDetour -- maximum allowable detour for determining relative connectivity
+        fromNodeCol -- column name for the from node in edge table
+        toNodeCol -- column name for the to node in edge table
+        stressCol -- column name for the stress of the edge
+        edgeCostCol -- column name for the cost of the edge
         verbose -- output useful messages
 
         return: None
@@ -53,9 +53,10 @@ class Scenario:
 
         self.lsG = buildRestrictedNetwork(self.hsG,self.maxStress)
 
-        # create connectivity matrices
-        self.hsConnectivity = self._getConnectivity(self.hsG,blocks)
-        self.lsConnectivity = self._getConnectivity(self.lsG,blocks)
+        # create connectivity matrix
+        self.connectivity = self._getConnectivity(
+            blocks,maxDist,maxDetour
+        )
 
 
     def __unicode__(self):
@@ -66,32 +67,56 @@ class Scenario:
         return r'Scenario %s  :  Max stress %i  :  Notes: %s' % (self.name, self.maxStress, self.notes)
 
 
-    def _getConnectivity(self,graph,blocks,maxDist,maxDetour,baseConnectivity=None):
-        """Create a connectivity matrix using the given networkx graph and census blocks
+    def _getConnectivity(self,blocks,maxDist,maxDetour):
+        """Create a connectivity matrix using the this class' networkx graphs and
+        census blocks. The matrix relies on bitwise math so the following
+        correspondence of values to connectivity combinations is possible:
+        0 = neither hs nor ls connected (binary 00)
+        1 = hs connected but not ls connected (binary 01)
+        2 = ls connected but not hs connected (binary 10) (not possible under current methodology)
+        3 = both hs and ls connected (binary 11)
 
         kwargs:
-        graph -- networkx graph object
+        hsG -- networkx graph object for the high stress network
+        lsG -- networkx graph object for the low stress network
         blocks -- dataframe holding census block data
         maxDist -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
-        maxDetour -- if a comparison matrix is given, this is used to assess relative connectivity
-        baseConnectivity -- optional comparison connectivity matrix. if given, connectivity is determined relative to these figures
+        maxDetour -- this is used to assess relative connectivity
 
         return: pandas sparse dataframe
         """
         if self.verbose:
-            print("Getting connectivity on graph")
-        matrix = np.empty([len(blocks),len(blocks)],np.bool_)
+            print("Building connectivity matrix")
+        matrix = np.zeros((len(blocks),len(blocks)),dtype=np.uint8)
         df = pd.DataFrame(
             matrix,
             blocks['blockid'].values,
             blocks['blockid'].values
-        ).to_sparse(fill_value=False)
+        ).to_sparse(fill_value=0)
 
-        # change to network distances instead of t/f?
+        df = df.apply(self._isConnected)
+
+
         return df
 
         # get nx routes using:
         # http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.applymap.html#pandas.DataFrame.applymap
         # https://stackoverflow.com/questions/43654727/pandas-retrieve-row-and-column-name-for-each-element-during-applymap
 
-    def _isConnected()
+    def _isConnected(self,cell):
+        hsConnected = True
+        lsConnected = False
+
+        fromBlock = cell.index
+        toBlock = cell.name
+
+        # first test hs connection
+        # if nx.has_path(fromBlock,toBlock):
+        #     pass
+
+
+        # next test ls connection (but only if hsConnected)
+        # if hsConnected:
+        #     pass
+
+        return hsConnected | (lsConnected << 1)
