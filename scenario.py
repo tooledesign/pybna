@@ -90,4 +90,8 @@ class Scenario:
         # change to network distances instead of t/f?
         return df
 
+        # get nx routes using:
+        # http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.applymap.html#pandas.DataFrame.applymap
+        # https://stackoverflow.com/questions/43654727/pandas-retrieve-row-and-column-name-for-each-element-during-applymap
+
     def _isConnected()
