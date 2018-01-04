@@ -17,7 +17,8 @@ from destinations import Destinations
 class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
-    def __init__(self,host,db,user,password,censusTable=None,blockIdCol=None,roadIdsCol=None,verbose=False):
+    def __init__(self, host, db, user, password, censusTable=None,
+                 blockIdCol=None, roadIdsCol=None, verbose=False):
         """Connects to the BNA database
 
         kwargs:
@@ -57,10 +58,9 @@ class pyBNA:
             blockIdCol = "blockid10"
         if roadIdsCol is None:
             roadIdsCol = "road_ids"
-        self.blocks = self._getBlocks(censusTable,blockIdCol,roadIdsCol)
+        self.blocks = self._getBlocks(censusTable, blockIdCol, roadIdsCol)
 
-
-    def _getPkidColumn(self,table):
+    def _getPkidColumn(self, table):
         # connect to pg and read id col
         cur = self.conn.cursor()
         cur.execute(' \
@@ -69,7 +69,7 @@ class pyBNA:
         JOIN   pg_attribute a ON a.attrelid = i.indrelid \
                 AND a.attnum = ANY(i.indkey) \
         WHERE  i.indrelid = %(table)s::regclass \
-        AND    i.indisprimary;', {"table": quote_ident(table,cur)})
+        AND    i.indisprimary;', {"table": quote_ident(table, cur)})
 
         if cur.rowcount == 0:
             raise Error('No primary key defined on table %s' % table)
@@ -79,7 +79,6 @@ class pyBNA:
             print("   ID: %s" % row[0])
         return row[0]
 
-
     def listScenarios(self):
         """Prints the current stored scenarios
 
@@ -88,8 +87,7 @@ class pyBNA:
         for k, v in self.scenarios.iteritems():
             print(v)
 
-
-    def checkScenarioName(self,name,raiseError=True):
+    def checkScenarioName(self, name, raiseError=True):
         """Checks the scenarios for whether a scenario by the given name exists.
         If raiseError is true then raise an error if a match is found.
         Returns true if the check is passed.
@@ -106,8 +104,7 @@ class pyBNA:
         else:
             return True
 
-
-    def addScenarioExisting(self,scenario):
+    def addScenarioExisting(self, scenario):
         """Register a pre-existing scenario object with this pyBNA
 
         Return: None
@@ -117,11 +114,10 @@ class pyBNA:
                 print("Adding scenario %s" % scenario)
             self.scenarios[scenario.name] = scenario
 
-
     def addScenarioNew(self, name, notes, maxDist, maxStress, edgeTable, nodeTable,
-                    edgeIdCol=None, nodeIdCol=None, maxDetour=1.25,
-                    fromNodeCol='source_vert', toNodeCol='target_vert',
-                    stressCol='link_stress', edgeCostCol='link_cost', verbose=False):
+                       edgeIdCol=None, nodeIdCol=None, maxDetour=1.25,
+                       fromNodeCol='source_vert', toNodeCol='target_vert',
+                       stressCol='link_stress', edgeCostCol='link_cost', verbose=False):
         """Creates a new scenario and registers it
 
         args:
@@ -151,11 +147,10 @@ class pyBNA:
             if nodeIdCol is None:
                 nodeIdCol = self._getPkidColumn(nodeTable)
             self.scenarios[name] = Scenario(name, notes, self.conn, self.blocks,
-                maxDist, maxStress, edgeTable, nodeTable, edgeIdCol, nodeIdCol,
-                maxDetour, fromNodeCol, toNodeCol, stressCol, edgeCostCol,
-                self.verbose
-            )
-
+                                            maxDist, maxStress, edgeTable, nodeTable, edgeIdCol, nodeIdCol,
+                                            maxDetour, fromNodeCol, toNodeCol, stressCol, edgeCostCol,
+                                            self.verbose
+                                            )
 
     def addScenarioPickle(self, path, name=None):
         """Unpickles a saved scenario and registers it. If name is None uses
@@ -173,18 +168,17 @@ class pyBNA:
         try:
             if self.verbose:
                 print("Unpickling scenario at %s and adding" % path)
-            scenario = pickle.load(open(path,"rb"))
+            scenario = pickle.load(open(path, "rb"))
         except pickle.UnpicklingError:
-            raise pickle.UnpicklingError("Could not restore %s. Is this file a valid scenario pickle?" % path)
+            raise pickle.UnpicklingError(
+                "Could not restore %s. Is this file a valid scenario pickle?" % path)
         except IOError:
             raise FileNotFoundError("No file found at %s" % path)
 
         if self.checkScenarioName(scenario.name):
             self.scenarios[scenario.name] = scenario
 
-
-
-    def _getBlocks(self,censusTable,blockIdCol,roadIdsCol):
+    def _getBlocks(self, censusTable, blockIdCol, roadIdsCol):
         """Get census blocks from BNA database
 
         return: geopandas geodataframe
@@ -233,23 +227,35 @@ class pyBNA:
         #         roadIds = set([row[1]])
         #     self.blocks[row[0]] = roadIds
 
-
     def _setBNADestinations(self):
         """Retrieve the generic BNA destination types and register them."""
         bnaDestinations = [
-            {'cat':'colleges','table':'neighborhood_colleges','uid':'id','name':'college_name'},
-            {'cat':'community_centers','table':'neighborhood_community_centers','uid':'id','name':'center_name'},
-            {'cat':'dentists','table':'neighborhood_dentists','uid':'id','name':'dentists_name'},
-            {'cat':'doctors','table':'neighborhood_doctors','uid':'id','name':'doctors_name'},
-            {'cat':'hospitals','table':'neighborhood_hospitals','uid':'id','name':'hospital_name'},
-            {'cat':'parks','table':'neighborhood_parks','uid':'id','name':'park_name'},
-            {'cat':'pharmacies','table':'neighborhood_pharmacies','uid':'id','name':'pharmacy_name'},
-            {'cat':'retail','table':'neighborhood_retail','uid':'id','name':'id'},
-            {'cat':'schools','table':'neighborhood_schools','uid':'id','name':'school_name'},
-            {'cat':'social_services','table':'neighborhood_social_services','uid':'id','name':'service_name'},
-            {'cat':'supermarkets','table':'neighborhood_supermarkets','uid':'id','name':'supermarket_name'},
-            {'cat':'transit','table':'neighborhood_transit','uid':'id','name':'transit_name'},
-            {'cat':'universities','table':'neighborhood_universities','uid':'id','name':'college_name'}
+            {'cat': 'colleges', 'table': 'neighborhood_colleges',
+                'uid': 'id', 'name': 'college_name'},
+            {'cat': 'community_centers', 'table': 'neighborhood_community_centers',
+                'uid': 'id', 'name': 'center_name'},
+            {'cat': 'dentists', 'table': 'neighborhood_dentists',
+                'uid': 'id', 'name': 'dentists_name'},
+            {'cat': 'doctors', 'table': 'neighborhood_doctors',
+                'uid': 'id', 'name': 'doctors_name'},
+            {'cat': 'hospitals', 'table': 'neighborhood_hospitals',
+                'uid': 'id', 'name': 'hospital_name'},
+            {'cat': 'parks', 'table': 'neighborhood_parks',
+                'uid': 'id', 'name': 'park_name'},
+            {'cat': 'pharmacies', 'table': 'neighborhood_pharmacies',
+                'uid': 'id', 'name': 'pharmacy_name'},
+            {'cat': 'retail', 'table': 'neighborhood_retail',
+                'uid': 'id', 'name': 'id'},
+            {'cat': 'schools', 'table': 'neighborhood_schools',
+                'uid': 'id', 'name': 'school_name'},
+            {'cat': 'social_services', 'table': 'neighborhood_social_services',
+                'uid': 'id', 'name': 'service_name'},
+            {'cat': 'supermarkets', 'table': 'neighborhood_supermarkets',
+                'uid': 'id', 'name': 'supermarket_name'},
+            {'cat': 'transit', 'table': 'neighborhood_transit',
+                'uid': 'id', 'name': 'transit_name'},
+            {'cat': 'universities', 'table': 'neighborhood_universities',
+                'uid': 'id', 'name': 'college_name'}
         ]
         if self.verbose:
             print('Adding standard BNA destinations')
@@ -258,15 +264,16 @@ class pyBNA:
 
         for d in bnaDestinations:
             self.destinations[d['cat']] = Destinations(
-                d['cat'],self.conn,d['table'],d['uid'],d['name'],verbose=self.verbose
+                d['cat'], self.conn, d['table'], d['uid'], d['name'], verbose=self.verbose
             )
             # add all the census blocks containing a destination from this category
             # to the pyBNA index of all blocks containing a destination of any type
-            self.destinationBlocks.update(self.destinations[d['cat']].destinationBlocks)
+            self.destinationBlocks.update(
+                self.destinations[d['cat']].destinationBlocks)
 
         if self.verbose:
-            print('%i census blocks are part of at least one destination' % len(self.destinationBlocks))
-
+            print('%i census blocks are part of at least one destination' %
+                  len(self.destinationBlocks))
 
     def score(self):
         """Calculate network score."""
