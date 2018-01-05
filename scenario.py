@@ -43,6 +43,7 @@ class Scenario:
         self.name = name
         self.notes = notes
         self.conn = conn
+        self.blocks = blocks
         self.maxStress = maxStress
         self.verbose = verbose
 
@@ -54,9 +55,7 @@ class Scenario:
         self.lsG = buildRestrictedNetwork(self.hsG,self.maxStress)
 
         # create connectivity matrix
-        self.connectivity = self._getConnectivity(
-            blocks,maxDist,maxDetour
-        )
+        self.connectivity = self._getConnectivity(maxDist,maxDetour)
 
 
     def __unicode__(self):
@@ -67,7 +66,7 @@ class Scenario:
         return r'Scenario %s  :  Max stress %i  :  Notes: %s' % (self.name, self.maxStress, self.notes)
 
 
-    def _getConnectivity(self,blocks,maxDist,maxDetour):
+    def _getConnectivity(self,maxDist,maxDetour):
         """Create a connectivity matrix using the this class' networkx graphs and
         census blocks. The matrix relies on bitwise math so the following
         correspondence of values to connectivity combinations is possible:
@@ -87,11 +86,11 @@ class Scenario:
         """
         if self.verbose:
             print("Building connectivity matrix")
-        matrix = np.zeros((len(blocks),len(blocks)),dtype=np.uint8)
+        matrix = np.zeros((len(self.blocks),len(self.blocks)),dtype=np.uint8)
         df = pd.DataFrame(
             matrix,
-            blocks['blockid'].values,
-            blocks['blockid'].values
+            self.blocks['blockid'].values,
+            self.blocks['blockid'].values
         ).to_sparse(fill_value=0)
 
         df = df.apply(self._isConnected)
@@ -104,13 +103,21 @@ class Scenario:
         # https://stackoverflow.com/questions/43654727/pandas-retrieve-row-and-column-name-for-each-element-during-applymap
 
     def _isConnected(self,cell):
-        hsConnected = True
+        hsConnected = False
         lsConnected = False
 
         fromBlock = cell.index
         toBlock = cell.name
+        hsDist = -1
+        lsDist = -1
+
+        fromNodes = s.blocks.loc[s.blocks['blockid'] == fromBlock]['roadids'].values
+        toNodes = s.blocks.loc[s.blocks['blockid'] == toBlock]['roadids'].values
 
         # first test hs connection
+        # for i in self.blocks["roadids"][blockid=fromBlock]
+        # try:
+        #     nx.dijkstra_path(self.hsG,)
         # if nx.has_path(fromBlock,toBlock):
         #     pass
 
