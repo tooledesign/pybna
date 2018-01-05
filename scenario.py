@@ -86,6 +86,12 @@ class Scenario:
         """
         if self.verbose:
             print("Building connectivity matrix")
+
+        '''
+        need to rewrite with an i,j table instead of full matrix
+        itertools.product(p.blocks['blockid'].values,p.blocks['blockid'])
+
+        '''
         matrix = np.zeros((len(self.blocks),len(self.blocks)),dtype=np.uint8)
         df = pd.DataFrame(
             matrix,
@@ -93,7 +99,7 @@ class Scenario:
             self.blocks['blockid'].values
         ).to_sparse(fill_value=0)
 
-        df = df.apply(self._isConnected)
+        df = df.apply(self._isConnected,args=(maxDist,maxDetour))
 
 
         return df
@@ -102,7 +108,7 @@ class Scenario:
         # http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.applymap.html#pandas.DataFrame.applymap
         # https://stackoverflow.com/questions/43654727/pandas-retrieve-row-and-column-name-for-each-element-during-applymap
 
-    def _isConnected(self,cell):
+    def _isConnected(self,cell,maxDist,maxDetour):
         hsConnected = False
         lsConnected = False
 
@@ -111,16 +117,25 @@ class Scenario:
         hsDist = -1
         lsDist = -1
 
-        fromNodes = s.blocks.loc[s.blocks['blockid'] == fromBlock]['roadids'].values
-        toNodes = s.blocks.loc[s.blocks['blockid'] == toBlock]['roadids'].values
+        fromNodes = self.blocks.loc[self.blocks['blockid'] == fromBlock]['roadids'].values
+        toNodes = self.blocks.loc[self.blocks['blockid'] == toBlock]['roadids'].values
 
         # first test hs connection
-        # for i in self.blocks["roadids"][blockid=fromBlock]
-        # try:
-        #     nx.dijkstra_path(self.hsG,)
-        # if nx.has_path(fromBlock,toBlock):
-        #     pass
+        for i in fromNodes:
+            for j in toNodes:
+                try:
+                    l = nx.dijkstra_path_length(self.hsG,i,j,weight='weight')
+                    if hsDist < 0:
+                        hsDist = l
+                    elif l < hsDist and l < maxDist:
+                        hsDist = l
+                    else:
+                        pass
+                except nx.NetworkNoPath:
+                    pass
 
+        if hsDist > 0:
+            hsConnected = True
 
         # next test ls connection (but only if hsConnected)
         # if hsConnected:
