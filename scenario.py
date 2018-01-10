@@ -6,6 +6,7 @@ import networkx as nx
 from nxutils import *
 import psycopg2
 import numpy as np
+from scipy.sparse import coo_matrix
 import pandas as pd
 import geopandas as gpd
 
@@ -76,9 +77,6 @@ class Scenario:
         3 = both hs and ls connected (binary 11)
 
         kwargs:
-        hsG -- networkx graph object for the high stress network
-        lsG -- networkx graph object for the low stress network
-        blocks -- dataframe holding census block data
         maxDist -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
         maxDetour -- this is used to assess relative connectivity
 
@@ -87,19 +85,14 @@ class Scenario:
         if self.verbose:
             print("Building connectivity matrix")
 
-        '''
-        need to rewrite with an i,j table instead of full matrix
-        itertools.product(p.blocks['blockid'].values,p.blocks['blockid'])
+        # create ixj dataframe for block connectivity
+        self.blocks['tmpkey'] = 1
+        tdf = self.blocks[['blockid','tmpkey']]
+        df = tdf.merge(tdf,on='tmpkey',suffixes=('from','to')).drop(columns=['tmpkey']).to_sparse()
+        df['hsls'] = pd.SparseSeries([False] * len(df),dtype='int8',fill_value=0)
 
-        '''
-        matrix = np.zeros((len(self.blocks),len(self.blocks)),dtype=np.uint8)
-        df = pd.DataFrame(
-            matrix,
-            self.blocks['blockid'].values,
-            self.blocks['blockid'].values
-        ).to_sparse(fill_value=0)
-
-        df = df.apply(self._isConnected,args=(maxDist,maxDetour))
+        # run connectivity for all rows
+        # df['hsls'] = df.apply(self._isConnected,axis=1,args=(maxDist,maxDetour))
 
 
         return df
@@ -108,12 +101,12 @@ class Scenario:
         # http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.applymap.html#pandas.DataFrame.applymap
         # https://stackoverflow.com/questions/43654727/pandas-retrieve-row-and-column-name-for-each-element-during-applymap
 
-    def _isConnected(self,cell,maxDist,maxDetour):
+    def _isConnected(self,row,maxDist,maxDetour):
         hsConnected = False
         lsConnected = False
 
-        fromBlock = cell.index
-        toBlock = cell.name
+        fromBlock = row['blockidfrom']
+        toBlock = row['blockidto']
         hsDist = -1
         lsDist = -1
 
