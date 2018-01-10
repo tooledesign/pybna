@@ -18,7 +18,8 @@ class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
     def __init__(self, host, db, user, password, censusTable=None,
-                 blockIdCol=None, roadIdsCol=None, verbose=False):
+                 blockIdCol=None, roadIdsCol=None, tilesShpPath=None,
+                 tilesTableName=None, verbose=False):
         """Connects to the BNA database
 
         kwargs:
@@ -29,6 +30,8 @@ class pyBNA:
         censusTable -- name of table of census blocks (if None use neighborhood_census_blocks, the BNA default)
         blockIdCol -- name of the column with census block ids in the block table (if None use blockid10, the BNA default)
         roadIdsCol -- name of the column with road ids in the block table (if None use road_ids, the BNA default)
+        tilesShpPath -- path to a shapefile holding features to be used to limit the analysis area (cannot be given in conjunction with tilesTableName)
+        tilesTableName -- table name in the BNA database holding features to be used to limit the analysis area (cannot be given in conjunction with tilesShpPath)
 
         return: None
         """
@@ -60,6 +63,14 @@ class pyBNA:
             roadIdsCol = "road_ids"
         self.blocks = self._getBlocks(censusTable, blockIdCol, roadIdsCol)
 
+        # Get tiles for running connectivity (if given)
+        if tilesShpPath and tilesTableName:
+            raise ValueError("Cannot accept tile sources from both shapefile _and_ pg table")
+        if tilesShpPath:
+            self.tiles = self._getTilesShp()
+        if tilesTableName:
+            self.tiles = self._getTilesPg()
+
     def _getPkidColumn(self, table):
         # connect to pg and read id col
         cur = self.conn.cursor()
@@ -78,6 +89,12 @@ class pyBNA:
         if self.verbose:
             print("   ID: %s" % row[0])
         return row[0]
+
+    def _getTilesShp(self):
+        return 1
+
+    def _getTilesPg(self):
+        return 1
 
     def listScenarios(self):
         """Prints the current stored scenarios
