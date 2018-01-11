@@ -14,8 +14,8 @@ import geopandas as gpd
 class Scenario:
     """A scenario to analyze in the BNA."""
 
-    def __init__(self, name, notes, conn, blocks, maxDist, maxStress, edgeTable,
-                    nodeTable, edgeIdCol, nodeIdCol, maxDetour=None,
+    def __init__(self, name, notes, conn, blocks, maxDist, maxStress,
+                    edgeTable, nodeTable, edgeIdCol, nodeIdCol, maxDetour=None,
                     fromNodeCol=None, toNodeCol=None,
                     stressCol=None, edgeCostCol=None,
                     verbose=False):
@@ -32,6 +32,7 @@ class Scenario:
         nodeTable -- name of the table of network nodes
         edgeIdCol -- column name for edge IDs
         nodeIdCol -- column name for the node IDs
+        tiles -- geodataframe holding tiles to split up processing
         maxDetour -- maximum allowable detour for determining relative connectivity (given as a percentage, i.e. 25 = 25%)
         fromNodeCol -- column name for the from node in edge table
         toNodeCol -- column name for the to node in edge table
@@ -76,13 +77,13 @@ class Scenario:
         """Create a connectivity matrix using the this class' networkx graphs and
         census blocks. The matrix relies on bitwise math so the following
         correspondence of values to connectivity combinations is possible:
-        0 = neither hs nor ls connected (binary 00)
+        0 = neither hs nor ls connected       (binary 00)
         1 = hs connected but not ls connected (binary 01)
         2 = ls connected but not hs connected (binary 10) (not possible under current methodology)
-        3 = both hs and ls connected (binary 11)
+        3 = both hs and ls connected          (binary 11)
 
         kwargs:
-        tiles -- a geopandas dataframe holding polygons used to divide the calculations into chunks and/or focus on a specific geography
+        tiles -- a geopandas dataframe holding polygons for breaking the analysis into chunks
 
         return: pandas sparse dataframe
         """
@@ -95,14 +96,43 @@ class Scenario:
         have blocks in the tile and should return a df with only blocks from the set
         that have a connection of some kind (i.e. hsls > 0)
         '''
-        self.blocks['tmpkey'] = 1
-        tdf = self.blocks[['blockid','tmpkey']]
-        df = tdf.merge(tdf,on='tmpkey',suffixes=('from','to')).drop(columns=['tmpkey']).to_sparse()
-        df['hsls'] = pd.SparseSeries([False] * len(df),dtype='int8',fill_value=0)
+        if tiles is None:
+            tiles = gpd.GeoDataFrame.from_features(gpd.GeoSeries(
+                self.blocks.unary_union.envelope,
+                name="geom"
+            ))
 
-        # run connectivity for all rows
-        # df['hsls'] = df.apply(self._isConnected,axis=1,args=(maxDist,maxDetour))
+        c = 1
+        ctotal = len(tiles)
+        for i in tiles.index:
+            if self.verbose:
+                print("Processing tile %i out of %i" % (c,ctotal))
+                
+            self.blocks["tempkey"] = 1
+            df = gpd.sjoin(
+                self.blocks,
+                tiles[tiles.index==i]
+            )[['blockid','geom','tempkey']]
 
+            df['geom'] = df.centroid
+
+            df = gpd.sjoin(
+                df,
+                tiles[tiles.index==i]
+            ).drop(columns=['geom','index_right'])
+
+            df = df.merge(
+                self.blocks[['blockid','tempkey']],
+                on='tempkey',
+                suffixes=('from','to')
+            ).drop(columns=['tempkey']).to_sparse()
+
+            self.blocks = self.blocks.drop(columns=['tempkey'])
+
+            df['hsls'] = pd.SparseSeries([False] * len(df),dtype='int8',fill_value=0)
+
+            # run connectivity for all rows
+            # df['hsls'] = df.apply(self._isConnected,axis=1,args=(maxDist,maxDetour))
 
         return df
 

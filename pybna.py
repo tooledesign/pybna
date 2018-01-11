@@ -19,7 +19,7 @@ class pyBNA:
 
     def __init__(self, host, db, user, password, censusTable=None,
                  blockIdCol=None, roadIdsCol=None, tilesShpPath=None,
-                 tilesTableName=None, verbose=False):
+                 tilesTableName=None, tilesTableGeomCol='geom', verbose=False):
         """Connects to the BNA database
 
         kwargs:
@@ -32,6 +32,7 @@ class pyBNA:
         roadIdsCol -- name of the column with road ids in the block table (if None use road_ids, the BNA default)
         tilesShpPath -- path to a shapefile holding features to be used to limit the analysis area (cannot be given in conjunction with tilesTableName)
         tilesTableName -- table name in the BNA database holding features to be used to limit the analysis area (cannot be given in conjunction with tilesShpPath)
+        tilesTableGeomCol -- name of the column with geometry (default: geom)
 
         return: None
         """
@@ -64,12 +65,13 @@ class pyBNA:
         self.blocks = self._getBlocks(censusTable, blockIdCol, roadIdsCol)
 
         # Get tiles for running connectivity (if given)
+        self.tiles = None
         if tilesShpPath and tilesTableName:
             raise ValueError("Cannot accept tile sources from both shapefile _and_ pg table")
         if tilesShpPath:
-            self.tiles = self._getTilesShp()
+            self.tiles = self._getTilesShp(tilesShpPath)
         if tilesTableName:
-            self.tiles = self._getTilesPg()
+            self.tiles = self._getTilesPg(tilesTableName,tilesTableGeomCol)
 
     def _getPkidColumn(self, table):
         # connect to pg and read id col
@@ -90,11 +92,22 @@ class pyBNA:
             print("   ID: %s" % row[0])
         return row[0]
 
-    def _getTilesShp(self):
+    def _getTilesShp(self,path):
         return 1
 
-    def _getTilesPg(self):
-        return 1
+    def _getTilesPg(self,tableName,geomColumn):
+        pkid = self._getPkidColumn(tableName)
+        q = sql.SQL('select {} as id, {} as geom from {};').format(
+            sql.Identifier(pkid),
+            sql.Identifier(geomColumn),
+            sql.Identifier(tableName)
+        ).as_string(self.conn)
+        return gpd.GeoDataFrame.from_postgis(
+            q,
+            self.conn,
+            geom_col='geom',
+            index_col='id'
+        )
 
     def listScenarios(self):
         """Prints the current stored scenarios
