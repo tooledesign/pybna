@@ -32,7 +32,7 @@ class Scenario:
         nodeTable -- name of the table of network nodes
         edgeIdCol -- column name for edge IDs
         nodeIdCol -- column name for the node IDs
-        maxDetour -- maximum allowable detour for determining relative connectivity
+        maxDetour -- maximum allowable detour for determining relative connectivity (given as a percentage, i.e. 25 = 25%)
         fromNodeCol -- column name for the from node in edge table
         toNodeCol -- column name for the to node in edge table
         stressCol -- column name for the stress of the edge
@@ -46,6 +46,11 @@ class Scenario:
         self.conn = conn
         self.blocks = blocks
         self.maxStress = maxStress
+        self.maxDist = maxDist
+        if maxDetour:
+            self.maxDetour = 1 + float(maxDetour) / 100
+        else:
+            self.maxDetour = 1.25
         self.verbose = verbose
 
         # build graphs
@@ -56,7 +61,7 @@ class Scenario:
         self.lsG = buildRestrictedNetwork(self.hsG,self.maxStress)
 
         # create connectivity matrix
-        self.connectivity = self._getConnectivity(maxDist,maxDetour)
+        self.connectivity = None
 
 
     def __unicode__(self):
@@ -67,7 +72,7 @@ class Scenario:
         return r'Scenario %s  :  Max stress %i  :  Notes: %s' % (self.name, self.maxStress, self.notes)
 
 
-    def _getConnectivity(self,maxDist,maxDetour):
+    def getConnectivity(self,tiles=None):
         """Create a connectivity matrix using the this class' networkx graphs and
         census blocks. The matrix relies on bitwise math so the following
         correspondence of values to connectivity combinations is possible:
@@ -77,8 +82,7 @@ class Scenario:
         3 = both hs and ls connected (binary 11)
 
         kwargs:
-        maxDist -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
-        maxDetour -- this is used to assess relative connectivity
+        tiles -- a geopandas dataframe holding polygons used to divide the calculations into chunks and/or focus on a specific geography
 
         return: pandas sparse dataframe
         """
@@ -86,6 +90,11 @@ class Scenario:
             print("Building connectivity matrix")
 
         # create ixj dataframe for block connectivity
+        '''
+        need to reconfigure this to accept tile inputs. the ij matrix should only
+        have blocks in the tile and should return a df with only blocks from the set
+        that have a connection of some kind (i.e. hsls > 0)
+        '''
         self.blocks['tmpkey'] = 1
         tdf = self.blocks[['blockid','tmpkey']]
         df = tdf.merge(tdf,on='tmpkey',suffixes=('from','to')).drop(columns=['tmpkey']).to_sparse()
@@ -101,7 +110,7 @@ class Scenario:
         # http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.applymap.html#pandas.DataFrame.applymap
         # https://stackoverflow.com/questions/43654727/pandas-retrieve-row-and-column-name-for-each-element-during-applymap
 
-    def _isConnected(self,row,maxDist,maxDetour):
+    def _isConnected(self,row):
         hsConnected = False
         lsConnected = False
 
@@ -120,7 +129,7 @@ class Scenario:
                     l = nx.dijkstra_path_length(self.hsG,i,j,weight='weight')
                     if hsDist < 0:
                         hsDist = l
-                    elif l < hsDist and l < maxDist:
+                    elif l < hsDist and l < self.maxDist:
                         hsDist = l
                     else:
                         pass

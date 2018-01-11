@@ -132,7 +132,7 @@ class pyBNA:
             self.scenarios[scenario.name] = scenario
 
     def addScenarioNew(self, name, notes, maxDist, maxStress, edgeTable, nodeTable,
-                       edgeIdCol=None, nodeIdCol=None, maxDetour=1.25,
+                       edgeIdCol=None, nodeIdCol=None, maxDetour=25,
                        fromNodeCol='source_vert', toNodeCol='target_vert',
                        stressCol='link_stress', edgeCostCol='link_cost', verbose=False):
         """Creates a new scenario and registers it
@@ -147,7 +147,7 @@ class pyBNA:
         nodeTable -- name of the table of network nodes
         edgeIdCol -- column name for edge IDs. if None uses the primary key defined on the table.
         nodeIdCol -- column name for the node IDs. if None uses the primary key defined on the table.
-        maxDetour -- the maximum allowable detour for determining low stress connectivity (if None uses 25%, the BNA default)
+        maxDetour -- the maximum allowable detour for determining low stress connectivity (given as a percentage, i.e. 25 = 25%; if None uses 25%, the BNA default)
         fromNodeCol -- column name for the from node in edge table (if None uses source_vert, the BNA default)
         toNodeCol -- column name for the to node in edge table (if None uses target_vert, the BNA default)
         stressCol -- column name for the stress of the edge (if None uses link_stress, the BNA default)
