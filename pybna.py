@@ -17,8 +17,8 @@ from destinations import Destinations
 class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
-    def __init__(self, host, db, user, password, censusTable=None,
-                 blockIdCol=None, roadIdsCol=None, tilesShpPath=None,
+    def __init__(self, host, db, user, password, censusTable="neighborhood_census_blocks",
+                 blockIdCol="blockid10", tilesShpPath=None,
                  tilesTableName=None, tilesTableGeomCol='geom', verbose=False):
         """Connects to the BNA database
 
@@ -27,9 +27,8 @@ class pyBNA:
         db -- name of database on server
         user -- username to connect to database
         password -- password to connect to database
-        censusTable -- name of table of census blocks (if None use neighborhood_census_blocks, the BNA default)
-        blockIdCol -- name of the column with census block ids in the block table (if None use blockid10, the BNA default)
-        roadIdsCol -- name of the column with road ids in the block table (if None use road_ids, the BNA default)
+        censusTable -- name of table of census blocks (default: neighborhood_census_blocks, the BNA default)
+        blockIdCol -- name of the column with census block ids in the block table (default: blockid10, the BNA default)
         tilesShpPath -- path to a shapefile holding features to be used to limit the analysis area (cannot be given in conjunction with tilesTableName)
         tilesTableName -- table name in the BNA database holding features to be used to limit the analysis area (cannot be given in conjunction with tilesShpPath)
         tilesTableGeomCol -- name of the column with geometry (default: geom)
@@ -47,6 +46,9 @@ class pyBNA:
         ])
         self.conn = psycopg2.connect(db_connection_string)
 
+        # get srid
+        self.srid = self._getSRID(censusTable)
+
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
         self.destinations = dict()
@@ -56,13 +58,9 @@ class pyBNA:
         self._setBNADestinations()
 
         # Get census blocks
-        if censusTable is None:
-            censusTable = "neighborhood_census_blocks"
-        if blockIdCol is None:
-            blockIdCol = "blockid10"
-        if roadIdsCol is None:
-            roadIdsCol = "road_ids"
-        self.blocks = self._getBlocks(censusTable, blockIdCol, roadIdsCol)
+        self.censusTable = censusTable
+        self.blockIdCol = blockIdCol
+        self.blocks = self._getBlocks(censusTable, blockIdCol)
 
         # Get tiles for running connectivity (if given)
         self.tiles = None
@@ -161,10 +159,10 @@ class pyBNA:
         edgeIdCol -- column name for edge IDs. if None uses the primary key defined on the table.
         nodeIdCol -- column name for the node IDs. if None uses the primary key defined on the table.
         maxDetour -- the maximum allowable detour for determining low stress connectivity (given as a percentage, i.e. 25 = 25%; if None uses 25%, the BNA default)
-        fromNodeCol -- column name for the from node in edge table (if None uses source_vert, the BNA default)
-        toNodeCol -- column name for the to node in edge table (if None uses target_vert, the BNA default)
-        stressCol -- column name for the stress of the edge (if None uses link_stress, the BNA default)
-        edgeCostCol -- column name for the cost of the edge (if None uses link_cost, the BNA default)
+        fromNodeCol -- column name for the from node in edge table (default: source_vert, the BNA default)
+        toNodeCol -- column name for the to node in edge table (default: target_vert, the BNA default)
+        stressCol -- column name for the stress of the edge (default: link_stress, the BNA default)
+        edgeCostCol -- column name for the cost of the edge (default: link_cost, the BNA default)
         verbose -- output useful messages
 
         Return: None
@@ -176,11 +174,12 @@ class pyBNA:
                 edgeIdCol = self._getPkidColumn(edgeTable)
             if nodeIdCol is None:
                 nodeIdCol = self._getPkidColumn(nodeTable)
-            self.scenarios[name] = Scenario(name, notes, self.conn, self.blocks,
-                                            maxDist, maxStress, edgeTable, nodeTable, edgeIdCol, nodeIdCol,
-                                            maxDetour, fromNodeCol, toNodeCol, stressCol, edgeCostCol,
-                                            self.verbose
-                                            )
+            self.scenarios[name] = Scenario(
+                name, notes, self.conn, self.blocks, self.srid, self.censusTable,
+                self.blockIdCol, maxDist, maxStress, edgeTable, nodeTable,
+                edgeIdCol, nodeIdCol, maxDetour, fromNodeCol, toNodeCol,
+                stressCol, edgeCostCol, self.verbose
+            )
 
     def addScenarioPickle(self, path, name=None):
         """Unpickles a saved scenario and registers it. If name is None uses
@@ -208,7 +207,7 @@ class pyBNA:
         if self.checkScenarioName(scenario.name):
             self.scenarios[scenario.name] = scenario
 
-    def _getBlocks(self, censusTable, blockIdCol, roadIdsCol):
+    def _getBlocks(self, censusTable, blockIdCol):
         """Get census blocks from BNA database
 
         return: geopandas geodataframe
@@ -216,10 +215,9 @@ class pyBNA:
         if self.verbose:
             print('Getting census blocks from %s' % censusTable)
 
-        q = sql.SQL('select {} as geom, {} as blockid, {} as roadids from {};').format(
+        q = sql.SQL('select {} as geom, {} as blockid from {};').format(
             sql.Identifier("geom"),
             sql.Identifier(blockIdCol),
-            sql.Identifier(roadIdsCol),
             sql.Identifier(censusTable)
         ).as_string(self.conn)
 
@@ -232,30 +230,8 @@ class pyBNA:
             geom_col='geom'
         )
 
-        df["roadids"] = df["roadids"].apply(set)
         return df
 
-        # cur = conn.cursor()
-        #
-        # cur.execute(
-        #     sql.SQL('select {}, {} from {};')
-        #         .format(
-        #             sql.Identifier(blockIdCol),
-        #             sql.Identifier(roadIdsCol),
-        #             sql.Identifier(censusTable)
-        #         )
-        #         .as_string(cur)
-        # )
-        #
-        # if self.verbose:
-        #     print(cur.query)
-        #
-        # for row in cur:
-        #     if type(row[1]) is list:
-        #         roadIds = set(row[1])
-        #     else:
-        #         roadIds = set([row[1]])
-        #     self.blocks[row[0]] = roadIds
 
     def _setBNADestinations(self):
         """Retrieve the generic BNA destination types and register them."""
@@ -304,6 +280,29 @@ class pyBNA:
         if self.verbose:
             print('%i census blocks are part of at least one destination' %
                   len(self.destinationBlocks))
+
+
+    def _getSchema(self,table):
+        cur = self.conn.cursor()
+        cur.execute(" \
+            select nspname::text \
+            from pg_namespace n, pg_class c \
+            where n.oid = c.relnamespace \
+            and c.oid = '%s'::regclass \
+        " % table)
+        return cur.next()[0]
+
+
+    def _getSRID(self,table):
+        schema = self._getSchema(table)
+        cur = self.conn.cursor()
+        cur.execute("select find_srid('%s','%s','%s')" % (schema,table,"geom"))
+        srid = cur.next()[0]
+
+        if self.verbose:
+            print("SRID: %i" % srid)
+
+        return srid
 
     def score(self):
         """Calculate network score."""

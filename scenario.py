@@ -14,8 +14,9 @@ import geopandas as gpd
 class Scenario:
     """A scenario to analyze in the BNA."""
 
-    def __init__(self, name, notes, conn, blocks, maxDist, maxStress,
-                    edgeTable, nodeTable, edgeIdCol, nodeIdCol, maxDetour=None,
+    def __init__(self, name, notes, conn, blocks, srid, censusTable, blockIdCol,
+                    maxDist, maxStress, edgeTable, nodeTable, edgeIdCol,
+                    nodeIdCol, maxDetour=None,
                     fromNodeCol=None, toNodeCol=None,
                     stressCol=None, edgeCostCol=None,
                     verbose=False):
@@ -26,6 +27,7 @@ class Scenario:
         notes -- any notes to provide further information about this scenario
         conn -- a psycopg2 database connection
         blocks -- geopandas dataframe of census blocks
+        srid -- the srid of the database
         maxDist -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
         maxStress -- the highest stress rating to allow for the low stress graph
         edgeTable -- name of the table of network edges
@@ -46,6 +48,7 @@ class Scenario:
         self.notes = notes
         self.conn = conn
         self.blocks = blocks
+        self.srid = srid
         self.maxStress = maxStress
         self.maxDist = maxDist
         if maxDetour:
@@ -58,10 +61,13 @@ class Scenario:
         self.hsG = buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,
             fromNodeCol,toNodeCol,edgeCostCol,stressCol,self.verbose
         )
-
-        self.nodes = {v:k for k,v in nx.get_node_attributes(self.hsG,"roadid").iteritems()}
-
         self.lsG = buildRestrictedNetwork(self.hsG,self.maxStress)
+
+        # get block nodes
+        self.blocks = self.blocks.merge(
+            self._getBlockNodes(censusTable,blockIdCol,nodeTable,nodeIdCol),
+            on="blockid"
+        )
 
         # create connectivity matrix
         self.connectivity = None
@@ -185,8 +191,69 @@ class Scenario:
 
         return hsConnected | (lsConnected << 1)
 
-    def _nodesFromRoadIds(self,row):
-        l = list()
-        for i in row["roadids"]:
-            l.append(self.nodes[i])
-        return l
+    def _getBlockNodes(self,censusTable,blockIdCol,nodeTable,nodeIdCol):
+        cur = self.conn.cursor()
+
+        # make temporary buffers
+        q = sql.SQL(' \
+            alter table {} drop column if exists tmp_geom_buffer; \
+            alter table {} add column tmp_geom_buffer geometry(multipolygon, %s); \
+            \
+            update {} \
+            set tmp_geom_buffer = st_multi(st_buffer(geom,15)); \
+            \
+            create index tsidx_neighborhood_cblockbuffgeoms \
+                on neighborhood_census_blocks \
+                using gist (tmp_geom_buffer); \
+            analyze neighborhood_census_blocks (tmp_geom_buffer); \
+        ').format(
+            sql.Identifier(censusTable),
+            sql.Identifier(censusTable),
+            sql.Identifier(censusTable)
+        ).as_string(cur)
+        cur.execute(q % self.srid)
+
+
+        q = sql.SQL('   select  b.blockid, \
+                                array_agg(v.{}) \
+                        from    (select {} as blockid, st_buffer(geom,15) as geom from {}) b, \
+                                {} r, \
+                                {} v \
+                        where   v.{} = r.{} \
+                        and     st_intersects(b.geom,r.geom) \
+                        and     ( \
+                                    st_contains(b.geom,r.geom) \
+                                OR  st_length( \
+                                        st_intersection(b.geom,r.geom) \
+                                    ) > 30 \
+                                ) \
+                        group by b.blockid \
+                        ').format(
+            sql.Identifier(nodeIdCol),
+            sql.Identifier(blockIdCol),
+            sql.Identifier(censusTable),
+            sql.Identifier('neighborhood_ways'),
+            sql.Identifier(nodeTable),
+            sql.Identifier("road_id"),
+            sql.Identifier("road_id")
+        ).as_string(self.conn)
+
+        df = pd.read_sql_query(
+            q,
+            self.conn
+        )
+
+        cur.execute(
+            sql.SQL('alter table {} drop column if exists tmp_geom_buffer;')
+                .format(
+                    sql.Identifier(fromNodeCol),
+                    sql.Identifier(toNodeCol),
+                    sql.Identifier(edgeIdCol),
+                    sql.Identifier(edgeCostCol),
+                    sql.Identifier(stressCol),
+                    sql.Identifier(edgeTable)
+                )
+                .as_string(cur)
+        )
+
+        return df
