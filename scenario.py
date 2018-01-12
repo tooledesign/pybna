@@ -59,6 +59,8 @@ class Scenario:
             fromNodeCol,toNodeCol,edgeCostCol,stressCol,self.verbose
         )
 
+        self.nodes = {v:k for k,v in nx.get_node_attributes(self.hsG,"roadid").iteritems()}
+
         self.lsG = buildRestrictedNetwork(self.hsG,self.maxStress)
 
         # create connectivity matrix
@@ -66,11 +68,11 @@ class Scenario:
 
 
     def __unicode__(self):
-        return u'Scenario %s  :  Max stress %i  :  Notes: %s' % (self.name, self.maxStress, self.notes)
+        return u"Scenario %s  :  Max stress %i  :  Notes: %s" % (self.name, self.maxStress, self.notes)
 
 
     def __repr__(self):
-        return r'Scenario %s  :  Max stress %i  :  Notes: %s' % (self.name, self.maxStress, self.notes)
+        return r"Scenario %s  :  Max stress %i  :  Notes: %s" % (self.name, self.maxStress, self.notes)
 
 
     def getConnectivity(self,tiles=None):
@@ -107,32 +109,40 @@ class Scenario:
         for i in tiles.index:
             if self.verbose:
                 print("Processing tile %i out of %i" % (c,ctotal))
-                
+
+            # select blocks that intersect the tile
             self.blocks["tempkey"] = 1
             df = gpd.sjoin(
                 self.blocks,
                 tiles[tiles.index==i]
-            )[['blockid','geom','tempkey']]
+            )[["blockid","geom","tempkey"]]
 
-            df['geom'] = df.centroid
+            # convert to centroids for more accurate intersection
+            df["geom"] = df.centroid
 
+            # select blocks whose centroids intersect the tile
             df = gpd.sjoin(
                 df,
                 tiles[tiles.index==i]
-            ).drop(columns=['geom','index_right'])
+            ).drop(columns=["geom","index_right"])
 
+            # add nodes
+            df["nodes"] = df.apply(self._nodesFromRoadIds,axis=1)
+
+            # cartesian join of subselected blocks (origins) with all census blocks (destinations)
             df = df.merge(
-                self.blocks[['blockid','tempkey']],
-                on='tempkey',
-                suffixes=('from','to')
-            ).drop(columns=['tempkey']).to_sparse()
+                self.blocks[["blockid","tempkey"]],
+                on="tempkey",
+                suffixes=("from","to")
+            ).drop(columns=["tempkey"]).to_sparse()
 
-            self.blocks = self.blocks.drop(columns=['tempkey'])
+            self.blocks = self.blocks.drop(columns=["tempkey"])
 
-            df['hsls'] = pd.SparseSeries([False] * len(df),dtype='int8',fill_value=0)
+            # add stress connectivity column
+            df["hsls"] = pd.SparseSeries([False] * len(df),dtype="int8",fill_value=0)
 
             # run connectivity for all rows
-            # df['hsls'] = df.apply(self._isConnected,axis=1,args=(maxDist,maxDetour))
+            df["hsls"] = df.apply(self._isConnected,axis=1)
 
         return df
 
@@ -144,26 +154,26 @@ class Scenario:
         hsConnected = False
         lsConnected = False
 
-        fromBlock = row['blockidfrom']
-        toBlock = row['blockidto']
+        fromBlock = row["blockidfrom"]
+        toBlock = row["blockidto"]
         hsDist = -1
         lsDist = -1
 
-        fromNodes = self.blocks.loc[self.blocks['blockid'] == fromBlock]['roadids'].values
-        toNodes = self.blocks.loc[self.blocks['blockid'] == toBlock]['roadids'].values
+        fromNodes = list(self.blocks[self.blocks.blockid == fromBlock]["nodes"].values[0])
+        toNodes = list(self.blocks.loc[self.blocks["blockid"] == toBlock]["nodes"].values[0])
 
         # first test hs connection
         for i in fromNodes:
             for j in toNodes:
                 try:
-                    l = nx.dijkstra_path_length(self.hsG,i,j,weight='weight')
+                    l = nx.dijkstra_path_length(self.hsG,i,j,weight="weight")
                     if hsDist < 0:
                         hsDist = l
                     elif l < hsDist and l < self.maxDist:
                         hsDist = l
                     else:
                         pass
-                except nx.NetworkNoPath:
+                except nx.NetworkXNoPath:
                     pass
 
         if hsDist > 0:
@@ -174,3 +184,9 @@ class Scenario:
         #     pass
 
         return hsConnected | (lsConnected << 1)
+
+    def _nodesFromRoadIds(self,row):
+        l = list()
+        for i in row["roadids"]:
+            l.append(self.nodes[i])
+        return l

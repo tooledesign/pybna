@@ -45,6 +45,25 @@ def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNode
             stress=min(row[4],99)   # stress
         )
 
+    # add data to nodes
+    if verbose:
+        print("Retriving nodes")
+
+    cur.execute(
+        sql.SQL('select {} AS id, road_id from {};')
+            .format(
+                sql.Identifier(nodeIdCol),
+                sql.Identifier(nodeTable)
+            )
+            .as_string(cur)
+    )
+
+    attrs = dict()
+    for row in cur:
+        attrs[row[0]] = row[1]
+
+    nx.set_node_attributes(DG,values=attrs,name="roadid")
+
     # # build nodes
     # if verbose:
     #     print(nodeQuery)
