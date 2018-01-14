@@ -115,7 +115,7 @@ class pyBNA:
         for k, v in self.scenarios.iteritems():
             print(v)
 
-    def checkScenarioName(self, name, raiseError=True):
+    def _checkScenarioName(self, name, raiseError=True):
         """Checks the scenarios for whether a scenario by the given name exists.
         If raiseError is true then raise an error if a match is found.
         Returns true if the check is passed.
@@ -137,13 +137,15 @@ class pyBNA:
 
         Return: None
         """
-        if self.checkScenarioName(scenario.name):
+        if self._checkScenarioName(scenario.name):
             if self.verbose:
                 print("Adding scenario %s" % scenario)
             self.scenarios[scenario.name] = scenario
 
-    def addScenarioNew(self, name, notes, maxDist, maxStress, edgeTable, nodeTable,
-                       edgeIdCol=None, nodeIdCol=None, maxDetour=25,
+    def addScenarioNew(self, name, notes, maxDist=2680, maxStress=1, maxDetour=25,
+                       roadTable="neighborhood_ways", roadIdCol=None,
+                       nodeTable="neighborhood_ways_net_vert", nodeIdCol=None,
+                       edgeTable="neighborhood_ways_net_link", edgeIdCol=None,
                        fromNodeCol='source_vert', toNodeCol='target_vert',
                        stressCol='link_stress', edgeCostCol='link_cost', verbose=False):
         """Creates a new scenario and registers it
@@ -154,11 +156,13 @@ class pyBNA:
         notes -- any notes to provide further information about this scenario
         maxDist -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
         maxStress -- the highest stress rating to allow for the low stress graph
-        edgeTable -- name of the table of network edges
+        maxDetour -- the maximum allowable detour for determining low stress connectivity (given as a percentage, i.e. 25 = 25%)
+        roadTable -- the table with road data
+        roadIdCol -- column name that uniquely identifies roads. if None uses the primary key defined on the table.
         nodeTable -- name of the table of network nodes
-        edgeIdCol -- column name for edge IDs. if None uses the primary key defined on the table.
         nodeIdCol -- column name for the node IDs. if None uses the primary key defined on the table.
-        maxDetour -- the maximum allowable detour for determining low stress connectivity (given as a percentage, i.e. 25 = 25%; if None uses 25%, the BNA default)
+        edgeTable -- name of the table of network edges
+        edgeIdCol -- column name for edge IDs. if None uses the primary key defined on the table.
         fromNodeCol -- column name for the from node in edge table (default: source_vert, the BNA default)
         toNodeCol -- column name for the to node in edge table (default: target_vert, the BNA default)
         stressCol -- column name for the stress of the edge (default: link_stress, the BNA default)
@@ -167,19 +171,26 @@ class pyBNA:
 
         Return: None
         """
-        if self.checkScenarioName(name):
+        if self._checkScenarioName(name):
             if self.verbose:
                 print("Creating scenario %s" % name)
-            if edgeIdCol is None:
-                edgeIdCol = self._getPkidColumn(edgeTable)
+
+            if roadIdCol is None:
+                roadIdCol = self._getPkidColumn(roadTable)
             if nodeIdCol is None:
                 nodeIdCol = self._getPkidColumn(nodeTable)
+            if edgeIdCol is None:
+                edgeIdCol = self._getPkidColumn(edgeTable)
+
             self.scenarios[name] = Scenario(
-                name, notes, self.conn, self.blocks, self.srid, self.censusTable,
-                self.blockIdCol, maxDist, maxStress, edgeTable, nodeTable,
-                edgeIdCol, nodeIdCol, maxDetour, fromNodeCol, toNodeCol,
-                stressCol, edgeCostCol, self.verbose
+                name, notes, self.conn, self.blocks, self.srid,
+                maxDist, maxStress, maxDetour, self.censusTable, self.blockIdCol,
+                roadTable, roadIdCol,
+                nodeTable, nodeIdCol,
+                edgeTable, edgeIdCol, fromNodeCol, toNodeCol, stressCol, edgeCostCol,
+                self.verbose
             )
+
 
     def addScenarioPickle(self, path, name=None):
         """Unpickles a saved scenario and registers it. If name is None uses
@@ -190,7 +201,7 @@ class pyBNA:
         """
         # check if name is specified and is OK
         if name:
-            self.checkScenarioName(name)
+            self._checkScenarioName(name)
 
         if not os.path.isfile(path):
             raise FileNotFoundError("No file found at %s" % path)
@@ -204,7 +215,7 @@ class pyBNA:
         except IOError:
             raise FileNotFoundError("No file found at %s" % path)
 
-        if self.checkScenarioName(scenario.name):
+        if self._checkScenarioName(scenario.name):
             self.scenarios[scenario.name] = scenario
 
     def _getBlocks(self, censusTable, blockIdCol):
