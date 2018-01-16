@@ -2,6 +2,7 @@
 # Tools for working with graphs in the BNA
 ###################################################################
 from graph_tool.all import *
+import pandas as pd
 import psycopg2
 from psycopg2 import sql
 
@@ -12,42 +13,39 @@ def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNode
 
     return: networkx DiGraph
     """
-    DG = nx.DiGraph()
-
-    cur = conn.cursor()
+    G = Graph()
 
     # build edges
     if verbose:
         print("Retrieving edges")
 
-    cur.execute(
-        sql.SQL('select {} AS fnode, {} AS tnode, {} AS id, {} AS cost, {} AS stress from {};')
-            .format(
-                sql.Identifier(fromNodeCol),
-                sql.Identifier(toNodeCol),
-                sql.Identifier(edgeIdCol),
-                sql.Identifier(edgeCostCol),
-                sql.Identifier(stressCol),
-                sql.Identifier(edgeTable)
-            )
-            .as_string(cur)
-    )
+    q = sql.SQL(
+        'select {} AS fnode, {} AS tnode, {} AS id, {} AS cost, {} AS stress from {};'
+    ).format(
+        sql.Identifier(fromNodeCol),
+        sql.Identifier(toNodeCol),
+        sql.Identifier(edgeIdCol),
+        sql.Identifier(edgeCostCol),
+        sql.Identifier(stressCol),
+        sql.Identifier(edgeTable)
+    ).as_string(cur)
 
     if verbose:
-        print(cur.query)
+        print(q)
 
-    '''
-    check out add_edge_list with hashing=True
-    https://graph-tool.skewed.de/static/doc/graph_tool.html#how-to-use-the-documentation
-    '''
-    for row in cur:
-        DG.add_edge(
-            row[0],                 # fnode
-            row[1],                 # tnode
-            edgeid=row[2],          # id
-            weight=row[3],          # cost
-            stress=min(row[4],99)   # stress
-        )
+    df = pd.read_sql_query(
+        q,
+        conn
+    )
+
+    # add edges to graph
+    pkid = G.new_edge_property("int16_t")
+    G.edge_properties["pkid"] = pkid
+    cost = G.new_edge_property("double")
+    G.edge_properties["cost"] = cost
+    stress = G.new_edge_property("int16_t")
+    G.edge_properties["stress"] = stress
+    G.add_edge_list(df.values,hashed=True,eprops=[pkid,cost,stress])
 
     # add data to nodes
     if verbose:
@@ -67,19 +65,6 @@ def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNode
         attrs[row[0]] = row[1]
 
     nx.set_node_attributes(DG,values=attrs,name="roadid")
-
-    # # build nodes
-    # if verbose:
-    #     print(nodeQuery)
-    # cur.execute(nodeQuery)
-    # for row in cur:
-    #     self.DG.add_edge(
-    #         int(row[0]),            # fnode
-    #         int(row[1]),            # tnode
-    #         edgeid=row[2],          # id
-    #         weight=row[3],          # cost
-    #         stress=min(row[4],99)   # stress
-    #     )
 
     return DG
 
