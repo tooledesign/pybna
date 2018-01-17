@@ -45,7 +45,7 @@ def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNode
     G.edge_properties["cost"] = cost
     stress = G.new_edge_property("int16_t")
     G.edge_properties["stress"] = stress
-    G.add_edge_list(df.values,hashed=True,eprops=[pkid,cost,stress])
+    G.vertex_properties["pkid"] = G.add_edge_list(df.values,hashed=True,eprops=[pkid,cost,stress])
 
     # add data to nodes
     if verbose:
