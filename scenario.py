@@ -3,13 +3,14 @@
 # A scenario includes two graphs: one for high stress, one for low stress
 ###################################################################
 import sys
-import networkx as nx
-from nxutils import *
+from graph_tool.all import *
 import psycopg2
+from psycopg2 import sql
 import numpy as np
 from scipy.sparse import coo_matrix
 import pandas as pd
 import geopandas as gpd
+import graphutils
 
 
 class Scenario:
@@ -65,10 +66,10 @@ class Scenario:
         self.verbose = verbose
 
         # build graphs
-        self.hsG = buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,
+        self.hsG = graphutils.buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,
             fromNodeCol,toNodeCol,edgeCostCol,stressCol,self.verbose
         )
-        self.lsG = buildRestrictedNetwork(self.hsG,self.maxStress)
+        self.lsG = graphutils.buildRestrictedNetwork(self.hsG,self.maxStress)
 
         # get block nodes
         self.blocks = self.blocks.merge(
@@ -136,6 +137,14 @@ class Scenario:
                 tiles[tiles.index==i]
             ).drop(columns=["index_right"])
 
+            # add graph vertices
+            if self.verbose:
+                print("Applying graph nodes to blocks")
+            df["graph_v"] = df.apply(
+                lambda row: [graphutils.translateNode(self.hsG,i) for i in row["nodes"]],
+                axis=1
+            )
+
             # cartesian join of subselected blocks (origins) with all census blocks (destinations)
             df = df.merge(
                 self.blocks[["blockid","tempkey","nodes","geom"]],
@@ -188,20 +197,15 @@ class Scenario:
         lsDist = -1
 
         # first test hs connection
-        for i in row["nodesfrom"]:
-            for j in row["nodesto"]:
-                """This part risks having a distance that is not the minimum, but
-                it's necessary for speeding up the calculations"""
-                if hsDist > 0 and hsDist < self.maxDist:
-                    continue
-
-                try:
-                    l = nx.dijkstra_path_length(self.hsG,i,j,weight="weight")
-                    if l < self.maxDist:
-                        hsDist = l
-                        hsConnected = True
-                except nx.NetworkXNoPath:
-                    pass
+        for i in row["graph_vfrom"]:
+            dist = np.min(shortest_distance(self.hsG,i,row["graph_vto"],self.hsG.ep.cost))
+            if np.isinf(dist):  # no path
+                continue
+            if dist < 0:
+                hsDist = dist
+                hsConnected = True
+            if dist < self.maxDist:
+                hsDist = dist
 
         # next test ls connection (but only if hsConnected)
         # if hsConnected:
@@ -270,6 +274,7 @@ class Scenario:
 
 
     def _progbar(self, curr, total, full_progbar):
-        frac = curr/total
+        frac = round(100*float(curr)/total,2)
         filled_progbar = int(round(frac*full_progbar))
-        print('\r' + '#'*filled_progbar + '-'*(full_progbar-filled_progbar) + '  %0.1f%  (%i/%i)' % (frac,curr,total)),
+        frac = str(frac) + "%"
+        print('\r' + '#'*filled_progbar + '-'*(full_progbar-filled_progbar) + '  %s  %i/%i' % (frac,curr,total)),
