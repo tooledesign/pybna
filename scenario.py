@@ -2,10 +2,11 @@
 # The Scenario class stores a BNA scenario for use in pyBNA.
 # A scenario includes two graphs: one for high stress, one for low stress
 ###################################################################
-import sys
+import sys, StringIO
 from graph_tool.all import *
 import psycopg2
 from psycopg2 import sql
+from tempfile import mkstemp
 import numpy as np
 from scipy.sparse import coo_matrix
 import pandas as pd
@@ -18,11 +19,11 @@ class Scenario:
 
     def __init__(self, name, notes, conn, blocks, srid,
                     maxDist, maxStress, maxDetour,
-                    censusTable, blockIdCol,
+                    censusSchema, censusTable, blockIdCol,
                     roadTable, roadIdCol,
                     nodeTable, nodeIdCol,
                     edgeTable, edgeIdCol, fromNodeCol, toNodeCol, stressCol, edgeCostCol,
-                    verbose=False):
+                    verbose=False, debug=False):
         """Get already built network from PostGIS connection.
 
         args:
@@ -34,6 +35,7 @@ class Scenario:
         maxDist -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
         maxStress -- the highest stress rating to allow for the low stress graph
         maxDetour -- maximum allowable detour for determining relative connectivity (given as a percentage, i.e. 25 = 25%)
+        censusSchema -- DB schema the census table is in
         censusTable -- name of table of census blocks (default: neighborhood_census_blocks, the BNA default)
         blockIdCol -- name of the column with census block ids in the block table (default: blockid10, the BNA default)
         roadTable -- the table with road data
@@ -47,6 +49,7 @@ class Scenario:
         stressCol -- column name for the stress of the edge
         edgeCostCol -- column name for the cost of the edge
         verbose -- output useful messages
+        debug -- produce additional output for testing and debugging
 
         return: None
         """
@@ -55,6 +58,7 @@ class Scenario:
         self.name = name
         self.notes = notes
         self.conn = conn
+        self.censusSchema = censusSchema
         self.blocks = blocks
         self.srid = srid
         self.maxStress = maxStress
@@ -64,6 +68,7 @@ class Scenario:
         else:
             self.maxDetour = 1.25
         self.verbose = verbose
+        self.debug = debug
 
         # build graphs
         self.hsG = graphutils.buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,
@@ -77,8 +82,16 @@ class Scenario:
             on="blockid"
         )
 
+        # get block graph nodes
+        self.blocks["graph_v"] = self.blocks["nodes"].apply(
+            lambda x: [int(find_vertex(self.hsG,self.hsG.vp.pkid,i)[0]) for i in x]
+        )
+
         # create connectivity matrix
         self.connectivity = None
+
+        if debug:
+            self._setDebug(True)
 
 
     def __unicode__(self):
@@ -89,7 +102,7 @@ class Scenario:
         return r"Scenario %s  :  Max stress %i  :  Notes: %s" % (self.name, self.maxStress, self.notes)
 
 
-    def getConnectivity(self,tiles=None):
+    def getConnectivity(self,tiles=None,dbTable=None):
         """Create a connectivity matrix using the this class' networkx graphs and
         census blocks. The matrix relies on bitwise math so the following
         correspondence of values to connectivity combinations is possible:
@@ -100,11 +113,26 @@ class Scenario:
 
         kwargs:
         tiles -- a geopandas dataframe holding polygons for breaking the analysis into chunks
+        dbTable -- if given, (over)writes the results to this table in the db
 
         return: pandas sparse dataframe
         """
         if self.verbose:
             print("Building connectivity matrix")
+
+        # drop db table if given
+        if dbTable:
+            cur = self.conn.cursor()
+            cur.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(dbTable)))
+            cur.execute(sql.SQL(
+                'create table {}.{} ( \
+                    id serial primary key, \
+                    source_blockid10 varchar(15), \
+                    target_blockid10 varchar(15), \
+                    stress_val SMALLINT \
+                )'
+            ).format(sql.Identifier(self.censusSchema),sql.Identifier(dbTable)))
+            cur.close()
 
         # create single tile if no tiles given
         if tiles is None:
@@ -113,7 +141,8 @@ class Scenario:
                 name="geom"
             ))
 
-        df = None
+        cdf = pd.DataFrame(columns=["blockidfrom","nodesfrom","graph_vfrom",
+            "blockidto","nodesto","graph_vto","hsls"])
         c = 1
         ctotal = len(tiles)
         for i in tiles.index:
@@ -126,7 +155,7 @@ class Scenario:
             df = gpd.sjoin(
                 self.blocks,
                 tiles[tiles.index==i]
-            )[["blockid","geom","nodes","tempkey"]]
+            )[["blockid","geom","nodes","graph_v","tempkey"]]
 
             # convert to centroids for more accurate intersection
             df.geom = df.centroid
@@ -137,17 +166,9 @@ class Scenario:
                 tiles[tiles.index==i]
             ).drop(columns=["index_right"])
 
-            # add graph vertices
-            if self.verbose:
-                print("Applying graph nodes to blocks")
-            df["graph_v"] = df.apply(
-                lambda row: [graphutils.translateNode(self.hsG,i) for i in row["nodes"]],
-                axis=1
-            )
-
             # cartesian join of subselected blocks (origins) with all census blocks (destinations)
             df = df.merge(
-                self.blocks[["blockid","tempkey","nodes","geom"]],
+                self.blocks[["blockid","tempkey","nodes","graph_v","geom"]],
                 on="tempkey",
                 suffixes=("from","to")
             ).drop(columns=["tempkey"])
@@ -174,11 +195,31 @@ class Scenario:
             self.progressTotal = len(df)
             df["hsls"] = df.apply(self._isConnected,axis=1)
 
-        return df
+            if dbTable:
+                if self.verbose:
+                    print("\nWriting tile results to database")
+                f = StringIO.StringIO()
+                df[["blockidfrom","blockidto","hsls"]].to_csv(f,index=False,header=False)
+                f.seek(0)
+                cur = self.conn.cursor()
+                cur.copy_from(f,dbTable,columns=("source_blockid10","target_blockid10","stress_val"),sep=",")
+                cur.close()
+            cdf = cdf.append(df).drop_duplicates(subset=["blockidfrom","blockidto"])
 
-        # get nx routes using:
-        # http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.applymap.html#pandas.DataFrame.applymap
-        # https://stackoverflow.com/questions/43654727/pandas-retrieve-row-and-column-name-for-each-element-during-applymap
+        cur = self.conn.cursor()
+        cur.execute(sql.SQL(' \
+            create index {} on {}.{} (source_blockid10,target_blockid10); \
+            analyze {}.{}; \
+        ').format(
+            sql.Identifier("idx_"+dbTable+"_blockpairs"),
+            sql.Identifier(self.censusSchema),
+            sql.Identifier(dbTable),
+            sql.Identifier(self.censusSchema),
+            sql.Identifier(dbTable)
+        ))
+        self.conn.commit()
+        return cdf
+
 
     def _isConnected(self,row):
         if self.verbose and self.progress % 500 == 0:
@@ -191,6 +232,10 @@ class Scenario:
         hsConnected = False
         lsConnected = False
 
+        # short circuit this pair if the origin or destination blocks have no vertices
+        if len(row["graph_vfrom"]) == 0 or len(row["graph_vto"]) == 0:
+            return 0
+
         fromBlock = row["blockidfrom"]
         toBlock = row["blockidto"]
         hsDist = -1
@@ -198,20 +243,60 @@ class Scenario:
 
         # first test hs connection
         for i in row["graph_vfrom"]:
-            dist = np.min(shortest_distance(self.hsG,i,row["graph_vto"],self.hsG.ep.cost))
-            if np.isinf(dist):  # no path
-                continue
-            if dist < 0:
-                hsDist = dist
-                hsConnected = True
-            if dist < self.maxDist:
-                hsDist = dist
+            dist = np.min(
+                shortest_distance(
+                    self.hsG,
+                    source=self.hsG.vertex(i),
+                    target=row["graph_vto"],
+                    weights=self.hsG.ep.cost,
+                    max_dist=self.maxDist
+                )
+            )
+            if self.debug:
+                self.blockDistances.append(
+                    [{
+                        "blockidfrom":fromBlock,
+                        "blockidto":toBlock,
+                        "hsDist":dist,
+                        "lsDist":-1
+                    }]
+                )
+
+            if not np.isinf(dist):  # test for no path
+                if hsDist < 0:
+                    hsDist = dist
+                    hsConnected = True
+                if dist < hsDist:
+                    hsDist = dist
 
         # next test ls connection (but only if hsConnected)
-        # if hsConnected:
-        #     pass
+        if hsConnected:
+            for i in row["graph_vfrom"]:
+                dist = np.min(
+                    shortest_distance(
+                        self.lsG,
+                        source=self.lsG.vertex(i),
+                        target=row["graph_vto"],
+                        weights=self.lsG.ep.cost,
+                        max_dist=self.maxDist
+                    )
+                )
+                if self.debug:
+                    self.blockDistances.append(
+                        [{
+                            "blockidfrom":fromBlock,
+                            "blockidto":toBlock,
+                            "hsDist":-1,
+                            "lsDist":dist
+                        }]
+                    )
+
+                if not np.isinf(dist):  # no path
+                    lsConnected = True
+                    continue
 
         return hsConnected | (lsConnected << 1)
+
 
     def _getBlockNodes(self,censusTable,blockIdCol,roadTable,roadIdCol,nodeTable,nodeIdCol):
         cur = self.conn.cursor()
@@ -269,12 +354,26 @@ class Scenario:
 
         # clean up
         cur.execute('drop table if exists tmp_blocknodes;')
-
+        cur.close()
         return df
+
+
+    def writeConnectivityToDB(self,df):
+        """Write the dataframe that comes from getConnectivity to this
+        scenario's database as the block connection matrix.
+        """
+
+
+
 
 
     def _progbar(self, curr, total, full_progbar):
         frac = round(100*float(curr)/total,2)
-        filled_progbar = int(round(frac*full_progbar))
+        filled_progbar = int(round(float(frac)/100*full_progbar))
         frac = str(frac) + "%"
         print('\r' + '#'*filled_progbar + '-'*(full_progbar-filled_progbar) + '  %s  %i/%i' % (frac,curr,total)),
+
+    def _setDebug(self,d):
+        self.debug = d
+        if self.debug:
+            self.blockDistances = pd.DataFrame(columns=["blockidfrom","blockidto","hsdist","lsdist"])

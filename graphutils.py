@@ -81,8 +81,11 @@ def buildRestrictedNetwork(G,maxStress):
     return GraphView(G,efilt=stressFilter)
 
 
-def translateNode(G,nodeId):
-    return find_vertex(G,G.vp.pkid,nodeId)[0]
+def translateNodes(G,nodeIds):
+    vs = list()
+    for i in nodeIds:
+        vs.append(int(find_vertex(G,G.vp.pkid,i)[0]))
+    return np.array(vs,dtype=np.int_,ndmin=1)
 
 
 class VisitorExample(AStarVisitor):

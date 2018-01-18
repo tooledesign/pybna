@@ -59,6 +59,7 @@ class pyBNA:
 
         # Get census blocks
         self.censusTable = censusTable
+        self.censusSchema = self._getSchema(self.censusTable)
         self.blockIdCol = blockIdCol
         self.blocks = self._getBlocks(censusTable, blockIdCol)
 
@@ -184,7 +185,8 @@ class pyBNA:
 
             self.scenarios[name] = Scenario(
                 name, notes, self.conn, self.blocks, self.srid,
-                maxDist, maxStress, maxDetour, self.censusTable, self.blockIdCol,
+                maxDist, maxStress, maxDetour,
+                self.censusSchema, self.censusTable, self.blockIdCol,
                 roadTable, roadIdCol,
                 nodeTable, nodeIdCol,
                 edgeTable, edgeIdCol, fromNodeCol, toNodeCol, stressCol, edgeCostCol,
