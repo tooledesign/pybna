@@ -159,6 +159,9 @@ class Scenario:
                 tiles[tiles.index==i]
             )[["blockid","geom","nodes","graph_v","tempkey"]]
 
+            if len(df) == 0:
+                continue
+
             # convert to centroids for more accurate intersection
             df.geom = df.centroid
 
