@@ -2,7 +2,7 @@ from pybna import pyBNA
 p = pyBNA("192.168.40.225","bna_ames","gis","gis",tilesTableName='tiles',verbose=True)
 p.addScenarioNew("base","lksjdfkd")
 s = p.scenarios['base']
-a = s.getConnectivity(p.tiles[p.tiles.index==120],dbTable="blocktest")
+a = s.getConnectivity(p.tiles[p.tiles.index>=120],dbTable="blocktest")
 # s._setDebug(True)
 blocks = s.blocks
 tiles = p.tiles
@@ -27,3 +27,12 @@ dist, pred = astar_search(
     VisitorExample(targets),
     heuristic=lambda v: heuristic(v, targets, g.vp.pos)
 )
+
+
+
+
+
+select c.id, b.geom, c.source_blockid10, c.target_blockid10, c.high_stress, c.low_stress
+from neighborhood_census_blocks b, blocktest c
+where b.blockid10 = c.target_blockid10
+and c.source_blockid10 = '191690004003002'

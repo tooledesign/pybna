@@ -129,7 +129,8 @@ class Scenario:
                     id serial primary key, \
                     source_blockid10 varchar(15), \
                     target_blockid10 varchar(15), \
-                    stress_val SMALLINT \
+                    high_stress BOOLEAN, \
+                    low_stress BOOLEAN \
                 )'
             ).format(sql.Identifier(self.censusSchema),sql.Identifier(dbTable)))
             cur.close()
@@ -173,8 +174,6 @@ class Scenario:
                 suffixes=("from","to")
             ).drop(columns=["tempkey"])
 
-            df = df[df["blockidfrom"] != df["blockidto"]]
-
             # filter out based on distances between blocks
             if self.verbose:
                 print("Filtering blocks based on crow-flies distance")
@@ -199,25 +198,29 @@ class Scenario:
                 if self.verbose:
                     print("\nWriting tile results to database")
                 f = StringIO.StringIO()
-                df[["blockidfrom","blockidto","hsls"]].to_csv(f,index=False,header=False)
+                out = df[["blockidfrom","blockidto","hsls"]].copy()
+                out["high_stress"] = np.where(out["hsls"] & 0b01 == 0b01, True, False)  # bitwise t/f test for high stress
+                out["low_stress"] = np.where(out["hsls"] & 0b10 == 0b10, True, False)   # bitwise t/f test for low stress
+                out[["blockidfrom","blockidto","high_stress","low_stress"]].to_csv(f,index=False,header=False)
                 f.seek(0)
                 cur = self.conn.cursor()
-                cur.copy_from(f,dbTable,columns=("source_blockid10","target_blockid10","stress_val"),sep=",")
+                cur.copy_from(f,dbTable,columns=("source_blockid10","target_blockid10","high_stress","low_stress"),sep=",")
                 cur.close()
             cdf = cdf.append(df).drop_duplicates(subset=["blockidfrom","blockidto"])
 
-        cur = self.conn.cursor()
-        cur.execute(sql.SQL(' \
-            create index {} on {}.{} (source_blockid10,target_blockid10); \
-            analyze {}.{}; \
-        ').format(
-            sql.Identifier("idx_"+dbTable+"_blockpairs"),
-            sql.Identifier(self.censusSchema),
-            sql.Identifier(dbTable),
-            sql.Identifier(self.censusSchema),
-            sql.Identifier(dbTable)
-        ))
-        self.conn.commit()
+        if dbTable:
+            cur = self.conn.cursor()
+            cur.execute(sql.SQL(' \
+                create index {} on {}.{} (source_blockid10,target_blockid10); \
+                analyze {}.{}; \
+            ').format(
+                sql.Identifier("idx_"+dbTable+"_blockpairs"),
+                sql.Identifier(self.censusSchema),
+                sql.Identifier(dbTable),
+                sql.Identifier(self.censusSchema),
+                sql.Identifier(dbTable)
+            ))
+            self.conn.commit()
         return cdf
 
 
@@ -238,6 +241,8 @@ class Scenario:
 
         fromBlock = row["blockidfrom"]
         toBlock = row["blockidto"]
+        if fromBlock == toBlock:    # if same block assume connected
+            return 3
         hsDist = -1
         lsDist = -1
 
