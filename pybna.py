@@ -19,7 +19,8 @@ class pyBNA:
 
     def __init__(self, host, db, user, password, censusTable="neighborhood_census_blocks",
                  blockIdCol="blockid10", tilesShpPath=None,
-                 tilesTableName=None, tilesTableGeomCol='geom', verbose=False):
+                 tilesTableName=None, tilesTableGeomCol='geom', tilesColumns=list(),
+                 verbose=False):
         """Connects to the BNA database
 
         kwargs:
@@ -70,7 +71,7 @@ class pyBNA:
         if tilesShpPath:
             self.tiles = self._getTilesShp(tilesShpPath)
         if tilesTableName:
-            self.tiles = self._getTilesPg(tilesTableName,tilesTableGeomCol)
+            self.tiles = self._getTilesPg(tilesTableName,tilesTableGeomCol,tilesColumns)
 
     def _getPkidColumn(self, table):
         # connect to pg and read id col
@@ -94,13 +95,24 @@ class pyBNA:
     def _getTilesShp(self,path):
         return 1
 
-    def _getTilesPg(self,tableName,geomColumn):
+    def _getTilesPg(self,tableName,geomColumn,addColumns):
         pkid = self._getPkidColumn(tableName)
-        q = sql.SQL('select {} as id, {} as geom from {};').format(
+
+        # handle additional columns
+        cols = " "
+        for c in addColumns:
+            cols = cols + sql.SQL(",{}").format(sql.Identifier(c)).as_string(self.conn)
+
+        # query
+        q = sql.SQL('select {} as id, {} as geom %s from {};' % cols).format(
             sql.Identifier(pkid),
             sql.Identifier(geomColumn),
             sql.Identifier(tableName)
         ).as_string(self.conn)
+
+        if self.verbose:
+            print(q)
+
         return gpd.GeoDataFrame.from_postgis(
             q,
             self.conn,

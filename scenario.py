@@ -150,6 +150,7 @@ class Scenario:
             self.progress = 0
             if self.verbose:
                 print("Processing tile %i out of %i" % (c,ctotal))
+                c += 1
 
             # select blocks that intersect the tile
             self.blocks["tempkey"] = 1
