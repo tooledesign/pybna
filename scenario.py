@@ -83,9 +83,10 @@ class Scenario:
         )
 
         # get block graph nodes
-        self.blocks["graph_v"] = self.blocks["nodes"].apply(
-            lambda x: [int(find_vertex(self.hsG,self.hsG.vp.pkid,i)[0]) for i in x]
-        )
+        # self.blocks["graph_v"] = self.blocks["nodes"].apply(
+        #     lambda x: [int(find_vertex(self.hsG,self.hsG.vp.pkid,i)[0]) for i in x]
+        # )
+        self.blocks["graph_v"] = self.blocks["nodes"].apply(self._getGraphNodes)
 
         # create connectivity matrix
         self.connectivity = None
@@ -159,6 +160,7 @@ class Scenario:
                 tiles[tiles.index==i]
             )[["blockid","geom","nodes","graph_v","tempkey"]]
 
+            # skip this tile if it's empty
             if len(df) == 0:
                 continue
 
@@ -170,6 +172,10 @@ class Scenario:
                 df,
                 tiles[tiles.index==i]
             ).drop(columns=["index_right"])
+
+            # skip this tile if it's empty
+            if len(df) == 0:
+                continue
 
             # cartesian join of subselected blocks (origins) with all census blocks (destinations)
             df = df.merge(
@@ -367,11 +373,21 @@ class Scenario:
         return df
 
 
-    def writeConnectivityToDB(self,df):
-        """Write the dataframe that comes from getConnectivity to this
-        scenario's database as the block connection matrix.
-        """
+    def _getGraphNodes(self,nodes):
+        gnodes = list()
+        for n in nodes:
+            try:
+                gnodes.append(int(find_vertex(self.hsG,self.hsG.vp.pkid,n)[0]))
+            except IndexError:
+                pass    # no graph nodes in network (orphaned segment problem)
+        return gnodes
 
+
+    # def writeConnectivityToDB(self,df):
+    #     """Write the dataframe that comes from getConnectivity to this
+    #     scenario's database as the block connection matrix.
+    #     """
+    #
 
 
 
