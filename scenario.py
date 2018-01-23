@@ -414,5 +414,5 @@ class Scenario:
             cur.execute('select 1')
             cur.fetchone()
             cur.close()
-        except
+        except:
             self.conn = psycopg2.connect(db_connection_string)
