@@ -12,6 +12,7 @@ from scipy.sparse import coo_matrix
 import pandas as pd
 import geopandas as gpd
 import graphutils
+from tqdm import tqdm
 
 
 class Scenario:
@@ -53,8 +54,9 @@ class Scenario:
 
         return: None
         """
-        self.progress = 0
-        self.progressTotal = -1
+        # register pandas apply with tqdm for progress bar
+        tqdm.pandas(desc="Evaluating connectivity")
+
         self.name = name
         self.notes = notes
         self.conn = conn
@@ -149,7 +151,6 @@ class Scenario:
         c = 1
         ctotal = len(tiles)
         for i in tiles.index:
-            self.progress = 0
             if self.verbose:
                 print("Processing tile %i out of %i" % (c,ctotal))
                 c += 1
@@ -200,10 +201,7 @@ class Scenario:
             df["hsls"] = pd.SparseSeries([False] * len(df),dtype="int8",fill_value=0)
 
             # run connectivity for all rows
-            if self.verbose:
-                print("Testing connectivity")
-            self.progressTotal = len(df)
-            df["hsls"] = df.apply(self._isConnected,axis=1)
+            df["hsls"] = df.progress_apply(self._isConnected,axis=1)
 
             if dbTable:
                 if self.verbose:
@@ -239,14 +237,6 @@ class Scenario:
 
 
     def _isConnected(self,row):
-        if self.verbose:
-            if self.progress % 500 == 0:
-                self._progbar(self.progress,self.progressTotal,50)
-            elif self.progress == self.progressTotal - 1:
-                self._progbar(self.progressTotal,self.progressTotal,50)
-            sys.stdout.flush()
-        self.progress += 1
-
         hsConnected = False
         lsConnected = False
 
@@ -388,25 +378,11 @@ class Scenario:
         return gnodes
 
 
-    # def writeConnectivityToDB(self,df):
-    #     """Write the dataframe that comes from getConnectivity to this
-    #     scenario's database as the block connection matrix.
-    #     """
-    #
-
-
-
-
-    def _progbar(self, curr, total, full_progbar):
-        frac = round(100*float(curr)/total,2)
-        filled_progbar = int(round(float(frac)/100*full_progbar))
-        frac = str(frac) + "%"
-        print('\r' + '#'*filled_progbar + '-'*(full_progbar-filled_progbar) + '  %s  %i/%i' % (frac,curr,total)),
-
     def _setDebug(self,d):
         self.debug = d
         if self.debug:
             self.blockDistances = pd.DataFrame(columns=["blockidfrom","blockidto","hsdist","lsdist"])
+
 
     def _reestablishConn(self):
         db_connection_string = self.conn.dsn
