@@ -75,6 +75,7 @@ class pyBNA:
 
     def _getPkidColumn(self, table):
         # connect to pg and read id col
+        self._reestablishConn()
         cur = self.conn.cursor()
         cur.execute(' \
         SELECT a.attname \
@@ -90,6 +91,7 @@ class pyBNA:
         row = cur.fetchone()
         if self.verbose:
             print("   ID: %s" % row[0])
+        cur.close()
         return row[0]
 
     def _getTilesShp(self,path):
@@ -184,6 +186,7 @@ class pyBNA:
 
         Return: None
         """
+        self._reestablishConn()
         if self._checkScenarioName(name):
             if self.verbose:
                 print("Creating scenario %s" % name)
@@ -329,6 +332,18 @@ class pyBNA:
 
         return srid
 
+
     def score(self):
         """Calculate network score."""
         pass
+
+
+    def _reestablishConn(self):
+        db_connection_string = self.conn.dsn
+        try:
+            cur = self.conn.cursor()
+            cur.execute('select 1')
+            cur.fetchone()
+            cur.close()
+        except:
+            self.conn = psycopg2.connect(db_connection_string)
