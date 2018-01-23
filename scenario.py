@@ -135,6 +135,7 @@ class Scenario:
                 )'
             ).format(sql.Identifier(self.censusSchema),sql.Identifier(dbTable)))
             cur.close()
+            self.conn.commit()
 
         # create single tile if no tiles given
         if tiles is None:
@@ -213,12 +214,15 @@ class Scenario:
                 out["low_stress"] = np.where(out["hsls"] & 0b10 == 0b10, True, False)   # bitwise t/f test for low stress
                 out[["blockidfrom","blockidto","high_stress","low_stress"]].to_csv(f,index=False,header=False)
                 f.seek(0)
+                self._reestablishConn()
                 cur = self.conn.cursor()
                 cur.copy_from(f,dbTable,columns=("source_blockid10","target_blockid10","high_stress","low_stress"),sep=",")
                 cur.close()
+                self.conn.commit()
             cdf = cdf.append(df).drop_duplicates(subset=["blockidfrom","blockidto"])
 
         if dbTable:
+            self._reestablishConn()
             cur = self.conn.cursor()
             cur.execute(sql.SQL(' \
                 create index {} on {}.{} (source_blockid10,target_blockid10); \
@@ -402,3 +406,13 @@ class Scenario:
         self.debug = d
         if self.debug:
             self.blockDistances = pd.DataFrame(columns=["blockidfrom","blockidto","hsdist","lsdist"])
+
+    def _reestablishConn(self):
+        db_connection_string = self.conn.dsn
+        try:
+            cur = self.conn.cursor()
+            cur.execute('select 1')
+            cur.fetchone()
+            cur.close()
+        except
+            self.conn = psycopg2.connect(db_connection_string)
