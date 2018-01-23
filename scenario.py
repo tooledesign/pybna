@@ -239,11 +239,12 @@ class Scenario:
 
 
     def _isConnected(self,row):
-        if self.verbose and self.progress % 500 == 0:
-            self._progbar(self.progress,self.progressTotal,50)
+        if self.verbose:
+            if self.progress % 500 == 0:
+                self._progbar(self.progress,self.progressTotal,50)
+            elif self.progress == self.progressTotal - 1:
+                self._progbar(self.progressTotal,self.progressTotal,50)
             sys.stdout.flush()
-            # bar = "+" * int(10*float(self.progress)/self.progressTotal)
-            # print("\r  %i/%i %s" % (self.progress,self.progressTotal,bar)),
         self.progress += 1
 
         hsConnected = False
