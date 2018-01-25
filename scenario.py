@@ -223,10 +223,14 @@ class Scenario:
             self._reestablishConn()
             cur = self.conn.cursor()
             cur.execute(sql.SQL(' \
-                create index {} on {}.{} (source_blockid10,target_blockid10); \
+                create index {} on {}.{} (source_blockid10,target_blockid10) where high_stress is true; \
+                create index {} on {}.{} (source_blockid10,target_blockid10) where low_stress is true; \
                 analyze {}.{}; \
             ').format(
-                sql.Identifier("idx_"+dbTable+"_blockpairs"),
+                sql.Identifier("idx_"+dbTable+"_blockpairs_hs"),
+                sql.Identifier(self.censusSchema),
+                sql.Identifier(dbTable),
+                sql.Identifier("idx_"+dbTable+"_blockpairs_ls"),
                 sql.Identifier(self.censusSchema),
                 sql.Identifier(dbTable),
                 sql.Identifier(self.censusSchema),
