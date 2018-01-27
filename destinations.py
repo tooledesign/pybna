@@ -27,7 +27,7 @@ class Destinations:
         if blocksCol is None:
             blocksCol = 'blockid10'
 
-        self.destinationBlocks = set(self._retrieve(conn,table,idCol,nameCol,blocksCol))
+        self.destination_blocks = set(self._retrieve(conn,table,idCol,nameCol,blocksCol))
 
 
     def __unicode__(self):

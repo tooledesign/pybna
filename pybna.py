@@ -10,6 +10,7 @@ from psycopg2 import sql
 from psycopg2.extensions import quote_ident
 import pandas as pd
 import geopandas as gpd
+import pickle
 
 from scenario import Scenario
 from destinations import Destinations
@@ -40,8 +41,15 @@ class pyBNA:
         return: pyBNA object
         """
         self.verbose = verbose
-
         self.config = yaml.safe_load(open(config))
+
+        if self.verbose:
+            print("\n \
+            ---------------pyBNA---------------\n \
+            Create and test BNA scenarios\n \
+            \n \
+            Configuration parameters:")
+            print(self.config)
 
         # set up db connection
         if user is None:
@@ -56,12 +64,6 @@ class pyBNA:
         ])
         self.conn = psycopg2.connect(db_connection_string)
 
-        # get srid
-        try:
-            self.srid = self.config['db']['srid']
-        except KeyError:
-            self.srid = self._get_srid(blocks_table)
-
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
         self.destinations = dict()
@@ -74,13 +76,19 @@ class pyBNA:
         if blocks_table:
             self.blocks_table = blocks_table
         else:
-            self.blocks_table = config['db']['blocks']['table']
+            self.blocks_table = self.config['db']['blocks']['table']
         self.census_schema = self._get_schema(self.blocks_table)
         if block_id_col:
             self.block_id_col = block_id_col
         else:
-            self.block_id_col = config['db']['blocks']['id_column']
-        self.blocks = self._get_blocks(blocks_table, block_id_col)
+            self.block_id_col = self.config['db']['blocks']['id_column']
+        self.blocks = self._get_blocks(self.blocks_table, self.block_id_col)
+
+        # get srid
+        try:
+            self.srid = self.config['db']['srid']
+        except KeyError:
+            self.srid = self._get_srid(self.blocks_table)
 
         # Get tiles for running connectivity (if given)
         self.tiles = None
@@ -90,6 +98,7 @@ class pyBNA:
             self.tiles = self._get_tiles_shp(tiles_shp_path)
         if tiles_table_name:
             self.tiles = self._get_tiles_pg(tiles_table_name,tiles_table_geom_col,tiles_columns)
+
 
     def _get_pkid_col(self, table):
         # connect to pg and read id col
@@ -112,8 +121,10 @@ class pyBNA:
         cur.close()
         return row[0]
 
+
     def _get_tiles_shp(self,path):
         return 1
+
 
     def _get_tiles_pg(self,tableName,geom_col,add_columns):
         pkid = self._get_pkid_col(tableName)
@@ -140,6 +151,7 @@ class pyBNA:
             index_col='id'
         )
 
+
     def list_scenarios(self):
         """Prints the current stored scenarios
 
@@ -148,10 +160,11 @@ class pyBNA:
         for k, v in self.scenarios.iteritems():
             print(v)
 
+
     def _check_scenario_name(self, name, raise_error=True):
         """Checks the scenarios for whether a scenario by the given name exists.
         If raise_error is true then raise an error if a match is found.
-        Returns true if the check is passed.
+        Returns true if the check is passed (meaning the name DOES NOT exist).
 
         Return: Boolean
         """
@@ -165,6 +178,7 @@ class pyBNA:
         else:
             return True
 
+
     def add_scenario_existing(self, scenario):
         """Register a pre-existing scenario object with this pyBNA
 
@@ -174,6 +188,7 @@ class pyBNA:
             if self.verbose:
                 print("Adding scenario %s" % scenario)
             self.scenarios[scenario.name] = scenario
+
 
     def add_scenario_new(self, name, notes,
                         max_distance=None, max_stress=None, max_detour=None,
@@ -200,21 +215,27 @@ class pyBNA:
                 print("Creating scenario %s" % name)
 
             if road_table is None:
-                road_table = config['scenario']['roads']['table']
-            if road_id_col is None:
+                road_table = self.config['scenario']['roads']['table']
+            try:
+                road_id_col = self.config['scenario']['roads']['id_column']
+            except KeyError:
                 road_id_col = self._get_pkid_col(road_table)
             if node_table is None:
-                node_table = config['scenario']['nodes']['table']
-            if node_id_col is None:
+                node_table = self.config['scenario']['nodes']['table']
+            try:
+                node_id_col = self.config['scenario']['nodes']['id_column']
+            except KeyError:
                 node_id_col = self._get_pkid_col(node_table)
             if edge_table is None:
-                node_table = config['scenario']['edges']['table']
-            if edge_id_col is None:
+                edge_table = self.config['scenario']['edges']['table']
+            try:
+                edge_id_col = self.config['scenario']['edges']['id_column']
+            except KeyError:
                 edge_id_col = self._get_pkid_col(edge_table)
-            node_source_col = config['scenario']['edges']['source_column']
-            node_target_col = config['scenario']['edges']['target_column']
-            edge_stress_col = config['scenario']['edges']['stress_column']
-            edge_cost_col = config['scenario']['edges']['cost_column']
+            node_source_col = self.config['scenario']['edges']['source_column']
+            node_target_col = self.config['scenario']['edges']['target_column']
+            edge_stress_col = self.config['scenario']['edges']['stress_column']
+            edge_cost_col = self.config['scenario']['edges']['cost_column']
 
             self.scenarios[name] = Scenario(
                 name, notes, self.conn, self.blocks, self.srid,
@@ -253,6 +274,30 @@ class pyBNA:
         if self._check_scenario_name(scenario.name):
             self.scenarios[scenario.name] = scenario
 
+
+    def save_scenario_to_pickle(self,scenario_name,path,overwrite=False):
+        """Pickles the saved scenario to the specified path.
+
+        Return: None
+        """
+        if self._check_scenario_name(scenario_name,raise_error=False):
+            raise KeyError("Scenario %s doesn't exist" % scenario_name)
+
+        # check for existing file
+        if os.path.isfile(path) and not overwrite:
+            raise IOError("File %s already exists" % path)
+
+        try:
+            if self.verbose:
+                print("Saving scenario to %s" % path)
+            self.scenarios[scenario_name].conn = None
+            pickle.dump(self.scenarios[scenario_name],open(path, "wb"))
+            self.scenarios[scenario_name].conn = self.conn
+        except pickle.UnpicklingError:
+            raise pickle.UnpicklingError(
+                "Could not save to %s" % path)
+
+
     def _get_blocks(self, blocks_table, block_id_col):
         """Get census blocks from BNA database
 
@@ -260,7 +305,6 @@ class pyBNA:
         """
         if self.verbose:
             print('Getting census blocks from %s' % blocks_table)
-
         q = sql.SQL('select {} as geom, {} as blockid from {};').format(
             sql.Identifier("geom"),
             sql.Identifier(block_id_col),

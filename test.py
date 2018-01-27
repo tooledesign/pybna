@@ -1,6 +1,6 @@
 from pybna import pyBNA
-p = pyBNA("192.168.40.225","bna_ames","gis","gis",tilesTableName='tiles',verbose=True)
-p.addScenarioNew("base","lksjdfkd")
+p = pyBNA("192.168.40.225","bna_ames",tiles_table_name='tiles',verbose=True)
+p.add_scenario_new("base","lksjdfkd")
 s = p.scenarios['base']
 a = s.getConnectivity(p.tiles[p.tiles.index>=120],dbTable="blocktest")
 # s._setDebug(True)
@@ -10,7 +10,7 @@ connectivity = s.connectivity
 df = s.blocks
 
 
-
+p.save_scenario_to_pickle('base','/home/spencer/test.pickly')
 
 
 
