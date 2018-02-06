@@ -325,47 +325,19 @@ class pyBNA:
 
     def _set_bna_destinations(self):
         """Retrieve the generic BNA destination types and register them."""
-        bna_destinations = [
-            {'cat': 'colleges', 'table': 'neighborhood_colleges',
-                'uid': 'id', 'name': 'college_name'},
-            {'cat': 'community_centers', 'table': 'neighborhood_community_centers',
-                'uid': 'id', 'name': 'center_name'},
-            {'cat': 'dentists', 'table': 'neighborhood_dentists',
-                'uid': 'id', 'name': 'dentists_name'},
-            {'cat': 'doctors', 'table': 'neighborhood_doctors',
-                'uid': 'id', 'name': 'doctors_name'},
-            {'cat': 'hospitals', 'table': 'neighborhood_hospitals',
-                'uid': 'id', 'name': 'hospital_name'},
-            {'cat': 'parks', 'table': 'neighborhood_parks',
-                'uid': 'id', 'name': 'park_name'},
-            {'cat': 'pharmacies', 'table': 'neighborhood_pharmacies',
-                'uid': 'id', 'name': 'pharmacy_name'},
-            {'cat': 'retail', 'table': 'neighborhood_retail',
-                'uid': 'id', 'name': 'id'},
-            {'cat': 'schools', 'table': 'neighborhood_schools',
-                'uid': 'id', 'name': 'school_name'},
-            {'cat': 'social_services', 'table': 'neighborhood_social_services',
-                'uid': 'id', 'name': 'service_name'},
-            {'cat': 'supermarkets', 'table': 'neighborhood_supermarkets',
-                'uid': 'id', 'name': 'supermarket_name'},
-            {'cat': 'transit', 'table': 'neighborhood_transit',
-                'uid': 'id', 'name': 'transit_name'},
-            {'cat': 'universities', 'table': 'neighborhood_universities',
-                'uid': 'id', 'name': 'college_name'}
-        ]
         if self.verbose:
-            print('Adding standard BNA destinations')
+            print('Adding destinations')
 
         cur = self.conn.cursor()
 
-        for d in bna_destinations:
-            self.destinations[d['cat']] = Destinations(
-                d['cat'], self.conn, d['table'], d['uid'], d['name'], verbose=self.verbose
+        for k, v in self.config['destinations'].iteritems():
+            self.destinations[k] = Destinations(
+                k, self.conn, v['table'], v['uid'], v['name'], verbose=self.verbose
             )
             # add all the census blocks containing a destination from this category
             # to the pyBNA index of all blocks containing a destination of any type
             self.destination_blocks.update(
-                self.destinations[d['cat']].destination_blocks)
+                self.destinations[k].destination_blocks)
 
         if self.verbose:
             print('%i census blocks are part of at least one destination' %
