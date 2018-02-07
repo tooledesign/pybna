@@ -70,7 +70,7 @@ class pyBNA:
 
         # Set default BNA destinations
         self.destination_blocks = set()
-        self._set_bna_destinations()
+        self._set_destinations()
 
         # Get census blocks
         if blocks_table:
@@ -323,7 +323,7 @@ class pyBNA:
         return df
 
 
-    def _set_bna_destinations(self):
+    def _set_destinations(self):
         """Retrieve the generic BNA destination types and register them."""
         if self.verbose:
             print('Adding destinations')
