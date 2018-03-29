@@ -4,7 +4,6 @@
 ###################################################################
 import os
 import yaml
-import networkx as nx
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import quote_ident
@@ -19,24 +18,17 @@ from destinations import Destinations
 class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
-    def __init__(self, host, db, config="default.config", user=None, password=None,
-                 blocks_table=None, block_id_col=None, tiles_shp_path=None,
-                 tiles_table_name=None, tiles_table_geom_col='geom', tiles_columns=list(),
-                 verbose=False):
+    def __init__(self, config="default.config", host=None, db=None, user=None,
+                 password=None, verbose=False):
         """Connects to the BNA database
 
         kwargs:
+        config -- path to the config file
         host -- hostname or address
         db -- name of database on server
-        config -- path to the config file
         user -- username to connect to database
         password -- password to connect to database
-        blocks_table -- name of table of census blocks (default: neighborhood_census_blocks, the BNA default)
-        block_id_col -- name of the column with census block ids in the block table (default: blockid10, the BNA default)
-        tiles_shp_path -- path to a shapefile holding features to be used to limit the analysis area (cannot be given in conjunction with tiles_table_name)
-        tiles_table_name -- table name in the BNA database holding features to be used to limit the analysis area (cannot be given in conjunction with tiles_shp_path)
-        tiles_table_geom_col -- name of the column with geometry (default: geom)
-        tiles_columns -- list of additional table columns to include with tiles (e.g. for filtering tiles)
+        verbose -- output useful messages
 
         return: pyBNA object
         """
@@ -46,12 +38,13 @@ class pyBNA:
         if self.verbose:
             print("\n \
             ---------------pyBNA---------------\n \
-            Create and test BNA scenarios\n \
-            \n \
-            Configuration parameters:")
-            print(self.config)
+            Create and test BNA scenarios")
 
         # set up db connection
+        if host is None:
+            host = self.config['db']['host']
+        if db is None:
+            db = self.config['db']['database']
         if user is None:
             user = self.config['db']['user']
         if password is None:
@@ -68,21 +61,15 @@ class pyBNA:
         self.scenarios = dict()
         self.destinations = dict()
 
-        # Set default BNA destinations
+        # Set destinations from config file
         self.destination_blocks = set()
         self._set_destinations()
 
-        # Get census blocks
-        if blocks_table:
-            self.blocks_table = blocks_table
-        else:
-            self.blocks_table = self.config['db']['blocks']['table']
-        self.census_schema = self._get_schema(self.blocks_table)
-        if block_id_col:
-            self.block_id_col = block_id_col
-        else:
-            self.block_id_col = self.config['db']['blocks']['id_column']
-        self.blocks = self._get_blocks(self.blocks_table, self.block_id_col)
+        # blocks
+        self.blocks = None
+        self.blocks_table = None
+        self.blocks_schema = None
+        self.block_id_col = None
 
         # get srid
         try:
@@ -240,7 +227,7 @@ class pyBNA:
             self.scenarios[name] = Scenario(
                 name, notes, self.conn, self.blocks, self.srid,
                 max_distance, max_stress, max_detour,
-                self.census_schema, self.blocks_table, self.block_id_col,
+                self.blocks_schema, self.blocks_table, self.block_id_col,
                 road_table, road_id_col,
                 node_table, node_id_col,
                 edge_table, edge_id_col, node_source_col, node_target_col, edge_stress_col, edge_cost_col,
@@ -298,29 +285,53 @@ class pyBNA:
                 "Could not save to %s" % path)
 
 
-    def _get_blocks(self, blocks_table, block_id_col):
-        """Get census blocks from BNA database
+    def _set_blocks(self, blocks_table=None, blocks_schema=None, block_id_col=None, shapefile=None):
+        """Set pybna's blocks from database or shapefile
 
         return: geopandas geodataframe
         """
-        if self.verbose:
-            print('Getting census blocks from %s' % blocks_table)
-        q = sql.SQL('select {} as geom, {} as blockid from {};').format(
-            sql.Identifier("geom"),
-            sql.Identifier(block_id_col),
-            sql.Identifier(blocks_table)
-        ).as_string(self.conn)
+        if shapefile:
+            if self.verbose:
+                print('Getting census blocks from %s' % shapefile)
+            try:
+                df = gpd.read_file(shapefile)
+                df = df.to_crs(epsg=self.srid)
+            except FileNotFoundError:
+                print('No file at %s' % shapefile)
+                raise
+            except IOError:
+                print('Could not open file at %s' % shapefile)
+                raise
+        else:
+            if blocks_table is None:
+                blocks_table = self.config['blocks']['table']
+            if blocks_schema is None:
+                blocks_schema = self._get_schema(self.blocks_table)
+            if block_id_col is None:
+                block_id_col = self.config['blocks']['id_column']
 
-        if self.verbose:
-            print(q)
+            if self.verbose:
+                print('Getting census blocks from %s.%s' % (blocks_schema,blocks_table))
+            q = sql.SQL('select {} as geom, {} as blockid from {}.{};').format(
+                sql.Identifier("geom"),
+                sql.Identifier(block_id_col),
+                sql.Identifier(blocks_schema),
+                sql.Identifier(blocks_table)
+            ).as_string(self.conn)
 
-        df = gpd.GeoDataFrame.from_postgis(
-            q,
-            self.conn,
-            geom_col='geom'
-        )
+            if self.verbose:
+                print(q)
 
-        return df
+            df = gpd.GeoDataFrame.from_postgis(
+                q,
+                self.conn,
+                geom_col='geom'
+            )
+
+        self.blocks = df
+        self.blocks_table = blocks_table
+        self.blocks_schema = blocks_schema
+        self.block_id_col = block_id_col
 
 
     def _set_destinations(self):
