@@ -12,7 +12,6 @@ import geopandas as gpd
 import pickle
 
 from scenario import Scenario
-from destinations import Destinations
 
 
 class pyBNA:
@@ -42,13 +41,13 @@ class pyBNA:
 
         # set up db connection
         if host is None:
-            host = self.config['db']['host']
+            host = self.config["db"]["host"]
         if db is None:
-            db = self.config['db']['database']
+            db = self.config["db"]["database"]
         if user is None:
-            user = self.config['db']['user']
+            user = self.config["db"]["user"]
         if password is None:
-            password = self.config['db']['password']
+            password = self.config["db"]["password"]
         db_connection_string = " ".join([
             "dbname=" + db,
             "user=" + user,
@@ -59,9 +58,10 @@ class pyBNA:
 
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
-        self.destinations = dict()
+        self._set_scenarios()
 
         # Set destinations from config file
+        self.destinations = dict()
         self.destination_blocks = set()
         self._set_destinations()
 
@@ -70,10 +70,11 @@ class pyBNA:
         self.blocks_table = None
         self.blocks_schema = None
         self.block_id_col = None
+        p._set_blocks()
 
         # get srid
         try:
-            self.srid = self.config['db']['srid']
+            self.srid = self.config["db"]["srid"]
         except KeyError:
             self.srid = self._get_srid(self.blocks_table)
 
@@ -91,16 +92,16 @@ class pyBNA:
         # connect to pg and read id col
         self._reestablish_conn()
         cur = self.conn.cursor()
-        cur.execute(' \
+        cur.execute(" \
         SELECT a.attname \
         FROM   pg_index i \
         JOIN   pg_attribute a ON a.attrelid = i.indrelid \
                 AND a.attnum = ANY(i.indkey) \
         WHERE  i.indrelid = %(table)s::regclass \
-        AND    i.indisprimary;', {"table": quote_ident(table, cur)})
+        AND    i.indisprimary;", {"table": quote_ident(table, cur)})
 
         if cur.rowcount == 0:
-            raise Error('No primary key defined on table %s' % table)
+            raise Error("No primary key defined on table %s" % table)
 
         row = cur.fetchone()
         if self.verbose:
@@ -122,7 +123,7 @@ class pyBNA:
             cols = cols + sql.SQL(",{}").format(sql.Identifier(c)).as_string(self.conn)
 
         # query
-        q = sql.SQL('select {} as id, {} as geom %s from {};' % cols).format(
+        q = sql.SQL("select {} as id, {} as geom %s from {};" % cols).format(
             sql.Identifier(pkid),
             sql.Identifier(geom_col),
             sql.Identifier(tableName)
@@ -134,8 +135,8 @@ class pyBNA:
         return gpd.GeoDataFrame.from_postgis(
             q,
             self.conn,
-            geom_col='geom',
-            index_col='id'
+            geom_col="geom",
+            index_col="id"
         )
 
 
@@ -159,7 +160,7 @@ class pyBNA:
             print("Checking name %s" % name)
         if name in self.scenarios:
             if raise_error:
-                raise KeyError('A scenario named %s already exists' % name)
+                raise KeyError("A scenario named %s already exists" % name)
             else:
                 return False
         else:
@@ -177,52 +178,85 @@ class pyBNA:
             self.scenarios[scenario.name] = scenario
 
 
-    def add_scenario_new(self, name, notes,
-                        max_distance=None, max_stress=None, max_detour=None,
-                        road_table=None, node_table=None, edge_table=None, verbose=False):
+    def _set_scenarios(self):
+        for scenario in self.config["bna"]["scenarios"]:
+            self.add_scenario_new(scenario)
+
+
+    def add_scenario_new(self, config, verbose=False):
         """Creates a new scenario and registers it
 
         args:
         name -- this scenario's name. a test is run to make sure there's not
             already a scenario of the same name.
-        notes -- any notes to provide further information about this scenario
-        max_distance -- the travel shed size, or maximum allowable trip distance (in units of the underlying coordinate system)
-        max_stress -- the highest stress rating to allow for the low stress graph
-        max_detour -- the maximum allowable detour for determining low stress connectivity (given as a percentage, i.e. 25 = 25%)
-        road_table -- the table with road data
-        node_table -- name of the table of network nodes
-        edge_table -- name of the table of network edges
         verbose -- output useful messages
 
         Return: None
         """
+        name = config["name"]
+        defaults = self.config["bna"]["defaults"]["scenario"]
         self._reestablish_conn()
         if self._check_scenario_name(name):
             if self.verbose:
                 print("Creating scenario %s" % name)
 
-            if road_table is None:
-                road_table = self.config['scenario']['roads']['table']
-            try:
-                road_id_col = self.config['scenario']['roads']['id_column']
-            except KeyError:
-                road_id_col = self._get_pkid_col(road_table)
-            if node_table is None:
-                node_table = self.config['scenario']['nodes']['table']
-            try:
-                node_id_col = self.config['scenario']['nodes']['id_column']
-            except KeyError:
-                node_id_col = self._get_pkid_col(node_table)
-            if edge_table is None:
-                edge_table = self.config['scenario']['edges']['table']
-            try:
-                edge_id_col = self.config['scenario']['edges']['id_column']
-            except KeyError:
-                edge_id_col = self._get_pkid_col(edge_table)
-            node_source_col = self.config['scenario']['edges']['source_column']
-            node_target_col = self.config['scenario']['edges']['target_column']
-            edge_stress_col = self.config['scenario']['edges']['stress_column']
-            edge_cost_col = self.config['scenario']['edges']['cost_column']
+            if "notes" in config:
+                notes = config["notes"]
+            else:
+                notes = "Scenario %s" % name
+
+            if "roads" in config:
+                road_table = config["roads"]
+            else:
+                road_table = defaults["roads"]
+            road_id_col = self._get_pkid_col(road_table)
+
+            if "nodes" in config:
+                node_table = config["nodes"]
+            else:
+                node_table = defaults["nodes"]
+            node_id_col = self._get_pkid_col(node_table)
+
+            if "edges" in config and "table" in config["edges"]:
+                edge_table = config["edges"]["table"]
+            else:
+                edge_table = defaults["edges"]["table"]
+            edge_id_col = self._get_pkid_col(edge_table)
+
+            if "edges" in config and "source_column" in config["edges"]:
+                node_source_col = config["edges"]["source_column"]
+            else:
+                node_source_col = defaults["edges"]["source_column"]
+
+            if "edges" in config and "target_column" in config["edges"]:
+                node_target_col = config["edges"]["target_column"]
+            else:
+                node_target_col = defaults["edges"]["target_column"]
+
+            if "edges" in config and "stress_column" in config["edges"]:
+                edge_stress_col = config["edges"]["stress_column"]
+            else:
+                edge_stress_col = defaults["edges"]["stress_column"]
+
+            if "edges" in config and "cost_column" in config["edges"]:
+                edge_cost_col = config["edges"]["cost_column"]
+            else:
+                edge_cost_col = defaults["edges"]["cost_column"]
+
+            if "max_distance" in config:
+                max_distance = config["max_distance"]
+            else:
+                max_distance = defaults["max_distance"]
+
+            if "max_detour" in config:
+                max_detour = config["max_detour"]
+            else:
+                max_detour = defaults["max_detour"]
+
+            if "max_stress" in config:
+                max_stress = config["max_stress"]
+            else:
+                max_stress = defaults["max_stress"]
 
             self.scenarios[name] = Scenario(
                 name, notes, self.conn, self.blocks, self.srid,
@@ -285,48 +319,35 @@ class pyBNA:
                 "Could not save to %s" % path)
 
 
-    def _set_blocks(self, blocks_table=None, blocks_schema=None, block_id_col=None, shapefile=None):
-        """Set pybna's blocks from database or shapefile
-
-        return: geopandas geodataframe
+    def _set_blocks(self):
         """
-        if shapefile:
-            if self.verbose:
-                print('Getting census blocks from %s' % shapefile)
-            try:
-                df = gpd.read_file(shapefile)
-                df = df.to_crs(epsg=self.srid)
-            except FileNotFoundError:
-                print('No file at %s' % shapefile)
-                raise
-            except IOError:
-                print('Could not open file at %s' % shapefile)
-                raise
+        Set pybna's blocks from database
+        """
+        blocks_table = self.config["bna"]["blocks"]["table"]
+        if "schema" in self.config["bna"]["blocks"]:
+            blocks_schema = self.config["bna"]["blocks"]["schema"]
         else:
-            if blocks_table is None:
-                blocks_table = self.config['blocks']['table']
-            if blocks_schema is None:
-                blocks_schema = self._get_schema(self.blocks_table)
-            if block_id_col is None:
-                block_id_col = self.config['blocks']['id_column']
+            blocks_schema = self._get_schema(self.blocks_table)
+        if block_id_col is None:
+            block_id_col = self.config["bna"]["blocks"]["id_column"]
 
-            if self.verbose:
-                print('Getting census blocks from %s.%s' % (blocks_schema,blocks_table))
-            q = sql.SQL('select {} as geom, {} as blockid from {}.{};').format(
-                sql.Identifier("geom"),
-                sql.Identifier(block_id_col),
-                sql.Identifier(blocks_schema),
-                sql.Identifier(blocks_table)
-            ).as_string(self.conn)
+        if self.verbose:
+            print("Getting census blocks from %s.%s" % (blocks_schema,blocks_table))
+        q = sql.SQL("select {} as geom, {} as blockid from {}.{};").format(
+            sql.Identifier("geom"),
+            sql.Identifier(block_id_col),
+            sql.Identifier(blocks_schema),
+            sql.Identifier(blocks_table)
+        ).as_string(self.conn)
 
-            if self.verbose:
-                print(q)
+        if self.verbose:
+            print(q)
 
-            df = gpd.GeoDataFrame.from_postgis(
-                q,
-                self.conn,
-                geom_col='geom'
-            )
+        df = gpd.GeoDataFrame.from_postgis(
+            q,
+            self.conn,
+            geom_col=self.config["bna"]["blocks"]["geom"]
+        )
 
         self.blocks = df
         self.blocks_table = blocks_table
@@ -340,18 +361,24 @@ class pyBNA:
             print('Adding destinations')
 
         cur = self.conn.cursor()
+        name = v["name"]
 
-        for k, v in self.config['destinations'].iteritems():
-            self.destinations[k] = Destinations(
-                k, self.conn, v['table'], v['uid'], v['name'], verbose=self.verbose
-            )
+        for v in self.config["destinations"]:
+            if "table" in v:
+                self.destinations[name] = Destinations(
+                    name, self.conn, v["table"], v["uid"], verbose=self.verbose
+                )
+            if "subcats" in v:
+                self.destinations[k] = Destinations(
+                    name, self.conn, v["table"], v["uid"], verbose=self.verbose
+                )
             # add all the census blocks containing a destination from this category
             # to the pyBNA index of all blocks containing a destination of any type
             self.destination_blocks.update(
-                self.destinations[k].destination_blocks)
+                self.destinations[name].destination_blocks)
 
         if self.verbose:
-            print('%i census blocks are part of at least one destination' %
+            print("%i census blocks are part of at least one destination" %
                   len(self.destination_blocks))
 
 
@@ -387,7 +414,7 @@ class pyBNA:
         db_connection_string = self.conn.dsn
         try:
             cur = self.conn.cursor()
-            cur.execute('select 1')
+            cur.execute("select 1")
             cur.fetchone()
             cur.close()
         except:

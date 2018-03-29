@@ -1,6 +1,6 @@
 from pybna import pyBNA
 p = pyBNA("192.168.40.225","bna_ames",verbose=True)
-p.set_blocks()
+# p.set_blocks()
 p.get_tiles(table='tiles')
 p.add_scenario_new("base","lksjdfkd")
 s = p.scenarios['base']
