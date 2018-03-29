@@ -12,6 +12,7 @@ import geopandas as gpd
 import pickle
 
 from scenario import Scenario
+from destinations import Destinations
 
 
 class pyBNA:
@@ -35,9 +36,11 @@ class pyBNA:
         self.config = yaml.safe_load(open(config))
 
         if self.verbose:
-            print("\n \
-            ---------------pyBNA---------------\n \
-            Create and test BNA scenarios")
+            print("")
+            print("---------------pyBNA---------------")
+            print("   Create and test BNA scenarios")
+            print("---------------pyBNA---------------")
+            print("")
 
         # set up db connection
         if host is None:
@@ -56,6 +59,19 @@ class pyBNA:
         ])
         self.conn = psycopg2.connect(db_connection_string)
 
+        # blocks
+        self.blocks = None
+        self.blocks_table = None
+        self.blocks_schema = None
+        self.block_id_col = None
+        self._set_blocks()
+
+        # get srid
+        try:
+            self.srid = self.config["db"]["srid"]
+        except KeyError:
+            self.srid = self._get_srid(self.blocks_table)
+
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
         self._set_scenarios()
@@ -65,40 +81,45 @@ class pyBNA:
         self.destination_blocks = set()
         self._set_destinations()
 
-        # blocks
-        self.blocks = None
-        self.blocks_table = None
-        self.blocks_schema = None
-        self.block_id_col = None
-        p._set_blocks()
-
-        # get srid
-        try:
-            self.srid = self.config["db"]["srid"]
-        except KeyError:
-            self.srid = self._get_srid(self.blocks_table)
-
         # Get tiles for running connectivity (if given)
         self.tiles = None
-        if tiles_shp_path and tiles_table_name:
-            raise ValueError("Cannot accept tile sources from both shapefile _and_ pg table")
-        if tiles_shp_path:
-            self.tiles = self._get_tiles_shp(tiles_shp_path)
-        if tiles_table_name:
-            self.tiles = self._get_tiles_pg(tiles_table_name,tiles_table_geom_col,tiles_columns)
+        if "tiles" in self.config["bna"]:
+            tile_config = self.config["bna"]["tiles"]
+            if "table" in tile_config and "file" in tile_config:
+                raise ValueError("Cannot accept tile sources from both shapefile _and_ pg table")
+            if "file" in tile_config:
+                self.tiles = self._get_tiles_shp(tiles_shp_path)
+            if "table" in tile_config:
+                tiles_table_name = tile_config["table"]
+                tiles_table_geom_col = tile_config["geom"]
+                if "columns" in tile_config:
+                    tiles_columns = tile_config["columns"]
+                else:
+                    tiles_columns = list()
+                self.tiles = self._get_tiles_pg(tiles_table_name,tiles_table_geom_col,tiles_columns)
 
 
-    def _get_pkid_col(self, table):
+    def _get_pkid_col(self, table, schema=None):
         # connect to pg and read id col
         self._reestablish_conn()
         cur = self.conn.cursor()
-        cur.execute(" \
-        SELECT a.attname \
-        FROM   pg_index i \
-        JOIN   pg_attribute a ON a.attrelid = i.indrelid \
-                AND a.attnum = ANY(i.indkey) \
-        WHERE  i.indrelid = %(table)s::regclass \
-        AND    i.indisprimary;", {"table": quote_ident(table, cur)})
+
+        if schema:
+            full_table = schema + "." + table
+        else:
+            full_table = table
+
+        q = sql.SQL(" \
+            SELECT a.attname \
+            FROM   pg_index i \
+            JOIN   pg_attribute a ON a.attrelid = i.indrelid \
+                    AND a.attnum = ANY(i.indkey) \
+            WHERE  i.indrelid = {}::regclass \
+            AND    i.indisprimary;"
+        ).format(
+            sql.Literal(full_table)
+        )
+        cur.execute(q)
 
         if cur.rowcount == 0:
             raise Error("No primary key defined on table %s" % table)
@@ -114,7 +135,7 @@ class pyBNA:
         return 1
 
 
-    def _get_tiles_pg(self,tableName,geom_col,add_columns):
+    def _get_tiles_pg(self,tableName,geom_col,add_columns=list()):
         pkid = self._get_pkid_col(tableName)
 
         # handle additional columns
@@ -327,12 +348,15 @@ class pyBNA:
         if "schema" in self.config["bna"]["blocks"]:
             blocks_schema = self.config["bna"]["blocks"]["schema"]
         else:
-            blocks_schema = self._get_schema(self.blocks_table)
-        if block_id_col is None:
+            blocks_schema = self._get_schema(blocks_table)
+        if "id_column" in self.config["bna"]["blocks"]:
             block_id_col = self.config["bna"]["blocks"]["id_column"]
+        else:
+            block_id_col = _get_pkid_col(blocks_table,schema=blocks_schema)
 
         if self.verbose:
             print("Getting census blocks from %s.%s" % (blocks_schema,blocks_table))
+
         q = sql.SQL("select {} as geom, {} as blockid from {}.{};").format(
             sql.Identifier("geom"),
             sql.Identifier(block_id_col),
@@ -361,21 +385,28 @@ class pyBNA:
             print('Adding destinations')
 
         cur = self.conn.cursor()
-        name = v["name"]
 
-        for v in self.config["destinations"]:
+        for v in self.config["bna"]["destinations"]:
             if "table" in v:
-                self.destinations[name] = Destinations(
-                    name, self.conn, v["table"], v["uid"], verbose=self.verbose
+                self.destinations[v["name"]] = Destinations(
+                    v["name"], self.conn, v["table"], v["uid"], verbose=self.verbose
                 )
+                # add all the census blocks containing a destination from this category
+                # to the pyBNA index of all blocks containing a destination of any type
+                self.destination_blocks.update(
+                    self.destinations[v["name"]].destination_blocks)
             if "subcats" in v:
-                self.destinations[k] = Destinations(
-                    name, self.conn, v["table"], v["uid"], verbose=self.verbose
-                )
-            # add all the census blocks containing a destination from this category
-            # to the pyBNA index of all blocks containing a destination of any type
-            self.destination_blocks.update(
-                self.destinations[name].destination_blocks)
+                for sub in v["subcats"]:
+                    self.destinations[sub["name"]] = Destinations(
+                        sub["name"],
+                        self.conn,
+                        sub["table"],
+                        sub["uid"],
+                        verbose=self.verbose
+                    )
+                    self.destination_blocks.update(
+                        self.destinations[sub["name"]].destination_blocks)
+
 
         if self.verbose:
             print("%i census blocks are part of at least one destination" %

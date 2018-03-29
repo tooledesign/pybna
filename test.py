@@ -1,10 +1,9 @@
-from pybna import pyBNA
-p = pyBNA("192.168.40.225","bna_ames",verbose=True)
-# p.set_blocks()
-p.get_tiles(table='tiles')
-p.add_scenario_new("base","lksjdfkd")
+import pdb
+import pybna
+p = pybna.pyBNA(host="192.168.40.225",db="st_louis_park",verbose=True)
 s = p.scenarios['base']
-a = s.getConnectivity(p.tiles[p.tiles.index>=120],dbTable="blocktest")
+a = s.getConnectivity(p.tiles,dbTable="blocktest")
+
 # s._setDebug(True)
 blocks = s.blocks
 tiles = p.tiles

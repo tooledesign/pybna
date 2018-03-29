@@ -56,7 +56,6 @@ class Destinations:
                     sql.Identifier(blocksCol),
                     sql.Identifier(table)
                 )
-                .as_string(cur)
         )
 
         if self.verbose:
@@ -65,13 +64,12 @@ class Destinations:
         allBlocks = set()
 
         for row in cur:
-            if type(row[2]) is list:
-                blocks = set(row[2])
+            if type(row[1]) is list:
+                blocks = set(row[1])
             else:
-                blocks = set([row[2]])
+                blocks = set([row[1]])
             self.destinations.append({
                 'id': row[0],
-                'name': row[1],
                 'blocks': blocks
             })
 
