@@ -46,7 +46,7 @@ class pyBNA:
         if host is None:
             host = self.config["db"]["host"]
         if db is None:
-            db = self.config["db"]["database"]
+            db = self.config["db"]["dbname"]
         if user is None:
             user = self.config["db"]["user"]
         if password is None:
@@ -68,7 +68,7 @@ class pyBNA:
 
         # get srid
         try:
-            self.srid = self.config["db"]["srid"]
+            self.srid = self.config["srid"]
         except KeyError:
             self.srid = self._get_srid(self.blocks_table)
 
