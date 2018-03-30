@@ -18,7 +18,7 @@ from destinations import Destinations
 class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
-    def __init__(self, config="default.config", host=None, db=None, user=None,
+    def __init__(self, config="config.yaml", host=None, db=None, user=None,
                  password=None, verbose=False):
         """Connects to the BNA database
 
