@@ -19,7 +19,7 @@ class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
     def __init__(self, config="config.yaml", host=None, db=None, user=None,
-                 password=None, verbose=False):
+                 password=None, verbose=False, debug=False):
         """Connects to the BNA database
 
         kwargs:
@@ -29,17 +29,19 @@ class pyBNA:
         user -- username to connect to database
         password -- password to connect to database
         verbose -- output useful messages
+        debug -- set to debug mode
 
         return: pyBNA object
         """
         self.verbose = verbose
+        self.debug = debug
         self.config = yaml.safe_load(open(config))
 
         if self.verbose:
             print("")
             print("---------------pyBNA---------------")
             print("   Create and test BNA scenarios")
-            print("---------------pyBNA---------------")
+            print("-----------------------------------")
             print("")
 
         # set up db connection
@@ -64,7 +66,9 @@ class pyBNA:
         self.blocks_table = None
         self.blocks_schema = None
         self.block_id_col = None
-        self._set_blocks()
+        self.block_pop = None
+        if not self.debug:
+            self._set_blocks()
 
         # get srid
         try:
@@ -74,12 +78,14 @@ class pyBNA:
 
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
-        self._set_scenarios()
+        if not self.debug:
+            self._set_scenarios()
 
         # Set destinations from config file
         self.destinations = dict()
         self.destination_blocks = set()
-        self._set_destinations()
+        if not self.debug:
+            self._set_destinations()
 
         # Get tiles for running connectivity (if given)
         self.tiles = None
@@ -345,6 +351,8 @@ class pyBNA:
         Set pybna's blocks from database
         """
         blocks_table = self.config["bna"]["blocks"]["table"]
+        pop = self.config["bna"]["blocks"]["population"]
+        geom = self.config["bna"]["blocks"]["geom"]
         if "schema" in self.config["bna"]["blocks"]:
             blocks_schema = self.config["bna"]["blocks"]["schema"]
         else:
@@ -357,9 +365,10 @@ class pyBNA:
         if self.verbose:
             print("Getting census blocks from %s.%s" % (blocks_schema,blocks_table))
 
-        q = sql.SQL("select {} as geom, {} as blockid from {}.{};").format(
-            sql.Identifier("geom"),
+        q = sql.SQL("select {} as geom, {} as blockid, {} as pop from {}.{};").format(
+            sql.Identifier(geom),
             sql.Identifier(block_id_col),
+            sql.Identifier(pop),
             sql.Identifier(blocks_schema),
             sql.Identifier(blocks_table)
         ).as_string(self.conn)
@@ -370,17 +379,18 @@ class pyBNA:
         df = gpd.GeoDataFrame.from_postgis(
             q,
             self.conn,
-            geom_col=self.config["bna"]["blocks"]["geom"]
+            geom_col=geom
         )
 
         self.blocks = df
         self.blocks_table = blocks_table
         self.blocks_schema = blocks_schema
         self.block_id_col = block_id_col
+        self.block_pop = pop
 
 
     def _set_destinations(self):
-        """Retrieve the generic BNA destination types and register them."""
+        """Retrieve the destinations identified in the config file and register them."""
         if self.verbose:
             print('Adding destinations')
 

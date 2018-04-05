@@ -3,30 +3,31 @@
 ###################################################################
 import psycopg2
 from psycopg2 import sql
+import pandas as pd
 
 
 class Destinations:
-    def __init__(self,category,conn,table,idCol,blocksCol=None,verbose=False):
+    def __init__(self,category,conn,table,id_col,blocks_col=None,verbose=False):
         """Sets up a new category of BNA destinations and retrieves data from
         the given db table
 
         category -- destination category type
         table -- the db table where data is stored
-        blocksCol -- the column name where census block ids are stored. if None
+        blocks_col -- the column name where census block ids are stored. if None
             uses blockid10, the BNA default.
 
         return: None
         """
         self.verbose = verbose
         self.category = category
-        self.lsPopulation = None
-        self.hsPopulation = None
+        self.ls_population = None
+        self.hs_population = None
         self.destinations = list()
 
-        if blocksCol is None:
-            blocksCol = 'blockid10'
+        if blocks_col is None:
+            blocks_col = 'blockid10'
 
-        self.destination_blocks = set(self._retrieve(conn,table,idCol,blocksCol))
+        self.destination_blocks = set(self._retrieve(conn,table,id_col,blocks_col))
 
 
     def __unicode__(self):
@@ -39,7 +40,7 @@ class Destinations:
         return r'%s: %i destinations' % (self.category, n)
 
 
-    def _retrieve(self,conn,table,idCol,blocksCol):
+    def _retrieve(self,conn,table,id_col,blocks_col):
         """Retrieve destinations from the database and store them in
         this class' list of destinations
 
@@ -52,8 +53,8 @@ class Destinations:
         cur.execute(
             sql.SQL('select {}, {} from {};')
                 .format(
-                    sql.Identifier(idCol),
-                    sql.Identifier(blocksCol),
+                    sql.Identifier(id_col),
+                    sql.Identifier(blocks_col),
                     sql.Identifier(table)
                 )
         )
@@ -76,3 +77,8 @@ class Destinations:
             allBlocks.update(blocks)
 
         return allBlocks
+
+    def set_population(self,blocks,connected_blocks):
+        pass
+        # self.ls_population =
+        # self.hs_population =

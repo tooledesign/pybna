@@ -20,6 +20,7 @@ bna:
         table: "neighborhood_census_blocks"
         # schema: "generated"
         id_column: "blockid10"
+        population: "pop10"
         geom: "geom"
 
     tiles:
@@ -224,7 +225,24 @@ bna:
 
     defaults:
         scenario:
-            roads: "neighborhood_ways"
+            roads:
+                table: "neighborhood_ways"
+                geom: "geom"
+                uid: "road_id"
+                source_column: "intersection_from"
+                target_column: "intersection_to"
+                oneway: {name: "one_way", forward: "ft", backward: "tf"}
+                stress:
+                    segment:
+                        ft: ft_seg_stress
+                        tf: tf_seg_stress
+                    crossing:
+                        ft: ft_int_stress
+                        tf: tf_int_stress
+            intersections:
+                table: "neighborhood_ways_intersections"
+                geom: "geom"
+                uid: "int_id"
             edges:
                 table: "neighborhood_ways_net_link"
                 source_column: "source_vert"
@@ -232,7 +250,8 @@ bna:
                 stress_column: "link_stress"
                 cost_column: "link_cost"
                 # id_column: link_id
-            nodes: "neighborhood_ways_net_vert"
+            nodes:
+                table: "neighborhood_ways_net_vert"
                 # id_column: vert_id
             max_distance: 2680
             max_detour: 25
