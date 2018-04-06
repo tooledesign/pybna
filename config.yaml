@@ -45,42 +45,37 @@ bna:
     # note that scenarios are added as a list (i.e. with a dash)
     #   - name: scenario1
     #     notes: "Description of scenario1"
-    #     roads:
-    #         table: "neighborhood_ways_s1" #
-    #         # id_column: road_id
-    #         speed_limit: "speed_limit_s1"
-    #         lanes:
-    #             forward: "ft_lanes_s1"
-    #             backward: "tf_lanes_s1"
-    #         parking:
-    #             forward: "ft_park_s1"
-    #             backward: "tf_park_s1"
-    #         bike_infra:
-    #             forward: "ft_bike_infra_s1"
-    #             backward: "tf_bike_infra_s1"
+    #   - roads:
+    #         table: "neighborhood_ways_s1"
+    #         geom: "geo"
+    #         uid: "id"
+    #         source_column: "fr"
+    #         target_column: "to"
+    #         oneway: {name: "oneway", forward: "fw", backward: "bw"}
     #         stress:
     #             segment:
-    #                 forward: "ft_seg_stress_s1"
-    #                 backward: "tf_seg_stress_s1"
-    #             intersection:
-    #                 forward: "ft_int_stress_s1"
-    #                 backward: "tf_int_stress_s1"
-    #     intersections:
-    #         table: "neighborhood_ways_s1_intersections" #
-    #         # id_column: int_id
-    #     edges:
-    #         table: "neighborhood_ways_s1_net_link" #
-    #         source_column: "source_vert_s1"
-    #         target_column: "target_vert_s1"
-    #         stress_column: "link_stress_s1"
-    #         cost_column: "link_cost_s1"
-    #         # id_column: link_id
-    #     nodes:
-    #         table: "neighborhood_ways_s1_net_vert" #
-    #         # id_column: vert_id
-    #     max_distance: 2680
-    #     max_detour: 25
-    #     max_stress: 1
+    #                 ft: fw_stress
+    #                 tf: bw_stress
+    #             crossing:
+    #                 ft: fw_int_stress
+    #                 tf: bw_int_stress
+    #       intersections:
+    #         table: "neighborhood_ways_s1_intersections"
+    #         geom: "geo"
+    #         uid: "id"
+    #       edges:
+    #         table: "neighborhood_ways_s1_net_link"
+    #         source_column: "source"
+    #         target_column: "target"
+    #         stress_column: "stress"
+    #         cost_column: "cost"
+    #         # id_column: id
+    #       nodes:
+    #         table: "neighborhood_ways_s1_net_vert"
+    #         # id_column: id
+    #       max_distance: 5000
+    #       max_detour: 50
+    #       max_stress: 3
 
     destinations:
       - name: people
