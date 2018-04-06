@@ -47,7 +47,7 @@ class Destinations:
         return: list of all census block ids that contain a destination in this category
         """
         if self.verbose:
-            print('Getting destinations for %s' % table)
+            print('Getting destinations for %s from %s' % (self.category,table))
         cur = conn.cursor()
 
         cur.execute(
@@ -62,7 +62,7 @@ class Destinations:
         if self.verbose:
             print(cur.query)
 
-        allBlocks = set()
+        all_blocks = set()
 
         for row in cur:
             if type(row[1]) is list:
@@ -74,9 +74,9 @@ class Destinations:
                 'blocks': blocks
             })
 
-            allBlocks.update(blocks)
+            all_blocks.update(blocks)
 
-        return allBlocks
+        return all_blocks
 
     def set_population(self,blocks,connected_blocks):
         pass
