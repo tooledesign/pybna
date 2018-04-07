@@ -65,7 +65,7 @@ class Destinations:
         all_blocks = set()
 
         for row in cur:
-            if type(row[1]) is list:
+            if isinstance(row[1], list):
                 blocks = set(row[1])
             else:
                 blocks = set([row[1]])

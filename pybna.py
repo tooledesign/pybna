@@ -210,7 +210,7 @@ class pyBNA:
             self.add_scenario_new(scenario)
 
 
-    def add_scenario_new(self, config, verbose=False):
+    def add_scenario_new(self, config):
         """Creates a new scenario and registers it
 
         args:
@@ -221,79 +221,11 @@ class pyBNA:
         Return: None
         """
         name = config["name"]
-        defaults = self.config["bna"]["defaults"]["scenario"]
-        self._reestablish_conn()
         if self._check_scenario_name(name):
             if self.verbose:
                 print("Creating scenario %s" % name)
 
-            if "notes" in config:
-                notes = config["notes"]
-            else:
-                notes = "Scenario %s" % name
-
-            if "roads" in config:
-                road_table = config["roads"]
-            else:
-                road_table = defaults["roads"]
-            road_id_col = self._get_pkid_col(road_table)
-
-            if "nodes" in config:
-                node_table = config["nodes"]
-            else:
-                node_table = defaults["nodes"]
-            node_id_col = self._get_pkid_col(node_table)
-
-            if "edges" in config and "table" in config["edges"]:
-                edge_table = config["edges"]["table"]
-            else:
-                edge_table = defaults["edges"]["table"]
-            edge_id_col = self._get_pkid_col(edge_table)
-
-            if "edges" in config and "source_column" in config["edges"]:
-                node_source_col = config["edges"]["source_column"]
-            else:
-                node_source_col = defaults["edges"]["source_column"]
-
-            if "edges" in config and "target_column" in config["edges"]:
-                node_target_col = config["edges"]["target_column"]
-            else:
-                node_target_col = defaults["edges"]["target_column"]
-
-            if "edges" in config and "stress_column" in config["edges"]:
-                edge_stress_col = config["edges"]["stress_column"]
-            else:
-                edge_stress_col = defaults["edges"]["stress_column"]
-
-            if "edges" in config and "cost_column" in config["edges"]:
-                edge_cost_col = config["edges"]["cost_column"]
-            else:
-                edge_cost_col = defaults["edges"]["cost_column"]
-
-            if "max_distance" in config:
-                max_distance = config["max_distance"]
-            else:
-                max_distance = defaults["max_distance"]
-
-            if "max_detour" in config:
-                max_detour = config["max_detour"]
-            else:
-                max_detour = defaults["max_detour"]
-
-            if "max_stress" in config:
-                max_stress = config["max_stress"]
-            else:
-                max_stress = defaults["max_stress"]
-
-            self.scenarios[name] = Scenario(
-                name, notes, self.conn, self.blocks, self.srid,
-                max_distance, max_stress, max_detour,
-                self.blocks_schema, self.blocks_table, self.block_id_col,
-                road_table, road_id_col,
-                node_table, node_id_col,
-                edge_table, edge_id_col, node_source_col, node_target_col, edge_stress_col, edge_cost_col,
-                self.verbose
-            )
+            self.scenarios[name] = Scenario(self, config)
 
 
     def add_scenario_from_pickle(self, path, name=None):
