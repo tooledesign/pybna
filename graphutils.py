@@ -7,7 +7,7 @@ import psycopg2
 from psycopg2 import sql
 
 
-def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNodeCol,
+def build_network(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNodeCol,
         edgeCostCol,stressCol,verbose=False):
     """Builds a networkx graph from a complete network stored in the PostGIS database
 
@@ -74,14 +74,14 @@ def buildNetwork(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNode
     return G
 
 
-def buildRestrictedNetwork(G,maxStress):
+def build_restricted_network(G,maxStress):
     stressFilter = G.new_edge_property("bool")
     # G.edge_properties["stressFilter"] = stressFilter
     map_property_values(G.ep.stress,stressFilter,lambda x: x<=maxStress)
     return GraphView(G,efilt=stressFilter)
 
 
-def translateNodes(G,nodeIds):
+def translate_nodes(G,nodeIds):
     vs = list()
     for i in nodeIds:
         vs.append(int(find_vertex(G,G.vp.pkid,i)[0]))

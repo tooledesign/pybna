@@ -49,7 +49,7 @@ class Scenario:
         self.debug = bna.debug
 
         # build graphs
-        self.hsG = graphutils.buildNetwork(
+        self.hsG = graphutils.build_network(
             self.conn,
             self.config["edges"]["table"],
             self.config["nodes"]["table"],
@@ -61,7 +61,7 @@ class Scenario:
             self.config["edges"]["stress_column"],
             self.verbose
         )
-        self.lsG = graphutils.buildRestrictedNetwork(
+        self.lsG = graphutils.build_restricted_network(
             self.hsG,
             self.config["max_stress"]
         )
