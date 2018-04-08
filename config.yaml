@@ -54,11 +54,11 @@ bna:
     #         oneway: {name: "oneway", forward: "fw", backward: "bw"}
     #         stress:
     #             segment:
-    #                 ft: fw_stress
-    #                 tf: bw_stress
+    #                 forward: fw_stress
+    #                 backward: bw_stress
     #             crossing:
-    #                 ft: fw_int_stress
-    #                 tf: bw_int_stress
+    #                 forward: fw_int_stress
+    #                 backward: bw_int_stress
     #       intersections:
     #         table: "neighborhood_ways_s1_intersections"
     #         geom: "geo"
@@ -69,10 +69,10 @@ bna:
     #         target_column: "target"
     #         stress_column: "stress"
     #         cost_column: "cost"
-    #         # id_column: id
+    #         id_column: id
     #       nodes:
     #         table: "neighborhood_ways_s1_net_vert"
-    #         # id_column: id
+    #         id_column: id
     #       max_distance: 5000
     #       max_detour: 50
     #       max_stress: 3
@@ -229,11 +229,11 @@ bna:
                 oneway: {name: "one_way", forward: "ft", backward: "tf"}
                 stress:
                     segment:
-                        ft: ft_seg_stress
-                        tf: tf_seg_stress
+                        forward: ft_seg_stress
+                        backward: tf_seg_stress
                     crossing:
-                        ft: ft_int_stress
-                        tf: tf_int_stress
+                        forward: ft_int_stress
+                        backward: tf_int_stress
             intersections:
                 table: "neighborhood_ways_intersections"
                 geom: "geom"
@@ -244,10 +244,10 @@ bna:
                 target_column: "target_vert"
                 stress_column: "link_stress"
                 cost_column: "link_cost"
-                # id_column: link_id
+                id_column: link_id
             nodes:
                 table: "neighborhood_ways_net_vert"
-                # id_column: vert_id
+                id_column: vert_id
             max_distance: 2680
             max_detour: 25
             max_stress: 1

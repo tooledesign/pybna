@@ -2,7 +2,7 @@
 # The Scenario class stores a BNA scenario for use in pyBNA.
 # A scenario includes two graphs: one for high stress, one for low stress
 ###################################################################
-import sys, StringIO
+import sys, os, StringIO
 import collections
 from graph_tool.all import *
 import psycopg2
@@ -35,48 +35,52 @@ class Scenario:
         # register pandas apply with tqdm for progress bar
         tqdm.pandas(desc="Evaluating connectivity")
 
+        self.bna = bna
+        self.module_dir = os.path.dirname(os.path.abspath(__file__))
+        self.config = config
+        self._set_config_from_defaults(self.config,self.bna.config["bna"]["defaults"]["scenario"])
         self.name = self.config["name"]
-        bna._reestablish_conn()
-        self.conn = bna.conn
-        self.config = _set_config_from_defaults(config,bna["defaults"]["scenario"])
+        self.bna._reestablish_conn()
+        self.conn = self.bna.conn
 
         if "notes" in self.config:
             self.notes = self.config["notes"]
         else:
             notes = "Scenario %s" % self.name
 
-        self.verbose = bna.verbose
-        self.debug = bna.debug
+        self.verbose = self.bna.verbose
+        self.debug = self.bna.debug
 
         # build graphs
-        self.hs_graph = graphutils.build_network(
-            self.conn,
-            self.config["edges"]["table"],
-            self.config["nodes"]["table"],
-            self.config["edges"]["id_column"],
-            self.config["nodes"]["id_column"],
-            self.config["edges"]["source_column"],
-            self.config["edges"]["target_column"],
-            self.config["edges"]["cost_column"],
-            self.config["edges"]["stress_column"],
-            self.verbose
-        )
-        self.ls_graph = graphutils.build_restricted_network(
-            self.hs_graph,
-            self.config["max_stress"]
-        )
+        if not self.debug:
+            self.hs_graph = graphutils.build_network(
+                self.conn,
+                self.config["edges"]["table"],
+                self.config["nodes"]["table"],
+                self.config["edges"]["id_column"],
+                self.config["nodes"]["id_column"],
+                self.config["edges"]["source_column"],
+                self.config["edges"]["target_column"],
+                self.config["edges"]["cost_column"],
+                self.config["edges"]["stress_column"],
+                self.verbose
+            )
+            self.ls_graph = graphutils.build_restricted_network(
+                self.hs_graph,
+                self.config["max_stress"]
+            )
 
-        # get block nodes
-        self.blocks = bna.blocks.merge(
-            self._get_block_nodes(censusTable,blockIdCol,self.config["roads"]["table"],self.config["roads"]["uid"],self.config["nodes"]["table"],self.config["nodes"]["id_column"]),
-            on="blockid"
-        )
+            # get block nodes
+            self.blocks = self.bna.blocks.merge(
+                self._get_block_nodes(censusTable,blockIdCol,self.config["roads"]["table"],self.config["roads"]["uid"],self.config["nodes"]["table"],self.config["nodes"]["id_column"]),
+                on="blockid"
+            )
 
-        # get block graph nodes
-        # self.blocks["graph_v"] = self.blocks["nodes"].apply(
-        #     lambda x: [int(find_vertex(self.hs_graph,self.hs_graph.vp.pkid,i)[0]) for i in x]
-        # )
-        self.blocks["graph_v"] = self.blocks["nodes"].apply(self._get_graph_nodes)
+            # get block graph nodes
+            # self.blocks["graph_v"] = self.blocks["nodes"].apply(
+            #     lambda x: [int(find_vertex(self.hs_graph,self.hs_graph.vp.pkid,i)[0]) for i in x]
+            # )
+            self.blocks["graph_v"] = self.blocks["nodes"].apply(self._get_graph_nodes)
 
         # create connectivity matrix
         self.connectivity = None
@@ -105,7 +109,7 @@ class Scenario:
         for k, v in defaults.iteritems():
             if (k in config and isinstance(config[k], dict)
                     and isinstance(defaults[k], collections.Mapping)):
-                _set_config_from_defaults(config[k], defaults[k])
+                self._set_config_from_defaults(config[k], defaults[k])
             elif k in config:
                 pass
             else:
@@ -142,7 +146,7 @@ class Scenario:
                     high_stress BOOLEAN, \
                     low_stress BOOLEAN \
                 )'
-            ).format(sql.Identifier(bna.blocks_schema),sql.Identifier(db_table)))
+            ).format(sql.Identifier(self.bna.blocks_schema),sql.Identifier(db_table)))
             cur.close()
             self.conn.commit()
 
@@ -235,12 +239,12 @@ class Scenario:
                 analyze {}.{}; \
             ').format(
                 sql.Identifier("idx_"+db_table+"_blockpairs_hs"),
-                sql.Identifier(bna.blocks_schema),
+                sql.Identifier(self.bna.blocks_schema),
                 sql.Identifier(db_table),
                 sql.Identifier("idx_"+db_table+"_blockpairs_ls"),
-                sql.Identifier(bna.blocks_schema),
+                sql.Identifier(self.bna.blocks_schema),
                 sql.Identifier(db_table),
-                sql.Identifier(bna.blocks_schema),
+                sql.Identifier(self.bna.blocks_schema),
                 sql.Identifier(db_table)
             ))
             self.conn.commit()
@@ -321,8 +325,8 @@ class Scenario:
 
     # def _get_block_nodes(self,censusTable,blockIdCol,self.config["roads"]["table"],self.config["roads"]["uid"],self.config["nodes"]["table"],nodeIdCol):
     def _get_block_nodes(self):
-        bna._reestablish_conn()
-        cur = bna.conn.cursor()
+        self.bna._reestablish_conn()
+        cur = self.bna.conn.cursor()
 
         # make temporary nodes table and add blocks
         q = sql.SQL(' \
@@ -340,10 +344,10 @@ class Scenario:
             create index tsidx_blocknodesgeom on tmp_blocknodes using gist (geom); \
             analyze tmp_blocknodes; \
         ').format(
-            sql.Identifier(bna.config["bna"]["blocks"]["id_column"]),
-            sql.Identifier(bna.config["bna"]["blocks"]["table"])
+            sql.Identifier(self.bna.config["bna"]["blocks"]["id_column"]),
+            sql.Identifier(self.bna.config["bna"]["blocks"]["table"])
         ).as_string(cur)
-        cur.execute(q % bna.srid)
+        cur.execute(q % self.bna.srid)
 
         # add nodes
         q = sql.SQL(' \
@@ -406,3 +410,54 @@ class Scenario:
             cur.close()
         except:
             self.conn = psycopg2.connect(db_connection_string)
+
+
+    def build_db_network(self,dry=False):
+        """
+        Builds the network in the DB using details from the BNA config file.
+
+        args:
+        dry -- dry run only, don't execute the query in the DB (for debugging)
+        """
+        if self.verbose:
+            print("Building network in database")
+            
+        # set up substitutions
+        net_subs = {
+            "srid": sql.Literal(self.bna.srid),
+            "schema": sql.Identifier(self.bna._get_schema(self.config["roads"]["table"])),
+            "roads": sql.Identifier(self.config["roads"]["table"]),
+            "road_id": sql.Identifier(self.config["roads"]["uid"]),
+            "roads_geom": sql.Identifier(self.config["roads"]["geom"]),
+            "road_source": sql.Identifier(self.config["roads"]["source_column"]),
+            "road_target": sql.Identifier(self.config["roads"]["target_column"]),
+            "one_way": sql.Identifier(self.config["roads"]["oneway"]["name"]),
+            "forward": sql.Literal(self.config["roads"]["oneway"]["forward"]),
+            "backward": sql.Literal(self.config["roads"]["oneway"]["backward"]),
+            "intersections": sql.Identifier(self.config["intersections"]["table"]),
+            "int_id": sql.Identifier(self.config["intersections"]["uid"]),
+            "nodes": sql.Identifier(self.config["nodes"]["table"]),
+            "node_id": sql.Identifier(self.config["nodes"]["id_column"]),
+            "edges": sql.Identifier(self.config["edges"]["table"]),
+            "edge_id": sql.Identifier(self.config["edges"]["id_column"]),
+            "ft_seg_stress": sql.Identifier(self.config["roads"]["stress"]["segment"]["forward"]),
+            "tf_seg_stress": sql.Identifier(self.config["roads"]["stress"]["segment"]["backward"]),
+            "ft_int_stress": sql.Identifier(self.config["roads"]["stress"]["crossing"]["forward"]),
+            "tf_int_stress": sql.Identifier(self.config["roads"]["stress"]["crossing"]["backward"])
+        }
+
+        # read in the raw query language
+        f = open(os.path.join(self.module_dir,"build_network.sql"))
+        raw = f.read()
+        f.close()
+
+        # compose the query
+        q = sql.SQL(raw).format(**net_subs)
+
+        if dry:
+            print(q.as_string(self.conn))
+        else:
+            cur = self.conn.cursor()
+            cur.execute(q)
+            del cur
+            self.conn.commit()
