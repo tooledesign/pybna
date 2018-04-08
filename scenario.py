@@ -49,7 +49,7 @@ class Scenario:
         self.debug = bna.debug
 
         # build graphs
-        self.hsG = graphutils.build_network(
+        self.hs_graph = graphutils.build_network(
             self.conn,
             self.config["edges"]["table"],
             self.config["nodes"]["table"],
@@ -61,8 +61,8 @@ class Scenario:
             self.config["edges"]["stress_column"],
             self.verbose
         )
-        self.lsG = graphutils.build_restricted_network(
-            self.hsG,
+        self.ls_graph = graphutils.build_restricted_network(
+            self.hs_graph,
             self.config["max_stress"]
         )
 
@@ -74,7 +74,7 @@ class Scenario:
 
         # get block graph nodes
         # self.blocks["graph_v"] = self.blocks["nodes"].apply(
-        #     lambda x: [int(find_vertex(self.hsG,self.hsG.vp.pkid,i)[0]) for i in x]
+        #     lambda x: [int(find_vertex(self.hs_graph,self.hs_graph.vp.pkid,i)[0]) for i in x]
         # )
         self.blocks["graph_v"] = self.blocks["nodes"].apply(self._get_graph_nodes)
 
@@ -266,10 +266,10 @@ class Scenario:
         for i in row["graph_vfrom"]:
             dist = np.min(
                 shortest_distance(
-                    self.hsG,
-                    source=self.hsG.vertex(i),
+                    self.hs_graph,
+                    source=self.hs_graph.vertex(i),
                     target=row["graph_vto"],
-                    weights=self.hsG.ep.cost,
+                    weights=self.hs_graph.ep.cost,
                     max_dist=self.config["max_distance"]
                 )
             )
@@ -295,10 +295,10 @@ class Scenario:
             for i in row["graph_vfrom"]:
                 dist = np.min(
                     shortest_distance(
-                        self.lsG,
-                        source=self.lsG.vertex(i),
+                        self.ls_graph,
+                        source=self.ls_graph.vertex(i),
                         target=row["graph_vto"],
-                        weights=self.lsG.ep.cost,
+                        weights=self.ls_graph.ep.cost,
                         max_dist=self.config["max_distance"]
                     )
                 )
@@ -385,7 +385,7 @@ class Scenario:
         gnodes = list()
         for n in nodes:
             try:
-                gnodes.append(int(find_vertex(self.hsG,self.hsG.vp.pkid,n)[0]))
+                gnodes.append(int(find_vertex(self.hs_graph,self.hs_graph.vp.pkid,n)[0]))
             except IndexError:
                 pass    # no graph nodes in network (orphaned segment problem)
         return gnodes
