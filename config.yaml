@@ -22,12 +22,14 @@ bna:
         id_column: "blockid10"
         population: "pop10"
         geom: "geom"
+        roads_tolerance: 15     # determines whether a road is considered "connected" to a block
+        min_road_length: 30     # determines whether a road is considered "connected" to a block
 
     tiles:
         # file: "/path/to/shapefile.shp"
         table: "grid_bna"
         geom: "geom"
-        # columns: ["column1","column2"]
+        # columns: ["column1","column2"] # note: pybna already grabs the id column
 
     scenarios:
     # list of scenarios with settings for all BNA inputs

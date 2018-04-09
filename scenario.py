@@ -51,6 +51,8 @@ class Scenario:
         self.verbose = self.bna.verbose
         self.debug = self.bna.debug
 
+        # check for network tables in db
+
         # build graphs
         if not self.debug:
             self.hs_graph = graphutils.build_network(
@@ -72,7 +74,7 @@ class Scenario:
 
             # get block nodes
             self.blocks = self.bna.blocks.merge(
-                self._get_block_nodes(censusTable,blockIdCol,self.config["roads"]["table"],self.config["roads"]["uid"],self.config["nodes"]["table"],self.config["nodes"]["id_column"]),
+                self._get_block_nodes(),
                 on="blockid"
             )
 
@@ -153,7 +155,7 @@ class Scenario:
         # create single tile if no tiles given
         if tiles is None:
             tiles = gpd.GeoDataFrame.from_features(gpd.GeoSeries(
-                _get_graph_nodes.unary_union.envelope,
+                self.blocks.unary_union.envelope,
                 name="geom"
             ))
 
@@ -167,9 +169,9 @@ class Scenario:
                 c += 1
 
             # select blocks that intersect the tile
-            _get_graph_nodes["tempkey"] = 1
+            self.blocks["tempkey"] = 1
             df = gpd.sjoin(
-                _get_graph_nodes,
+                self.blocks,
                 tiles[tiles.index==i]
             )[["blockid","geom","nodes","graph_v","tempkey"]]
 
@@ -192,7 +194,7 @@ class Scenario:
 
             # cartesian join of subselected blocks (origins) with all census blocks (destinations)
             df = df.merge(
-                _get_graph_nodes[["blockid","tempkey","nodes","graph_v","geom"]],
+                self.blocks[["blockid","tempkey","nodes","graph_v","geom"]],
                 on="tempkey",
                 suffixes=("from","to")
             ).drop(columns=["tempkey"])
@@ -206,7 +208,7 @@ class Scenario:
             )
             df = df[df.keep].drop(columns=["geomfrom","geomto","keep"]) #.to_sparse()
 
-            _get_graph_nodes = _get_graph_nodes.drop(columns=["tempkey"])
+            self.blocks = self.blocks.drop(columns=["tempkey"])
 
             # add stress connectivity column
             df["hsls"] = pd.SparseSeries([False] * len(df),dtype="int8",fill_value=0)
@@ -266,123 +268,109 @@ class Scenario:
         hsDist = -1
         lsDist = -1
 
-        # first test hs connection
+        # create temporary vertices for from and to blocks
+        o_vertex = self.hs_graph.add_vertex()
+        d_vertex = self.hs_graph.add_vertex()
         for i in row["graph_vfrom"]:
-            dist = np.min(
-                shortest_distance(
-                    self.hs_graph,
-                    source=self.hs_graph.vertex(i),
-                    target=row["graph_vto"],
-                    weights=self.hs_graph.ep.cost,
+            self.hs_graph.add_edge(o_vertex,self.hs_graph.vertex(i))
+        for i in row["graph_vto"]:
+            self.hs_graph.add_edge(self.hs_graph.vertex(i),d_vertex)
+
+        # first test hs connection
+        dist = shortest_distance(
+                self.hs_graph,
+                source=o_vertex,
+                target=d_vertex,
+                weights=self.hs_graph.ep.cost,
+                max_dist=self.config["max_distance"]
+        )
+        if self.debug:
+            self.blockDistances.append(
+                [{
+                    "blockidfrom":fromBlock,
+                    "blockidto":toBlock,
+                    "hsDist":dist,
+                    "lsDist":-1
+                }]
+            )
+
+        if not np.isinf(dist):  # test for no path
+            if hsDist < 0:
+                hsDist = dist
+                hs_connected = True
+            if dist < hsDist:
+                hsDist = dist
+
+        # remove temporary vertices from graph
+        self.hs_graph.remove_vertex([o_vertex,d_vertex])
+
+        # next test ls connection (but only if hs_connected)
+        if hs_connected:
+            o_vertex = self.ls_graph.add_vertex()
+            d_vertex = self.ls_graph.add_vertex()
+            for i in row["graph_vfrom"]:
+                self.hs_graph.add_edge(o_vertex,self.ls_graph.vertex(i))
+            for i in row["graph_vto"]:
+                self.hs_graph.add_edge(self.ls_graph.vertex(i),d_vertex)
+
+            dist = shortest_distance(
+                    self.ls_graph,
+                    source=o_vertex,
+                    target=d_vertex,
+                    weights=self.ls_graph.ep.cost,
                     max_dist=self.config["max_distance"]
-                )
             )
             if self.debug:
                 self.blockDistances.append(
                     [{
                         "blockidfrom":fromBlock,
                         "blockidto":toBlock,
-                        "hsDist":dist,
-                        "lsDist":-1
+                        "hsDist":-1,
+                        "lsDist":dist
                     }]
                 )
 
-            if not np.isinf(dist):  # test for no path
-                if hsDist < 0:
-                    hsDist = dist
-                    hs_connected = True
-                if dist < hsDist:
-                    hsDist = dist
+            if not np.isinf(dist):  # no path
+                ls_connected = True
 
-        # next test ls connection (but only if hs_connected)
-        if hs_connected:
-            for i in row["graph_vfrom"]:
-                dist = np.min(
-                    shortest_distance(
-                        self.ls_graph,
-                        source=self.ls_graph.vertex(i),
-                        target=row["graph_vto"],
-                        weights=self.ls_graph.ep.cost,
-                        max_dist=self.config["max_distance"]
-                    )
-                )
-                if self.debug:
-                    self.blockDistances.append(
-                        [{
-                            "blockidfrom":fromBlock,
-                            "blockidto":toBlock,
-                            "hsDist":-1,
-                            "lsDist":dist
-                        }]
-                    )
-
-                if not np.isinf(dist):  # no path
-                    ls_connected = True
-                    continue
+            # remove temporary vertices from graph
+            self.ls_graph.remove_vertex([o_vertex,d_vertex])
 
         return hs_connected | (ls_connected << 1)
 
 
-    # def _get_block_nodes(self,censusTable,blockIdCol,self.config["roads"]["table"],self.config["roads"]["uid"],self.config["nodes"]["table"],nodeIdCol):
     def _get_block_nodes(self):
+        # set up substitutions
+        subs = {
+            "blocks_schema": sql.Identifier(self.bna.blocks_schema),
+            "blocks": sql.Identifier(self.bna.config["bna"]["blocks"]["table"]),
+            "block_id": sql.Identifier(self.bna.config["bna"]["blocks"]["id_column"]),
+            "block_geom": sql.Identifier(self.bna.config["bna"]["blocks"]["geom"]),
+            "roads_schema": sql.Identifier(self.bna._get_schema(self.config["roads"]["table"])),
+            "roads": sql.Identifier(self.config["roads"]["table"]),
+            "road_id": sql.Identifier(self.config["roads"]["uid"]),
+            "road_geom": sql.Identifier(self.config["roads"]["geom"]),
+            "nodes": sql.Identifier(self.config["nodes"]["table"]),
+            "node_id": sql.Identifier(self.config["nodes"]["id_column"]),
+            "distance": sql.Literal(self.bna.config["bna"]["blocks"]["roads_tolerance"]),
+            "min_length": sql.Literal(self.bna.config["bna"]["blocks"]["min_road_length"])
+        }
+
+        # read in the raw query language
+        f = open(os.path.join(self.module_dir,"sql","block_nodes.sql"))
+        raw = f.read()
+        f.close()
+
         self.bna._reestablish_conn()
-        cur = self.bna.conn.cursor()
+        q = sql.SQL(raw).format(**subs).as_string(self.bna.conn)
 
-        # make temporary nodes table and add blocks
-        q = sql.SQL(' \
-            drop table if exists tmp_blocknodes; \
-            create temp table tmp_blocknodes ( \
-                id serial primary key, \
-                geom geometry(multipolygon, %s), \
-                blockid text, \
-                nodes int[] \
-            ); \
-            \
-            insert into tmp_blocknodes (blockid, geom) \
-            select {}, st_multi(st_buffer(geom,15)) from {}; \
-            \
-            create index tsidx_blocknodesgeom on tmp_blocknodes using gist (geom); \
-            analyze tmp_blocknodes; \
-        ').format(
-            sql.Identifier(self.bna.config["bna"]["blocks"]["id_column"]),
-            sql.Identifier(self.bna.config["bna"]["blocks"]["table"])
-        ).as_string(cur)
-        cur.execute(q % self.bna.srid)
+        if self.debug:
+            print(q)
 
-        # add nodes
-        q = sql.SQL(' \
-            update tmp_blocknodes \
-            set     nodes = array(( \
-                        select  v.{} \
-                        from    {} r, {} v \
-                        where   r.{} = v.{} \
-                        and     st_intersects(tmp_blocknodes.geom,r.geom) \
-                        and     ( \
-                                    st_contains(tmp_blocknodes.geom,r.geom) \
-                                or  st_length( \
-                                        st_intersection(tmp_blocknodes.geom,r.geom) \
-                                    ) > 30 \
-                                ) \
-            )); \
-        ').format(
-            sql.Identifier(self.config["nodes"]["id_column"]),
-            sql.Identifier(self.config["roads"]["table"]),
-            sql.Identifier(self.config["nodes"]["table"]),
-            sql.Identifier(self.config["roads"]["uid"]),
-            sql.Identifier(self.config["roads"]["uid"])
+        return pd.read_sql_query(
+            q,
+            self.bna.conn
         )
-        cur.execute(q)
-
-        # pull down to pandas df
-        df = pd.read_sql_query(
-            "select blockid, nodes from tmp_blocknodes",
-            self.conn
-        )
-
-        # clean up
-        cur.execute('drop table if exists tmp_blocknodes;')
-        cur.close()
-        return df
 
 
     def _get_graph_nodes(self,nodes):
@@ -447,7 +435,7 @@ class Scenario:
         }
 
         # read in the raw query language
-        f = open(os.path.join(self.module_dir,"build_network.sql"))
+        f = open(os.path.join(self.module_dir,"sql","build_network.sql"))
         raw = f.read()
         f.close()
 

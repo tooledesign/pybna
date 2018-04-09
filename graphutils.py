@@ -9,7 +9,7 @@ from psycopg2 import sql
 
 def build_network(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNodeCol,
         edgeCostCol,stressCol,verbose=False):
-    """Builds a networkx graph from a complete network stored in the PostGIS database
+    """Builds a networkx graph from a complete BNA network stored in the PostGIS database
 
     return: networkx DiGraph
     """
@@ -58,7 +58,6 @@ def build_network(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNod
                 sql.Identifier(nodeIdCol),
                 sql.Identifier(nodeTable)
             )
-            .as_string(cur)
     )
     attrs = dict()
     for row in cur:
@@ -81,31 +80,31 @@ def build_restricted_network(G,maxStress):
     return GraphView(G,efilt=stressFilter)
 
 
-def translate_nodes(G,nodeIds):
-    vs = list()
-    for i in nodeIds:
-        vs.append(int(find_vertex(G,G.vp.pkid,i)[0]))
-    return np.array(vs,dtype=np.int_,ndmin=1)
+# def translate_nodes(G,nodeIds):
+#     vs = list()
+#     for i in nodeIds:
+#         vs.append(int(find_vertex(G,G.vp.pkid,i)[0]))
+#     return np.array(vs,dtype=np.int_,ndmin=1)
 
-
-class VisitorExample(AStarVisitor):
-    def __init__(self, targets):
-        # self.touched_v = touched_v
-        # self.touched_e = touched_e
-        self.targets = targets
-    # def discover_vertex(self, u):
-    #     self.touched_v[u] = True
-    # def examine_edge(self, e):
-    #     self.touched_e[e] = True
-    def edge_relaxed(self, e):
-        if e.target() in self.targets:
-            raise StopSearch()
-
-
-def heuristic(v,targets,pos):
-    xys = [pos[i] for i in targets]
-    meanTarget = np.mean(np.array(xys),axis=0)
-    return np.sqrt(sum((pos[v].a - meanTarget) ** 2))
+#
+# class VisitorExample(AStarVisitor):
+#     def __init__(self, targets):
+#         # self.touched_v = touched_v
+#         # self.touched_e = touched_e
+#         self.targets = targets
+#     # def discover_vertex(self, u):
+#     #     self.touched_v[u] = True
+#     # def examine_edge(self, e):
+#     #     self.touched_e[e] = True
+#     def edge_relaxed(self, e):
+#         if e.target() in self.targets:
+#             raise StopSearch()
+#
+#
+# def heuristic(v,targets,pos):
+#     xys = [pos[i] for i in targets]
+#     meanTarget = np.mean(np.array(xys),axis=0)
+#     return np.sqrt(sum((pos[v].a - meanTarget) ** 2))
 
 # dist, pred = astar_search(
 #     g, g.vertex(0), weight,

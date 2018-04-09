@@ -1,8 +1,5 @@
 ----------------------------------------
--- INPUTS
--- location: neighborhood
--- {srid} psql var must be set before running this script,
---      e.g. psql -v nb_output_srid=2249 -f build_network.sql
+-- Builds a BNA network in the database
 ----------------------------------------
 DROP TABLE IF EXISTS {schema}.{nodes};
 DROP TABLE IF EXISTS {schema}.{edges};

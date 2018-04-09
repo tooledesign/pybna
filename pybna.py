@@ -147,10 +147,13 @@ class pyBNA:
         # handle additional columns
         cols = " "
         for c in add_columns:
+            if c == pkid:   # we already grab the primary key column
+                continue
             cols = cols + sql.SQL(",{}").format(sql.Identifier(c)).as_string(self.conn)
 
         # query
-        q = sql.SQL("select {} as id, {} as geom %s from {};" % cols).format(
+        q = sql.SQL("select {} as id, {} as pkid, {} as geom %s from {};" % cols).format(
+            sql.Identifier(pkid),
             sql.Identifier(pkid),
             sql.Identifier(geom_col),
             sql.Identifier(tableName)
