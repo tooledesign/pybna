@@ -421,7 +421,7 @@ class Scenario:
         """
         if self.verbose:
             print("Building network in database")
-            
+
         # set up substitutions
         net_subs = {
             "srid": sql.Literal(self.bna.srid),
@@ -451,13 +451,15 @@ class Scenario:
         raw = f.read()
         f.close()
 
-        # compose the query
-        q = sql.SQL(raw).format(**net_subs)
+        cur = self.conn.cursor()
+        statements = [s for s in raw.split(";") if len(s.strip()) > 1]
+        for statement in tqdm(statements):
+            # compose the query
+            q = sql.SQL(statement).format(**net_subs)
 
-        if dry:
-            print(q.as_string(self.conn))
-        else:
-            cur = self.conn.cursor()
-            cur.execute(q)
-            del cur
-            self.conn.commit()
+            if dry:
+                print(q.as_string(self.conn))
+            else:
+                cur.execute(q)
+        self.conn.commit()
+        del cur
