@@ -333,7 +333,7 @@ AND     source_road_dir = {backward};
 
 UPDATE  {schema}.{edges}
 SET     int_stress = 1
-WHERE   NOT int_crossing;;
+WHERE   NOT int_crossing;
 
 --target_stress
 UPDATE  {schema}.{edges}
