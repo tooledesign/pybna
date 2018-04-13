@@ -42,6 +42,7 @@ class Scenario:
         self.name = self.config["name"]
         self.bna._reestablish_conn()
         self.conn = self.bna.conn
+        self.config["max_detour"] = float(100 + self.config["max_detour"])/100
 
         if "notes" in self.config:
             self.notes = self.config["notes"]
@@ -331,7 +332,8 @@ class Scenario:
                 )
 
             if not np.isinf(dist):  # no path
-                ls_connected = True
+                if lsDist <= (hsDist * self.config["max_detour"]):
+                    ls_connected = True
 
             # remove temporary vertices from graph
             self.ls_graph.remove_vertex([o_vertex,d_vertex])
