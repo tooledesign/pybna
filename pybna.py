@@ -74,7 +74,8 @@ class pyBNA:
         try:
             self.srid = self.config["srid"]
         except KeyError:
-            self.srid = self._get_srid(self.blocks_table)
+            if not self.debug:
+                self.srid = self._get_srid(self.blocks_table)
 
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
