@@ -16,6 +16,10 @@ db:
     dbname: "bna"
 
 bna:
+    boundary:
+        table: "neighborhood_boundary"
+        geom: "geom"
+        
     blocks:
         table: "neighborhood_census_blocks"
         # schema: "generated"

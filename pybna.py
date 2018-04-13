@@ -286,6 +286,8 @@ class pyBNA:
         Set pybna's blocks from database
         """
         blocks_table = self.config["bna"]["blocks"]["table"]
+        boundary_table = self.config["bna"]["boundary"]["table"]
+        boundary_geom = self.config["bna"]["boundary"]["geom"]
         pop = self.config["bna"]["blocks"]["population"]
         geom = self.config["bna"]["blocks"]["geom"]
         if "schema" in self.config["bna"]["blocks"]:
@@ -297,16 +299,27 @@ class pyBNA:
         else:
             block_id_col = _get_pkid_col(blocks_table,schema=blocks_schema)
 
+        subs = {
+            "block_geom": sql.Identifier(geom),
+            "block_id": sql.Identifier(block_id_col),
+            "pop": sql.Identifier(pop),
+            "blocks_schema": sql.Identifier(blocks_schema),
+            "blocks_table": sql.Identifier(blocks_table),
+            "boundary_table": sql.Identifier(boundary_table),
+            "boundary_geom": sql.Identifier(boundary_geom)
+        }
+
         if self.verbose:
             print("Getting census blocks from %s.%s" % (blocks_schema,blocks_table))
 
-        q = sql.SQL("select {} as geom, {} as blockid, {} as pop from {}.{};").format(
-            sql.Identifier(geom),
-            sql.Identifier(block_id_col),
-            sql.Identifier(pop),
-            sql.Identifier(blocks_schema),
-            sql.Identifier(blocks_table)
-        ).as_string(self.conn)
+        q = sql.SQL(" \
+            select b.{block_geom} as geom, b.{block_id} as blockid, b.{pop} as pop \
+            from {blocks_schema}.{blocks_table} b\
+            where exists ( \
+                select 1 from {boundary_table} bound \
+                where st_intersects(b.{block_geom},bound.{boundary_geom}) \
+            );"
+        ).format(**subs).as_string(self.conn)
 
         if self.verbose:
             print(q)
