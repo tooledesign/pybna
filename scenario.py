@@ -19,7 +19,7 @@ from tqdm import tqdm
 class Scenario:
     """A scenario to analyze in the BNA."""
 
-    def __init__(self, bna, config):
+    def __init__(self, bna, config, build_network=True):
         """
         Create new scenario from PostGIS.
 
@@ -52,7 +52,13 @@ class Scenario:
         self.verbose = self.bna.verbose
         self.debug = self.bna.debug
 
-        # check for network tables in db
+        if build_network:
+            self.build_db_network()
+        elif not self._check_db_network():
+            print("Network tables not found in database")
+            self.build_db_network()
+        else:
+            print("Network tables found in database")
 
         # build graphs
         if not self.debug:
@@ -120,7 +126,7 @@ class Scenario:
 
 
     def _get_connectivity(self,tiles=None,db_table=None):
-        """Create a connectivity matrix using the this class' networkx graphs and
+        """Create a connectivity matrix using the this class' graphs and
         census blocks. The matrix relies on bitwise math so the following
         correspondence of values to connectivity combinations is possible:
         0 = neither hs nor ls connected       (binary 00)
@@ -453,3 +459,29 @@ class Scenario:
                 cur.execute(q)
         self.conn.commit()
         del cur
+
+    def _check_db_network(self):
+        """
+        Checks for the db network tables identified in the config file.
+
+        returns True if they exist, False if they don't
+        """
+        for table in [self.config["edges"]["table"],self.config["nodes"]["table"]]:
+            if self.verbose:
+                print("Checking for %s in database" % table)
+
+            try:
+                cur = self.conn.cursor()
+                cur.execute(
+                    sql.SQL(
+                        "select * from {} limit 1"
+                    ).format(
+                        sql.Identifier(table)
+                    )
+                )
+                cur.fetchone()
+            except psycopg2.ProgrammingError:
+                return False
+
+        # no errors = tables found
+        return True

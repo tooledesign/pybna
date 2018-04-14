@@ -71,11 +71,10 @@ class pyBNA:
             self._set_blocks()
 
         # get srid
-        try:
+        if "srid" in self.config:
             self.srid = self.config["srid"]
-        except KeyError:
-            if not self.debug:
-                self.srid = self._get_srid(self.blocks_table)
+        elif not self.debug:
+            self.srid = self._get_srid(self.blocks_table)
 
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
@@ -90,20 +89,21 @@ class pyBNA:
 
         # Get tiles for running connectivity (if given)
         self.tiles = None
-        if "tiles" in self.config["bna"]:
-            tile_config = self.config["bna"]["tiles"]
-            if "table" in tile_config and "file" in tile_config:
-                raise ValueError("Cannot accept tile sources from both shapefile _and_ pg table")
-            if "file" in tile_config:
-                self.tiles = self._get_tiles_shp(tiles_shp_path)
-            if "table" in tile_config:
-                tiles_table_name = tile_config["table"]
-                tiles_table_geom_col = tile_config["geom"]
-                if "columns" in tile_config:
-                    tiles_columns = tile_config["columns"]
-                else:
-                    tiles_columns = list()
-                self.tiles = self._get_tiles_pg(tiles_table_name,tiles_table_geom_col,tiles_columns)
+        if not self.debug:
+            if "tiles" in self.config["bna"]:
+                tile_config = self.config["bna"]["tiles"]
+                if "table" in tile_config and "file" in tile_config:
+                    raise ValueError("Cannot accept tile sources from both shapefile _and_ pg table")
+                if "file" in tile_config:
+                    self.tiles = self._get_tiles_shp(tiles_shp_path)
+                if "table" in tile_config:
+                    tiles_table_name = tile_config["table"]
+                    tiles_table_geom_col = tile_config["geom"]
+                    if "columns" in tile_config:
+                        tiles_columns = tile_config["columns"]
+                    else:
+                        tiles_columns = list()
+                    self.tiles = self._get_tiles_pg(tiles_table_name,tiles_table_geom_col,tiles_columns)
 
 
     def _get_pkid_col(self, table, schema=None):
@@ -210,11 +210,14 @@ class pyBNA:
 
 
     def _set_scenarios(self):
+        build_network = True
+        if self.debug:
+            build_network = False
         for scenario in self.config["bna"]["scenarios"]:
-            self.add_scenario_new(scenario)
+            self.add_scenario_new(scenario,build_network)
 
 
-    def add_scenario_new(self, config):
+    def add_scenario_new(self, config, build_network=True):
         """Creates a new scenario and registers it
 
         args:
@@ -229,7 +232,7 @@ class pyBNA:
             if self.verbose:
                 print("Creating scenario %s" % name)
 
-            self.scenarios[name] = Scenario(self, config)
+            self.scenarios[name] = Scenario(self, config, build_network)
 
 
     def add_scenario_from_pickle(self, path, name=None):
