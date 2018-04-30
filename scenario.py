@@ -125,7 +125,7 @@ class Scenario:
                 config[k] = defaults[k]
 
 
-    def _get_connectivity(self,tiles=None,db_table=None):
+    def _get_connectivity(self,tiles=None,db_table=None,append=False):
         """Create a connectivity matrix using the this class' graphs and
         census blocks. The matrix relies on bitwise math so the following
         correspondence of values to connectivity combinations is possible:
@@ -136,28 +136,25 @@ class Scenario:
 
         kwargs:
         tiles -- a geopandas dataframe holding polygons for breaking the analysis into chunks
-        db_table -- if given, (over)writes the results to this table in the db
+        db_table -- if given, writes the results to this table in the db
+        append -- determines whether to append results to an existing db table
+            (only applies if db_table is given)
 
         return: pandas sparse dataframe
         """
         if self.verbose:
             print("Building connectivity matrix")
 
-        # drop db table if given
-        if db_table:
+        # drop db table if given or check existence if append mode set
+        if db_table and not append:
+            self.create_db_connectivity_table(db_table,overwrite=True)
+        elif db_table:
             cur = self.conn.cursor()
-            cur.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(db_table)))
-            cur.execute(sql.SQL(
-                'create table {}.{} ( \
-                    id serial primary key, \
-                    source_blockid10 varchar(15), \
-                    target_blockid10 varchar(15), \
-                    high_stress BOOLEAN, \
-                    low_stress BOOLEAN \
-                )'
-            ).format(sql.Identifier(self.bna.blocks_schema),sql.Identifier(db_table)))
-            cur.close()
-            self.conn.commit()
+            try:
+                cur.execute(sql.SQL('select 1 from {} limit 1').format(sql.Identifier(db_table)))
+                cur.close()
+            except psycopg2.ProgrammingError:
+                raise ValueError("table %s not found" % db_table)
 
         # create single tile if no tiles given
         if tiles is None:
@@ -460,6 +457,7 @@ class Scenario:
         self.conn.commit()
         del cur
 
+
     def _check_db_network(self):
         """
         Checks for the db network tables identified in the config file.
@@ -485,3 +483,20 @@ class Scenario:
 
         # no errors = tables found
         return True
+
+
+    def create_db_connectivity_table(self,db_table,overwrite=False):
+        cur = self.conn.cursor()
+        if overwrite:
+            cur.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(db_table)))
+        cur.execute(sql.SQL(
+            'create table {}.{} ( \
+                id serial primary key, \
+                source_blockid10 varchar(15), \
+                target_blockid10 varchar(15), \
+                high_stress BOOLEAN, \
+                low_stress BOOLEAN \
+            )'
+        ).format(sql.Identifier(self.bna.blocks_schema),sql.Identifier(db_table)))
+        cur.close()
+        self.conn.commit()
