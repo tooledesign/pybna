@@ -64,14 +64,8 @@ class Scenario:
         if not self.debug:
             self.hs_graph = graphutils.build_network(
                 self.conn,
-                self.config["edges"]["table"],
-                self.config["nodes"]["table"],
-                self.config["edges"]["id_column"],
-                self.config["nodes"]["id_column"],
-                self.config["edges"]["source_column"],
-                self.config["edges"]["target_column"],
-                self.config["edges"]["cost_column"],
-                self.config["edges"]["stress_column"],
+                self.config["edges"],
+                self.config["nodes"],
                 self.verbose
             )
             self.ls_graph = graphutils.build_restricted_network(

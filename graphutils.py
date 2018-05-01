@@ -7,13 +7,28 @@ import psycopg2
 from psycopg2 import sql
 
 
-def build_network(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNodeCol,
-        edgeCostCol,stressCol,verbose=False):
-    """Builds a networkx graph from a complete BNA network stored in the PostGIS database
+def build_network(conn,edge_config,node_config,verbose=False):
+    """Builds a graph-tool graph from a complete BNA network stored in the PostGIS database
 
-    return: networkx DiGraph
+    args:
+    edge_config -- Dictionary holding info for the edges (can be derived from BNA config file)
+    node_config -- Dictionary holding info for the nodes (can be derived from BNA config file)
+    roads_config -- Dictionary holding info for the roads (can be derived from BNA config file)
+
+    return: graph-tool graph
     """
     G = Graph()
+
+    # set vars from input dictionaries
+    edge_table = edge_config["table"]
+    node_table = node_config["table"]
+    edge_id_col = edge_config["id_column"]
+    node_id_col = node_config["id_column"]
+    from_node_col = edge_config["source_column"]
+    to_node_col = edge_config["target_column"]
+    edge_cost_col = edge_config["cost_column"]
+    stress_col = edge_config["stress_column"]
+
 
     # build edges
     if verbose:
@@ -22,12 +37,12 @@ def build_network(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNod
     q = sql.SQL(
         'select {} AS fnode, {} AS tnode, {} AS id, {} AS cost, {} AS stress from {};'
     ).format(
-        sql.Identifier(fromNodeCol),
-        sql.Identifier(toNodeCol),
-        sql.Identifier(edgeIdCol),
-        sql.Identifier(edgeCostCol),
-        sql.Identifier(stressCol),
-        sql.Identifier(edgeTable)
+        sql.Identifier(from_node_col),
+        sql.Identifier(to_node_col),
+        sql.Identifier(edge_id_col),
+        sql.Identifier(edge_cost_col),
+        sql.Identifier(stress_col),
+        sql.Identifier(edge_table)
     ).as_string(conn)
 
     if verbose:
@@ -55,8 +70,8 @@ def build_network(conn,edgeTable,nodeTable,edgeIdCol,nodeIdCol,fromNodeCol,toNod
     cur.execute(
         sql.SQL('select {} AS id, road_id, st_x(geom) as x, st_y(geom) as y from {};')
             .format(
-                sql.Identifier(nodeIdCol),
-                sql.Identifier(nodeTable)
+                sql.Identifier(node_id_col),
+                sql.Identifier(node_table)
             )
     )
     attrs = dict()

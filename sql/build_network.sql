@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS {schema}.{edges};
 -- create new tables
 CREATE TABLE {schema}.{nodes} (
     {node_id} SERIAL PRIMARY KEY,
-    {road_id} INTEGER,
+    road_id INTEGER,
     vert_cost INTEGER,
     geom geometry(point,{srid})
 );
@@ -36,14 +36,14 @@ CREATE TABLE {schema}.{edges} (
 );
 
 -- create vertices
-INSERT INTO {schema}.{nodes} ({road_id}, geom)
+INSERT INTO {schema}.{nodes} (road_id, geom)
 SELECT  ways.{road_id},
         ST_LineInterpolatePoint(ways.{roads_geom},0.5)
 FROM    {schema}.{roads} ways;
 
 -- index
 CREATE INDEX sidx_nodes_geom ON {schema}.{nodes} USING gist (geom);
-CREATE INDEX idx_nodes_roadid ON {schema}.{nodes} ({road_id});
+CREATE INDEX idx_nodes_roadid ON {schema}.{nodes} (road_id);
 ANALYZE {schema}.{nodes};
 
 ---------------
@@ -60,8 +60,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} IN (roads1.{road_source}, roads1.{road_target})
 AND     ints.{int_id} IN (roads2.{road_source}, roads2.{road_target})
 AND     roads1.{one_way} IS NULL
@@ -79,8 +79,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} IN (roads1.{road_source}, roads1.{road_target})
 AND     ints.{int_id} = roads2.{road_source}
 AND     roads1.{one_way} IS NULL
@@ -98,8 +98,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} IN (roads1.{road_source}, roads1.{road_target})
 AND     ints.{int_id} = roads2.{road_target}
 AND     roads1.{one_way} IS NULL
@@ -117,8 +117,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} = roads1.{road_target}
 AND     ints.{int_id} IN (roads2.{road_source}, roads2.{road_target})
 AND     roads1.{one_way} = {forward}
@@ -136,8 +136,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} = roads1.{road_target}
 AND     ints.{int_id} = roads2.{road_source}
 AND     roads1.{one_way} = {forward}
@@ -155,8 +155,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} = roads1.{road_target}
 AND     ints.{int_id} = roads2.{road_target}
 AND     roads1.{one_way} = {forward}
@@ -174,8 +174,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} = roads1.{road_source}
 AND     ints.{int_id} IN (roads2.{road_source}, roads2.{road_target})
 AND     roads1.{one_way} = {backward}
@@ -193,8 +193,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} = roads1.{road_source}
 AND     ints.{int_id} = roads2.{road_target}
 AND     roads1.{one_way} = {backward}
@@ -212,8 +212,8 @@ FROM    {schema}.{intersections} ints,
         {schema}.{roads} roads1,
         {schema}.{nodes} vert2,
         {schema}.{roads} roads2
-WHERE   vert1.{road_id} = roads1.{road_id}
-AND     vert2.{road_id} = roads2.{road_id}
+WHERE   vert1.road_id = roads1.{road_id}
+AND     vert2.road_id = roads2.{road_id}
 AND     ints.{int_id} = roads1.{road_source}
 AND     ints.{int_id} = roads2.{road_source}
 AND     roads1.{one_way} = {backward}
@@ -221,7 +221,7 @@ AND     roads2.{one_way} = {forward}
 AND     roads1.{road_id} != roads2.{road_id};
 
 -- index
-CREATE INDEX idx_nodes_road_id ON {schema}.{nodes} ({road_id});
+CREATE INDEX idx_nodes_road_id ON {schema}.{nodes} (road_id);
 CREATE INDEX idx_edges_int_id ON {schema}.{edges} ({int_id});
 CREATE INDEX idx_edges_src_trgt ON {schema}.{edges} (source_vert,target_vert);
 CREATE INDEX idx_edges_src_rdid ON {schema}.{edges} (source_road_id);
@@ -230,8 +230,8 @@ ANALYZE {schema}.{edges};
 
 --set source and target roads
 UPDATE  {schema}.{edges}
-SET     source_road_id = s_vert.{road_id},
-        target_road_id = t_vert.{road_id}
+SET     source_road_id = s_vert.road_id,
+        target_road_id = t_vert.road_id
 FROM    {schema}.{nodes} s_vert,
         {schema}.{nodes} t_vert
 WHERE   {schema}.{edges}.source_vert = s_vert.{node_id}
