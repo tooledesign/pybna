@@ -8,7 +8,7 @@ FROM    {blocks_schema}.{blocks} blocks,
         {roads_schema}.{roads} roads,
         {roads_schema}.{nodes} nodes
 WHERE   ST_DWithin(blocks.{block_geom},roads.{road_geom},{distance})
-AND     roads.{road_id} = nodes.{node_id}
+AND     roads.{road_id} = nodes.road_id
 AND     (
             ST_Contains(ST_Buffer(blocks.{block_geom},{distance}),roads.{road_geom})
         OR  ST_Length(

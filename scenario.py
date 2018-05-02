@@ -89,7 +89,7 @@ class Scenario:
         self.connectivity = None
 
         if self.debug:
-            self._setDebug(True)
+            self._set_debug(True)
 
 
     def __unicode__(self):
@@ -119,7 +119,7 @@ class Scenario:
                 config[k] = defaults[k]
 
 
-    def _get_connectivity(self,tiles=None,db_table=None,append=False):
+    def _get_connectivity(self,tiles=None,orig_blockid=None,dest_blockid=None,db_table=None,append=False):
         """Create a connectivity matrix using the this class' graphs and
         census blocks. The matrix relies on bitwise math so the following
         correspondence of values to connectivity combinations is possible:
@@ -129,13 +129,18 @@ class Scenario:
         3 = both hs and ls connected          (binary 11)
 
         kwargs:
-        tiles -- a geopandas dataframe holding polygons for breaking the analysis into chunks
+        tiles -- a geopandas dataframe holding polygons for breaking the analysis into chunks (can't be used with blockid)
+        orig_blockid -- uid of a specific block to use as an origin (can't be used with tiles)
+        dest_blockid -- uid of a specific block to use as a destination (can't be used with tiles)
         db_table -- if given, writes the results to this table in the db
         append -- determines whether to append results to an existing db table
             (only applies if db_table is given)
 
         return: pandas sparse dataframe
         """
+        if tiles and (orig_blockid or dest_blockid):
+            raise ValueError("Can't run connectivity using tiles and blockids")
+
         if self.verbose:
             print("Building connectivity matrix")
 
@@ -162,37 +167,46 @@ class Scenario:
         c = 1
         ctotal = len(tiles)
         for i in tiles.index:
-            if self.verbose:
-                print("Processing tile %i out of %i" % (c,ctotal))
-                c += 1
-
-            # select blocks that intersect the tile
             self.blocks["tempkey"] = 1
-            df = gpd.sjoin(
-                self.blocks,
-                tiles[tiles.index==i]
-            )[["blockid","geom","nodes","graph_v","tempkey"]]
 
-            # skip this tile if it's empty
-            if len(df) == 0:
-                continue
+            if orig_blockid:
+                df = self.blocks[self.blocks["blockid"]==orig_blockid]
+            else:
+                if self.verbose:
+                    print("Processing tile %i out of %i" % (c,ctotal))
+                    c += 1
 
-            # convert to centroids for more accurate intersection
-            df.geom = df.centroid
+                # select blocks that intersect the tile
+                df = gpd.sjoin(
+                    self.blocks,
+                    tiles[tiles.index==i]
+                )[["blockid","geom","nodes","graph_v","tempkey"]]
 
-            # select blocks whose centroids intersect the tile
-            df = gpd.sjoin(
-                df,
-                tiles[tiles.index==i]
-            ).drop(columns=["index_right"])
+                # skip this tile if it's empty
+                if len(df) == 0:
+                    continue
 
-            # skip this tile if it's empty
-            if len(df) == 0:
-                continue
+                # convert to centroids for more accurate intersection
+                df.geom = df.centroid
+
+                # select blocks whose centroids intersect the tile
+                df = gpd.sjoin(
+                    df,
+                    tiles[tiles.index==i]
+                ).drop(columns=["index_right"])
+
+                # skip this tile if it's empty
+                if len(df) == 0:
+                    continue
+
+            if dest_blockid:
+                dblocks = self.blocks[self.blocks["blockid"]==dest_blockid][["blockid","tempkey","nodes","graph_v","geom"]]
+            else:
+                dblocks = self.blocks[["blockid","tempkey","nodes","graph_v","geom"]]
 
             # cartesian join of subselected blocks (origins) with all census blocks (destinations)
             df = df.merge(
-                self.blocks[["blockid","tempkey","nodes","graph_v","geom"]],
+                dblocks,
                 on="tempkey",
                 suffixes=("from","to")
             ).drop(columns=["tempkey"])
@@ -259,12 +273,12 @@ class Scenario:
         if len(row["graph_vfrom"]) == 0 or len(row["graph_vto"]) == 0:
             return 0
 
-        fromBlock = row["blockidfrom"]
-        toBlock = row["blockidto"]
-        if fromBlock == toBlock:    # if same block assume connected
+        from_block = row["blockidfrom"]
+        to_block = row["blockidto"]
+        if from_block == to_block:    # if same block assume connected
             return 3
-        hsDist = -1
-        lsDist = -1
+        hs_dist = -1
+        ls_dist = -1
 
         # create temporary vertices for from and to blocks
         o_vertex = self.hs_graph.add_vertex()
@@ -283,21 +297,21 @@ class Scenario:
                 max_dist=self.config["max_distance"]
         )
         if self.debug:
-            self.blockDistances.append(
+            self.block_distances.append(
                 [{
-                    "blockidfrom":fromBlock,
-                    "blockidto":toBlock,
-                    "hsDist":dist,
-                    "lsDist":-1
+                    "blockidfrom":from_block,
+                    "blockidto":to_block,
+                    "hs_dist":dist,
+                    "ls_dist":-1
                 }]
             )
 
         if not np.isinf(dist):  # test for no path
-            if hsDist < 0:
-                hsDist = dist
+            if hs_dist < 0:
+                hs_dist = dist
                 hs_connected = True
-            if dist < hsDist:
-                hsDist = dist
+            if dist < hs_dist:
+                hs_dist = dist
 
         # remove temporary vertices from graph
         self.hs_graph.remove_vertex([o_vertex,d_vertex])
@@ -307,9 +321,9 @@ class Scenario:
             o_vertex = self.ls_graph.add_vertex()
             d_vertex = self.ls_graph.add_vertex()
             for i in row["graph_vfrom"]:
-                self.hs_graph.add_edge(o_vertex,self.ls_graph.vertex(i))
+                self.ls_graph.add_edge(o_vertex,self.ls_graph.vertex(i))
             for i in row["graph_vto"]:
-                self.hs_graph.add_edge(self.ls_graph.vertex(i),d_vertex)
+                self.ls_graph.add_edge(self.ls_graph.vertex(i),d_vertex)
 
             dist = shortest_distance(
                     self.ls_graph,
@@ -319,17 +333,17 @@ class Scenario:
                     max_dist=self.config["max_distance"]
             )
             if self.debug:
-                self.blockDistances.append(
+                self.block_distances.append(
                     [{
-                        "blockidfrom":fromBlock,
-                        "blockidto":toBlock,
-                        "hsDist":-1,
-                        "lsDist":dist
+                        "blockidfrom":from_block,
+                        "blockidto":to_block,
+                        "hs_dist":-1,
+                        "ls_dist":dist
                     }]
                 )
 
             if not np.isinf(dist):  # no path
-                if lsDist <= (hsDist * self.config["max_detour"]):
+                if ls_dist <= (hs_dist * self.config["max_detour"]):
                     ls_connected = True
 
             # remove temporary vertices from graph
@@ -382,10 +396,10 @@ class Scenario:
         return gnodes
 
 
-    def _setDebug(self,d):
+    def _set_debug(self,d):
         self.debug = d
         if self.debug:
-            self.blockDistances = pd.DataFrame(columns=["blockidfrom","blockidto","hsdist","lsdist"])
+            self.block_distances = pd.DataFrame(columns=["blockidfrom","blockidto","hs_dist","ls_dist"])
 
 
     def _reestablishConn(self):
