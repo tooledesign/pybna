@@ -138,7 +138,7 @@ class Scenario:
 
         return: pandas sparse dataframe
         """
-        if tiles and (orig_blockid or dest_blockid):
+        if isinstance(tiles,gpd.GeoDataFrame) and (orig_blockid or dest_blockid):
             raise ValueError("Can't run connectivity using tiles and blockids")
 
         if self.verbose:
