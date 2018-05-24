@@ -147,7 +147,9 @@ class Scenario:
         # drop db table if given or check existence if append mode set
         if db_table and not append:
             self.create_db_connectivity_table(db_table,overwrite=True)
-        elif db_table:
+        elif (append and db_table is None):
+            raise ValueError("Append mode requires a table to add data to")
+        else:
             cur = self.conn.cursor()
             try:
                 cur.execute(sql.SQL('select 1 from {} limit 1').format(sql.Identifier(db_table)))
