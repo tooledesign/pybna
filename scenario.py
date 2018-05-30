@@ -19,7 +19,7 @@ from tqdm import tqdm
 class Scenario:
     """A scenario to analyze in the BNA."""
 
-    def __init__(self, bna, config, build_network=True):
+    def __init__(self, bna, config, build_network=False):
         """
         Create new scenario from PostGIS.
 

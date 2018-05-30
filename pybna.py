@@ -19,7 +19,7 @@ class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
     def __init__(self, config="config.yaml", host=None, db=None, user=None,
-                 password=None, verbose=False, debug=False):
+                 password=None, verbose=False, debug=False, force_net_build=False):
         """Connects to the BNA database
 
         kwargs:
@@ -30,11 +30,13 @@ class pyBNA:
         password -- password to connect to database
         verbose -- output useful messages
         debug -- set to debug mode
+        force_net_build -- force rebuild of network when a scenario is added (not applicable if debug is set)
 
         return: pyBNA object
         """
         self.verbose = verbose
         self.debug = debug
+        self.force_net_build = force_net_build
         self.config = yaml.safe_load(open(config))
 
         if self.verbose:
@@ -79,13 +81,14 @@ class pyBNA:
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
         if not self.debug:
-            self._set_scenarios()
+            self._set_scenarios(self.force_net_build)
 
         # Set destinations from config file
         self.destinations = dict()
         self.destination_blocks = set()
         if not self.debug:
-            self._set_destinations()
+            pass
+            # self._set_destinations()
 
         # Get tiles for running connectivity (if given)
         self.tiles = None
@@ -209,8 +212,9 @@ class pyBNA:
             self.scenarios[scenario.name] = scenario
 
 
-    def _set_scenarios(self):
-        build_network = True
+    def _set_scenarios(self,force_net_build=False):
+        if force_net_build:
+            build_network = True
         if self.debug:
             build_network = False
         for scenario in self.config["bna"]["scenarios"]:
