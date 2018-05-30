@@ -213,12 +213,10 @@ class pyBNA:
 
 
     def _set_scenarios(self,force_net_build=False):
-        if force_net_build:
-            build_network = True
         if self.debug:
-            build_network = False
+            force_net_build = False
         for scenario in self.config["bna"]["scenarios"]:
-            self.add_scenario_new(scenario,build_network)
+            self.add_scenario_new(scenario,force_net_build)
 
 
     def add_scenario_new(self, config, build_network=True):
