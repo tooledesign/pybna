@@ -489,6 +489,7 @@ class Scenario:
                 )
                 cur.fetchone()
             except psycopg2.ProgrammingError:
+                self.conn.rollback()
                 return False
 
         # no errors = tables found
