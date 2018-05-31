@@ -246,7 +246,7 @@ class Scenario:
                 self.conn.commit()
             cdf = cdf.append(df).drop_duplicates(subset=["blockidfrom","blockidto"])
 
-        if db_table:
+        if db_table and not append:
             self._reestablishConn()
             cur = self.conn.cursor()
             cur.execute(sql.SQL(' \
