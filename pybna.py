@@ -6,10 +6,10 @@ import os
 import yaml
 import psycopg2
 from psycopg2 import sql
-from psycopg2.extensions import quote_ident
 import pandas as pd
 import geopandas as gpd
 import pickle
+from tqdm import tqdm
 
 from scenario import Scenario
 from destinations import Destinations
@@ -19,7 +19,7 @@ class pyBNA:
     """Collection of BNA scenarios and attendant functions."""
 
     def __init__(self, config="config.yaml", host=None, db=None, user=None,
-                 password=None, verbose=False, debug=False, force_net_build=False):
+                 password=None, verbose=False, debug=False, load_scenarios=False):
         """Connects to the BNA database
 
         kwargs:
@@ -30,13 +30,13 @@ class pyBNA:
         password -- password to connect to database
         verbose -- output useful messages
         debug -- set to debug mode
-        force_net_build -- force rebuild of network when a scenario is added (not applicable if debug is set)
+        load_scenarios -- automatically load scenarios defined in the config file
 
         return: pyBNA object
         """
         self.verbose = verbose
         self.debug = debug
-        self.force_net_build = force_net_build
+        self.module_dir = os.path.dirname(os.path.abspath(__file__))
         self.config = yaml.safe_load(open(config))
 
         if self.verbose:
@@ -55,13 +55,13 @@ class pyBNA:
             user = self.config["db"]["user"]
         if password is None:
             password = self.config["db"]["password"]
-        db_connection_string = " ".join([
+        self.db_connection_string = " ".join([
             "dbname=" + db,
             "user=" + user,
             "host=" + host,
             "password=" + password
         ])
-        self.conn = psycopg2.connect(db_connection_string)
+        self.conn = psycopg2.connect(self.db_connection_string)
 
         # blocks
         self.blocks = None
@@ -80,8 +80,8 @@ class pyBNA:
 
         # Create dictionaries to hold scenarios and destinations
         self.scenarios = dict()
-        if not self.debug:
-            self._set_scenarios(self.force_net_build)
+        if load_scenarios:
+            self.load_scenarios()
 
         # Set destinations from config file
         self.destinations = dict()
@@ -212,7 +212,7 @@ class pyBNA:
             self.scenarios[scenario.name] = scenario
 
 
-    def _set_scenarios(self,force_net_build=False):
+    def load_scenarios(self,force_net_build=False):
         if self.debug:
             force_net_build = False
         for scenario in self.config["bna"]["scenarios"]:
@@ -414,3 +414,91 @@ class pyBNA:
             cur.close()
         except:
             self.conn = psycopg2.connect(db_connection_string)
+
+
+    def _get_db_connection(self):
+        """
+        Returns a new db connection using the settings from the config file
+        """
+        return psycopg2.connect(self.db_connection_string)
+
+
+    def travel_sheds(self,connectivity_table,block_ids,out_table,schema=None,overwrite=False,dry=False):
+        """
+        Creates a new DB table showing the high- and low-stress travel sheds
+        for the block(s) identified by block_ids. If more than one block is
+        passed to block_ids the table will have multiple travel sheds that need
+        to be filtered by a user.
+
+        args
+        connectivity_table -- the connectivity table to use for building travel sheds
+        block_ids -- the ids to use building travel sheds
+        out_table -- the table to save travel sheds to
+        overwrite -- whether to overwrite an existing table
+        """
+        conn = self._get_db_connection()
+
+        if schema is None:
+            schema = self.blocks_schema
+
+        cur = conn.cursor()
+
+        if overwrite and not dry:
+            cur.execute(sql.SQL('drop table if exists {}.{}').format(
+                sql.Identifier(schema),
+                sql.Identifier(out_table)
+            ))
+
+        if not dry:
+            cur.execute(
+                sql.SQL(
+                    "create table {}.{} ( \
+                        id serial primary key, \
+                        geom geometry(multipolygon,{}), \
+                        source_blockid text, \
+                        target_blockid text, \
+                        low_stress boolean, \
+                        high_stress boolean \
+                    )"
+                ).format(
+                    sql.Identifier(schema),
+                    sql.Identifier(out_table),
+                    sql.Literal(self.srid)
+                )
+            )
+
+        # read in the raw query language
+        f = open(os.path.join(self.module_dir,"sql","travel_shed.sql"))
+        raw = f.read()
+        f.close()
+
+        # set global sql vars
+        sidx = "sidx_" + out_table + "_geom"
+        idx = "idx_" + out_table + "_source_blockid"
+
+        for block in tqdm(block_ids):
+            # compose the query
+            subs = {
+                "schema": sql.Identifier(schema),
+                "table": sql.Identifier(out_table),
+                "geom": sql.Identifier(self.config["bna"]["blocks"]["geom"]),
+                "blocks_schema": sql.Identifier(self.blocks_schema),
+                "blocks": sql.Identifier(self.blocks_table),
+                "connectivity": sql.Identifier(connectivity_table),
+                "block_id_col": sql.Identifier(self.config["bna"]["blocks"]["id_column"]),
+                "source_blockid": sql.Identifier("source_blockid10"),
+                "target_blockid": sql.Identifier("target_blockid10"),
+                "block_id": sql.Literal(block),
+                "sidx": sql.Identifier(sidx),
+                "idx": sql.Identifier(idx)
+            }
+
+            q = sql.SQL(raw).format(**subs)
+
+            if dry:
+                print(q.as_string(self.conn))
+            else:
+                cur.execute(q)
+
+        conn.commit()
+        del cur
