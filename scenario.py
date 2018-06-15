@@ -441,8 +441,10 @@ class Scenario:
             "int_id": sql.Identifier(self.config["intersections"]["uid"]),
             "nodes": sql.Identifier(self.config["nodes"]["table"]),
             "node_id": sql.Identifier(self.config["nodes"]["id_column"]),
+            "node_index": sql.Identifier("sidx_"+self.config["nodes"]["table"]),
             "edges": sql.Identifier(self.config["edges"]["table"]),
             "edge_id": sql.Identifier(self.config["edges"]["id_column"]),
+            "edge_index": sql.Identifier("sidx_"+self.config["edges"]["table"]),
             "ft_seg_stress": sql.Identifier(self.config["roads"]["stress"]["segment"]["forward"]),
             "tf_seg_stress": sql.Identifier(self.config["roads"]["stress"]["segment"]["backward"]),
             "ft_int_stress": sql.Identifier(self.config["roads"]["stress"]["crossing"]["forward"]),
@@ -450,20 +452,62 @@ class Scenario:
         }
 
         # read in the raw query language
-        f = open(os.path.join(self.module_dir,"sql","build_network.sql"))
-        raw = f.read()
+        f = open(os.path.join(self.module_dir,"sql","build_network","create_tables.sql"))
+        create_query = f.read()
+        f.close()
+        f = open(os.path.join(self.module_dir,"sql","build_network","insert_nodes.sql"))
+        nodes_query = f.read()
+        f.close()
+        f = open(os.path.join(self.module_dir,"sql","build_network","insert_edges.sql"))
+        edges_query = f.read()
+        f.close()
+        f = open(os.path.join(self.module_dir,"sql","build_network","cleanup.sql"))
+        cleanup_query = f.read()
         f.close()
 
         cur = self.conn.cursor()
-        statements = [s for s in raw.split(";") if len(s.strip()) > 1]
-        for statement in tqdm(statements):
-            # compose the query
-            q = sql.SQL(statement).format(**net_subs)
 
-            if dry:
-                print(q.as_string(self.conn))
+        # create
+        print("Creating network tables")
+        q = sql.SQL(create_query).format(**net_subs)
+        if dry:
+            print(q.as_string(self.conn))
+        else:
+            cur.execute(q)
+
+        # nodes
+        print("Adding network nodes")
+        q = sql.SQL(nodes_query).format(**net_subs)
+        if dry:
+            print(q.as_string(self.conn))
+        else:
+            cur.execute(q)
+
+        # edges
+        print("Adding network edges")
+        statements = [s for s in edges_query.split(";") if len(s.strip()) > 1]
+        prog_statements = tqdm(statements)
+        for statement in prog_statements:
+            # handle progress updates
+            if statement.strip()[:2] == '--':
+                prog_statements.set_description(statement.strip()[2:])
             else:
-                cur.execute(q)
+                # compose the query
+                q = sql.SQL(statement).format(**net_subs)
+
+                if dry:
+                    print(q.as_string(self.conn))
+                else:
+                    cur.execute(q)
+
+        # cleanup
+        print("Finishing up network")
+        q = sql.SQL(cleanup_query).format(**net_subs)
+        if dry:
+            print(q.as_string(self.conn))
+        else:
+            cur.execute(q)
+
         self.conn.commit()
         del cur
 
