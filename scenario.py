@@ -2,7 +2,7 @@
 # The Scenario class stores a BNA scenario for use in pyBNA.
 # A scenario includes two graphs: one for high stress, one for low stress
 ###################################################################
-import sys, os, StringIO
+import sys, os, StringIO, random, string
 import collections
 from graph_tool.all import *
 import psycopg2
@@ -555,3 +555,97 @@ class Scenario:
         ).format(sql.Identifier(self.bna.blocks_schema),sql.Identifier(db_table)))
         cur.close()
         self.conn.commit()
+
+
+    def index_db_connectivity_table(self,db_table,overwrite=False):
+        conn = self.bna._get_db_connection
+        cur = conn.cursor()
+        if overwrite:
+            # adapted from https://stackoverflow.com/questions/34010401/how-can-i-drop-all-indexes-of-a-table-in-postgres
+            cur.execute("\
+                SELECT indexrelid::regclass::text \
+                FROM   pg_index  i \
+                    LEFT   JOIN pg_depend d ON d.objid = i.indexrelid \
+                    AND d.deptype = 'i' \
+                WHERE  i.indrelid = {}::regclass \
+                AND    d.objid IS NULL \
+            ").format(sql.Literal(db_table))
+            for row in cur:
+                if row[0] is None:
+                    pass
+                else:
+                    q = "drop index " + row[0] + ";"
+                    cur2 = conn.cursor()
+                    cur2.execute(q)
+                    cur2.close()
+
+        cur.execute(sql.SQL(" \
+            CREATE INDEX {} ON {} (source_blockid10,target_blockid10) WHERE low_stress \
+        ").format(
+            sql.Identifier("idx_" + db_table + "_low_stress"),
+            sql.Identifier(db_table)
+        ))
+        conn.commit()
+        cur.execute("analyze {}").format(sql.Identifier(db_table));
+
+
+    def retrieve_connectivity(self,table,schema=None):
+        """
+        Sets the connectivity dataframe to a table retrieved from the database.
+        This would be used if the connectivity has already been calculated for
+        this scenario and resides in the db.
+
+        args:
+        table -- name of the table holding connectivity calcs
+        schema -- name of the schema the table resides in
+        """
+        if schema is None:
+            schema = self.bna._get_schema(table)
+
+        conn = self.bna._get_db_connection()
+
+        q = sql.SQL("select id, high_stress, low_stress from {}.{}").format(
+            sql.Identifier("schema"),
+            sql.Identifier("table")
+        )
+
+        if self.debug:
+            print(q.as_string(conn))
+
+        self.connectivity = pd.DataFrame.from_postgis(
+            q,
+            conn
+        )
+
+
+    def score_destinations(self,output_table,schema=None,destinations=None,overwrite=False):
+        """
+        Creates a new db table of scores for each block
+
+        args:
+        output_table -- table to create
+        schema -- schema for the table. default is the schema where the census block table is stored.
+        destinations -- list of destinations to calculate scores for. if None use all destinatinos
+        overwrite -- overwrite a pre-existing table
+        """
+        if destinations is None:
+            destinations = [i["category"] for i in self.destinations]
+        if schema is None:
+            schema = self.bna.blocks_schema
+
+        conn = self._get_db_connection()
+        cur = conn.cursor()
+
+        if overwrite:
+            pass
+            # drop table here
+
+        for destination in self.destinations:
+            if destination in destinations:
+                tbl = ''.join(random.choice(string.ascii_lowercase) for _ in range(7))
+                try:
+                    cur.execute(destination._select_query(table,schema))
+                except:
+                    conn.rollback()
+
+        conn.commit()

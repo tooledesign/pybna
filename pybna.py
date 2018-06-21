@@ -111,8 +111,8 @@ class pyBNA:
 
     def _get_pkid_col(self, table, schema=None):
         # connect to pg and read id col
-        self._reestablish_conn()
-        cur = self.conn.cursor()
+        conn = self._get_db_connection()
+        cur = conn.cursor()
 
         if schema:
             full_table = schema + "." + table
@@ -138,6 +138,7 @@ class pyBNA:
         if self.verbose:
             print("   ID: %s" % row[0])
         cur.close()
+        conn.close()
         return row[0]
 
 
@@ -378,7 +379,8 @@ class pyBNA:
 
 
     def _get_schema(self,table):
-        cur = self.conn.cursor()
+        conn = self._get_db_connection()
+        cur = conn.cursor()
         cur.execute(" \
             select nspname::text \
             from pg_namespace n, pg_class c \
