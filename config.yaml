@@ -19,7 +19,7 @@ bna:
     boundary:
         table: "neighborhood_boundary"
         geom: "geom"
-        
+
     blocks:
         table: "neighborhood_census_blocks"
         # schema: "generated"
@@ -51,7 +51,7 @@ bna:
     # note that scenarios are added as a list (i.e. with a dash)
     #   - name: scenario1
     #     notes: "Description of scenario1"
-    #   - roads:
+    #     roads:
     #         table: "neighborhood_ways_s1"
     #         geom: "geo"
     #         uid: "id"
@@ -65,23 +65,23 @@ bna:
     #             crossing:
     #                 forward: fw_int_stress
     #                 backward: bw_int_stress
-    #       intersections:
+    #     intersections:
     #         table: "neighborhood_ways_s1_intersections"
     #         geom: "geo"
     #         uid: "id"
-    #       edges:
+    #     edges:
     #         table: "neighborhood_ways_s1_net_link"
     #         source_column: "source"
     #         target_column: "target"
     #         stress_column: "stress"
     #         cost_column: "cost"
     #         id_column: id
-    #       nodes:
+    #     nodes:
     #         table: "neighborhood_ways_s1_net_vert"
     #         id_column: id
-    #       max_distance: 5000
-    #       max_detour: 50
-    #       max_stress: 3
+    #     max_distance: 5000
+    #     max_detour: 50
+    #     max_stress: 3
 
     destinations:
       - name: people
@@ -226,6 +226,7 @@ bna:
 
     defaults:
         scenario:
+            notes: "Default BNA scenario"
             roads:
                 table: "neighborhood_ways"
                 geom: "geom"
