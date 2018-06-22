@@ -26,12 +26,12 @@ class DestinationCategory:
         if "schema" in self.config:
             self.schema = self.config["schema"]
         else:
-            self.schema = self.bna._get_schema(self.table)
+            self.schema = self.bna.get_schema(self.table)
         self.blocks_col = self.config["blocks"]
         if "uid" in self.config:
             self.id_col = self.config["uid"]
         else:
-            self.id_col = self.bna._get_pkid_col(self.table)
+            self.id_col = self.bna.get_pkid_col(self.table)
         if "geom" in self.config:
             self.geom_col = self.config["geom"]
         else:
@@ -43,7 +43,7 @@ class DestinationCategory:
         self.ls_population = None
         self.hs_population = None
 
-        self._set_destinations()
+        self.set_destinations()
         self.query = self._select_query()
 
 
@@ -57,7 +57,7 @@ class DestinationCategory:
         return r'%s: %i destinations' % (self.category, n)
 
 
-    def _set_destinations(self):
+    def set_destinations(self):
         """Retrieve destinations from the database and store them in
         this class' dataframe of destinations
 
@@ -66,7 +66,7 @@ class DestinationCategory:
         if self.verbose:
             print('Getting destinations for %s from %s' % (self.category,table))
 
-        conn = self.bna._get_db_connection()
+        conn = self.bna.get_db_connection()
         cur = conn.cursor()
 
         subs = {
@@ -75,7 +75,7 @@ class DestinationCategory:
             "table": sql.Identifier(self.table)
         }
 
-        q = sql.SQL('select {id}, {blocks} from {table};').format(**subs))
+        q = sql.SQL('select {id}, {blocks} from {table};').format(**subs)
 
         if self.debug:
             print(q.as_string(conn))

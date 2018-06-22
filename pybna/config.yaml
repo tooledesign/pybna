@@ -35,53 +35,43 @@ bna:
         geom: "geom"
         # columns: ["column1","column2"] # note: pybna already grabs the id column
 
-    scenarios:
-    # list of scenarios with settings for all BNA inputs
-    # default attributes and table names are given in the defaults section
-    # below. Attributes and table names for each scenario only need to be
-    # provided where they differ from the default. For example, if the default
-    # roads table is neighborhood_ways and I want a scenario to use the
-    # scenario_ways table I would set
-    # roads:
-    #     table: "scenario_ways"
+    network:
+        roads:
+            table: "neighborhood_ways"
+            geom: "geom"
+            uid: "road_id"
+            source_column: "intersection_from"
+            target_column: "intersection_to"
+            oneway: {name: "one_way", forward: "ft", backward: "tf"}
+            stress:
+                segment:
+                    forward: ft_seg_stress
+                    backward: tf_seg_stress
+                crossing:
+                    forward: ft_int_stress
+                    backward: tf_int_stress
+        intersections:
+            table: "neighborhood_ways_intersections"
+            geom: "geom"
+            uid: "int_id"
+        edges:
+            table: "neighborhood_ways_net_link"
+            source_column: "source_vert"
+            target_column: "target_vert"
+            stress_column: "link_stress"
+            cost_column: "link_cost"
+            id_column: link_id
+        nodes:
+            table: "neighborhood_ways_net_vert"
+            id_column: vert_id
 
-      - name: base # this is empty so it uses all the defaults
-
-    # here's an example of a scenario that uses non-defaults
-    # note that scenarios are added as a list (i.e. with a dash)
-    #   - name: scenario1
-    #     notes: "Description of scenario1"
-    #     roads:
-    #         table: "neighborhood_ways_s1"
-    #         geom: "geo"
-    #         uid: "id"
-    #         source_column: "fr"
-    #         target_column: "to"
-    #         oneway: {name: "oneway", forward: "fw", backward: "bw"}
-    #         stress:
-    #             segment:
-    #                 forward: fw_stress
-    #                 backward: bw_stress
-    #             crossing:
-    #                 forward: fw_int_stress
-    #                 backward: bw_int_stress
-    #     intersections:
-    #         table: "neighborhood_ways_s1_intersections"
-    #         geom: "geo"
-    #         uid: "id"
-    #     edges:
-    #         table: "neighborhood_ways_s1_net_link"
-    #         source_column: "source"
-    #         target_column: "target"
-    #         stress_column: "stress"
-    #         cost_column: "cost"
-    #         id_column: id
-    #     nodes:
-    #         table: "neighborhood_ways_s1_net_vert"
-    #         id_column: id
-    #     max_distance: 5000
-    #     max_detour: 50
-    #     max_stress: 3
+    connectivity:
+        table: "neighborhood_connected_census_blocks"
+        source_column: "source_blockid10"
+        target_column: "target_blockid10"
+        max_distance: 2680
+        max_detour: 25      # given as a whole number percentage (i.e. 25 == 25%)
+        max_stress: 1
 
     destinations:
       - name: people
@@ -223,38 +213,3 @@ bna:
         breaks: {1: 60}
         uid: id
         blocks: blockid10
-
-    defaults:
-        scenario:
-            notes: "Default BNA scenario"
-            roads:
-                table: "neighborhood_ways"
-                geom: "geom"
-                uid: "road_id"
-                source_column: "intersection_from"
-                target_column: "intersection_to"
-                oneway: {name: "one_way", forward: "ft", backward: "tf"}
-                stress:
-                    segment:
-                        forward: ft_seg_stress
-                        backward: tf_seg_stress
-                    crossing:
-                        forward: ft_int_stress
-                        backward: tf_int_stress
-            intersections:
-                table: "neighborhood_ways_intersections"
-                geom: "geom"
-                uid: "int_id"
-            edges:
-                table: "neighborhood_ways_net_link"
-                source_column: "source_vert"
-                target_column: "target_vert"
-                stress_column: "link_stress"
-                cost_column: "link_cost"
-                id_column: link_id
-            nodes:
-                table: "neighborhood_ways_net_vert"
-                id_column: vert_id
-            max_distance: 2680
-            max_detour: 25
-            max_stress: 1

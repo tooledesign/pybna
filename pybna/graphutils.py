@@ -7,7 +7,7 @@ import psycopg2
 from psycopg2 import sql
 
 
-def build_network(conn,edge_config,node_config,verbose=False):
+def build_graph(conn,edge_config,node_config,verbose=False):
     """Builds a graph-tool graph from a complete BNA network stored in the PostGIS database
 
     args:
@@ -45,7 +45,7 @@ def build_network(conn,edge_config,node_config,verbose=False):
         sql.Identifier(edge_table)
     ).as_string(conn)
 
-    if verbose:
+    if debug:
         print(q)
 
     df = pd.read_sql_query(
@@ -65,15 +65,19 @@ def build_network(conn,edge_config,node_config,verbose=False):
 
     # set roadid property on vertices
     if verbose:
-        print("Retrieving node data")
+        print("Retrieving nodes")
     cur = conn.cursor()
-    cur.execute(
-        sql.SQL('select {} AS id, road_id, st_x(geom) as x, st_y(geom) as y from {};')
-            .format(
-                sql.Identifier(node_id_col),
-                sql.Identifier(node_table)
-            )
+    q = sql.SQL(
+        'select {} AS id, road_id, st_x(geom) as x, st_y(geom) as y from {};'
+    ).format(
+        sql.Identifier(node_id_col),
+        sql.Identifier(node_table)
     )
+
+    if debug:
+        print(q.as_string(conn))
+    cur.execute(q)
+
     attrs = dict()
     for row in cur:
         attrs[row[0]] = (row[1],row[2],row[3])
@@ -88,7 +92,7 @@ def build_network(conn,edge_config,node_config,verbose=False):
     return G
 
 
-def build_restricted_network(G,maxStress):
+def build_restricted_graph(G,maxStress):
     stressFilter = G.new_edge_property("bool")
     # G.edge_properties["stressFilter"] = stressFilter
     map_property_values(G.ep.stress,stressFilter,lambda x: x<=maxStress)
