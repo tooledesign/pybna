@@ -133,8 +133,9 @@ class pyBNA(Destinations,Connectivity,Core):
             conn.close()
 
         # get block nodes
-        self.net_blocks = self.blocks.blocks.merge(
-            self._get_block_nodes(),
-            on="blockid"
-        )
-        self.net_blocks["graph_v"] = self.net_blocks["nodes"].apply(self._get_graph_nodes)
+        if not self.debug:
+            self.net_blocks = self.blocks.blocks.merge(
+                self._get_block_nodes(),
+                on="blockid"
+            )
+            self.net_blocks["graph_v"] = self.net_blocks["nodes"].apply(self._get_graph_nodes)

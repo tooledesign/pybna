@@ -31,6 +31,7 @@ class Connectivity:
     ls_graph = None
     module_dir = None
     db_connectivity_table = None
+    tiles_pkid = None
 
     # register pandas apply with tqdm for progress bar
     tqdm.pandas(desc="Evaluating connectivity")
@@ -59,7 +60,7 @@ class Connectivity:
         if self.verbose:
             print("Building connectivity matrix")
 
-        # drop db table if given or check existence if append mode set
+        # drop db table or check existence if append mode set
         if not append:
             self._db_connectivity_table_create(self.db_connectivity_table,overwrite=False)
         else:
@@ -543,3 +544,109 @@ class Connectivity:
             q,
             conn
         )
+
+
+    def db_calculate_connectivity(self,tiles=None,append=False,dry=False):
+        """
+        Prepares and executes queries to do connectivity analysis within the
+        database. Operates on tiles and adds results as each tile completes.
+
+        args
+        tiles -- list of tile IDs to operate on. if empty use all tiles
+        append -- append to existing db table instead of creating a new one
+        dry -- only prepare the query language but don't execute in the database
+        """
+        # check tiles
+        if not tiles is None:
+            if not type(tiles) == list and not type(tiles) == tuple:
+                raise ValueError("Tile IDs must be given as a list-like object")
+
+        # drop db table or check existence if append mode set
+        if not append:
+            self._db_connectivity_table_create(self.db_connectivity_table,overwrite=False)
+        else:
+            conn = self.db.get_db_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute(sql.SQL('select 1 from {} limit 1').format(sql.Identifier(self.db_connectivity_table)))
+                cur.close()
+            except psycopg2.ProgrammingError:
+                raise ValueError("table %s not found" % self.db_connectivity_table)
+            conn.close()
+
+        # get all tile ids if list wasn't supplied
+        # !!!! still needs to be implemented`
+
+
+        for tile_id in tqdm(tiles):
+            hs_link_query = self._build_db_link_query(tile_id)
+            ls_link_query = self._build_db_link_query(tile_id,max_stress=self.config["bna"]["connectivity"]["max_stress"])
+
+            subs = {
+                "blocks_table": sql.Identifier(self.config["bna"]["blocks"]["table"]),
+                "block_id_col": sql.Identifier(self.config["bna"]["blocks"]["id_column"]),
+                "block_geom_col": sql.Identifier(self.config["bna"]["blocks"]["geom"]),
+                "tiles_table": sql.Identifier(self.config["bna"]["tiles"]["table"]),
+                "tile_id_col": sql.Identifier(self.tiles_pkid),
+                "tile_geom_col": sql.Identifier(self.config["bna"]["tiles"]["geom"]),
+                "tile_id": sql.Literal(tile_id),
+                "vert_table": sql.Identifier(self.net_config["nodes"]["table"]),
+                "vert_id_col": sql.Identifier(self.net_config["nodes"]["id_column"]),
+                "road_id": sql.Identifier("road_id"),
+                "connectivity_table": sql.Identifier(self.db_connectivity_table),
+                "max_trip_distance": sql.Literal(self.config["bna"]["connectivity"]["max_distance"]),
+                "max_detour": sql.Literal(self.config["bna"]["connectivity"]["max_detour"]),
+                "hs_link_query": sql.Literal(hs_link_query),
+                "ls_link_query": sql.Literal(ls_link_query)
+            }
+
+            f = open(os.path.join(self.module_dir,"sql","connectivity","connectivity.sql"))
+            raw = f.read()
+            f.close()
+
+            q = sql.SQL(raw).format(**subs)
+
+            conn = self.db.get_db_connection()
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur = conn.cursor()
+                cur.execute(q)
+            conn.commit()
+            conn.close()
+
+        if not dry:
+            self._db_connectivity_table_create_index();
+
+
+    def _build_db_link_query(self,tile_id,max_stress=99):
+        conn = self.db.get_db_connection()
+        cur = conn.cursor()
+
+        subs = {
+            "link_table": sql.Identifier(self.net_config["edges"]["table"]),
+            "link_id_col": sql.Identifier(self.net_config["edges"]["id_column"]),
+            "link_cost_col": sql.Identifier(self.net_config["edges"]["cost_column"]),
+            "link_stress_col": sql.Identifier(self.net_config["edges"]["stress_column"]),
+            "tiles_table": sql.Identifier(self.config["bna"]["tiles"]["table"]),
+            "tile_id_col": sql.Identifier(self.tiles_pkid),
+            "tile_geom_col": sql.Identifier(self.config["bna"]["tiles"]["geom"]),
+            "tile_id": sql.Literal(tile_id),
+            "max_trip_distance": sql.Literal(self.config["bna"]["connectivity"]["max_distance"]),
+            "max_stress": sql.Literal(max_stress)
+        }
+
+        return sql.SQL(" \
+            SELECT \
+                link.{link_id_col}, \
+                source_vert AS source, \
+                target_vert AS target, \
+                {link_cost_col} AS cost \
+            FROM \
+                {link_table} link, \
+                {tiles_table} tile \
+            WHERE \
+                tile.{tile_id_col}={tile_id} \
+                AND ST_DWithin(tile.{tile_geom_col},link.geom,{max_trip_distance}) \
+                AND {link_stress_col} <= {max_stress} \
+        ").format(**subs).as_string(conn)

@@ -25,6 +25,7 @@ class Core():
     srid = None
     blocks = None  # reference to Blocks class
     tiles = None
+    tiles_pkid = None
 
 
     def get_tiles(self,table_name,geom_col,add_columns=list()):
@@ -38,20 +39,20 @@ class Core():
         """
 
         print("Fetching tiles from DB")
-        pkid = self.db.get_pkid_col(table_name)
+        self.tiles_pkid = self.db.get_pkid_col(table_name)
         conn = self.db.get_db_connection()
 
         # handle additional columns
         cols = " "
         for c in add_columns:
-            if c == pkid:   # we already grab the primary key column
+            if c == self.tiles_pkid:   # we already grab the primary key column
                 continue
             cols = cols + sql.SQL(",{}").format(sql.Identifier(c)).as_string(conn)
 
         # query
         q = sql.SQL("select {} as id, {} as pkid, {} as geom %s from {};" % cols).format(
-            sql.Identifier(pkid),
-            sql.Identifier(pkid),
+            sql.Identifier(self.tiles_pkid),
+            sql.Identifier(self.tiles_pkid),
             sql.Identifier(geom_col),
             sql.Identifier(table_name)
         )
@@ -238,7 +239,7 @@ class Core():
             q = sql.SQL(raw).format(**subs)
 
             if dry:
-                print(q.as_string(self.conn))
+                print(q.as_string(conn))
             else:
                 cur.execute(q)
 
