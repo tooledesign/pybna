@@ -103,3 +103,45 @@ class DBUtils:
             print("SRID: %i" % srid)
 
         return srid
+
+
+    def get_column_type(self,table,column,schema=None):
+        """
+        Returns the data type of the column
+
+        args
+        table -- the table name
+        column -- the column name
+        schema -- the schema (inferred if not given)
+
+        returns
+        string
+        """
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+
+        if schema is not None:
+            full_table = schema + "." + table
+        else:
+            full_table = table
+
+        q = sql.SQL(" \
+            SELECT pg_catalog.format_type(a.atttypid,a.atttypmod) \
+            FROM   pg_catalog.pg_attribute a \
+            WHERE  a.attnum>0 \
+            AND NOT a.attisdropped \
+            AND a.attrelid = {}::regclass \
+            AND a.attname = {} \
+        ").format(
+            sql.Literal(full_table),
+            sql.Literal(column)
+        )
+        cur.execute(q)
+
+        if cur.rowcount == 0:
+            raise Error("Column %s not found in table %s" % (column,table))
+
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return row[0]

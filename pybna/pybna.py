@@ -120,22 +120,22 @@ class pyBNA(Destinations,Connectivity,Core):
         # build graphs
         if not self.debug:
             conn = self.db.get_db_connection()
-            self.hs_graph = graphutils.build_graph(
-                conn,
-                self.config["bna"]["network"]["edges"],
-                self.config["bna"]["network"]["nodes"],
-                self.verbose
-            )
-            self.ls_graph = graphutils.build_restricted_graph(
-                self.hs_graph,
-                self.config["bna"]["connectivity"]["max_stress"]
-            )
+            # self.hs_graph = graphutils.build_graph(
+            #     conn,
+            #     self.config["bna"]["network"]["edges"],
+            #     self.config["bna"]["network"]["nodes"],
+            #     self.verbose
+            # )
+            # self.ls_graph = graphutils.build_restricted_graph(
+            #     self.hs_graph,
+            #     self.config["bna"]["connectivity"]["max_stress"]
+            # )
             conn.close()
 
         # get block nodes
-        if not self.debug:
-            self.net_blocks = self.blocks.blocks.merge(
-                self._get_block_nodes(),
-                on="blockid"
-            )
-            self.net_blocks["graph_v"] = self.net_blocks["nodes"].apply(self._get_graph_nodes)
+        # if not self.debug:
+        #     self.net_blocks = self.blocks.blocks.merge(
+        #         self._get_block_nodes(),
+        #         on="blockid"
+        #     )
+        #     self.net_blocks["graph_v"] = self.net_blocks["nodes"].apply(self._get_graph_nodes)

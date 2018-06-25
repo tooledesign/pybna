@@ -123,6 +123,7 @@ class Core():
         self.blocks.table = blocks_table
         self.blocks.schema = blocks_schema
         self.blocks.id_column = block_id_col
+        self.blocks.id_type = self.db.get_column_type(blocks_table,block_id_col,schema=blocks_schema)
         self.blocks.geom = geom
         self.blocks.pop_column = pop
 
@@ -133,12 +134,13 @@ class Core():
         if self.verbose:
             print('Adding destinations')
 
-        cur = self.conn.cursor()
+        conn = self.db.get_db_connection()
+        cur = conn.cursor()
 
         for v in self.config["bna"]["destinations"]:
             if "table" in v:
-                self.destinations[v["name"]] = Destinations(
-                    v["name"], self.conn, v["table"], v["uid"], verbose=self.verbose
+                self.destinations[v["name"]] = DestinationCategory(
+                    v["name"], conn, v["table"], v["uid"], verbose=self.verbose
                 )
                 # add all the census blocks containing a destination from this category
                 # to the pyBNA index of all blocks containing a destination of any type
@@ -148,7 +150,7 @@ class Core():
                 for sub in v["subcats"]:
                     self.destinations[sub["name"]] = Destinations(
                         sub["name"],
-                        self.conn,
+                        conn,
                         sub["table"],
                         sub["uid"],
                         verbose=self.verbose

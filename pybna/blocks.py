@@ -12,5 +12,6 @@ class Blocks:
         self.table = None
         self.schema = None
         self.id_column = None
+        self.id_type = None
         self.geom = None
         self.pop_column = None

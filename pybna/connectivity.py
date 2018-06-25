@@ -514,7 +514,7 @@ class Connectivity:
             sql.Identifier(target)
         ))
         conn.commit()
-        cur.execute("analyze {}").format(sql.Identifier(self.db_connectivity_table));
+        cur.execute(sql.SQL("analyze {}").format(sql.Identifier(self.db_connectivity_table)));
 
 
     def retrieve_connectivity(self,table,schema=None):
