@@ -145,3 +145,30 @@ class DBUtils:
         cur.close()
         conn.close()
         return row[0]
+
+
+    def table_exists(self,table,schema=None):
+        """
+        Checks whether the given table exists in the db
+
+        args
+        table -- the table name
+        schema -- the schema name
+
+        returns
+        boolean -- true if exists, false if not
+        """
+        if schema is None:
+            full_table = table
+        else:
+            full_table = schema + "." + table
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(sql.SQL("select {}::regclass").format(sql.Literal(full_table)))
+            cur.close()
+            conn.close()
+            return True
+        except psycopg2.ProgrammingError:
+            conn.close()
+            return False

@@ -86,39 +86,39 @@ class Core():
         else:
             block_id_col = get_pkid_col(blocks_table,schema=blocks_schema)
 
-        subs = {
-            "block_geom": sql.Identifier(geom),
-            "block_id": sql.Identifier(block_id_col),
-            "pop": sql.Identifier(pop),
-            "blocks_schema": sql.Identifier(blocks_schema),
-            "blocks_table": sql.Identifier(blocks_table),
-            "boundary_table": sql.Identifier(boundary_table),
-            "boundary_geom": sql.Identifier(boundary_geom)
-        }
-
-        if self.verbose:
-            print("Getting census blocks from %s.%s" % (blocks_schema,blocks_table))
-
-        conn = self.db.get_db_connection()
-        q = sql.SQL(" \
-            select b.{block_geom} as geom, b.{block_id} as blockid, b.{pop} as pop \
-            from {blocks_schema}.{blocks_table} b\
-            where exists ( \
-                select 1 from {boundary_table} bound \
-                where st_intersects(b.{block_geom},bound.{boundary_geom}) \
-            );"
-        ).format(**subs)
-
-        if self.debug:
-            print(q.as_string(conn))
-
+        # subs = {
+        #     "block_geom": sql.Identifier(geom),
+        #     "block_id": sql.Identifier(block_id_col),
+        #     "pop": sql.Identifier(pop),
+        #     "blocks_schema": sql.Identifier(blocks_schema),
+        #     "blocks_table": sql.Identifier(blocks_table),
+        #     "boundary_table": sql.Identifier(boundary_table),
+        #     "boundary_geom": sql.Identifier(boundary_geom)
+        # }
+        #
+        # if self.verbose:
+        #     print("Getting census blocks from %s.%s" % (blocks_schema,blocks_table))
+        #
+        # conn = self.db.get_db_connection()
+        # q = sql.SQL(" \
+        #     select b.{block_geom} as geom, b.{block_id} as blockid, b.{pop} as pop \
+        #     from {blocks_schema}.{blocks_table} b\
+        #     where exists ( \
+        #         select 1 from {boundary_table} bound \
+        #         where st_intersects(b.{block_geom},bound.{boundary_geom}) \
+        #     );"
+        # ).format(**subs)
+        #
+        # if self.debug:
+        #     print(q.as_string(conn))
+        #
         self.blocks = Blocks()
-        self.blocks.blocks = gpd.GeoDataFrame.from_postgis(
-            q,
-            conn,
-            geom_col=geom
-        )
-        conn.close()
+        # self.blocks.blocks = gpd.GeoDataFrame.from_postgis(
+        #     q,
+        #     conn,
+        #     geom_col=geom
+        # )
+        # conn.close()
 
         self.blocks.table = blocks_table
         self.blocks.schema = blocks_schema

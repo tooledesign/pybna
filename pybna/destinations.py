@@ -40,11 +40,14 @@ class Destinations():
         conn = self.db.get_db_connection()
         cur = conn.cursor()
 
-        if overwrite:
-            cur.execute("drop table if exists {}.{}").format(
-                sql.Identifier(schema),
-                sql.Identifier(output_table)
-            )
+        if not dry:
+            if overwrite:
+                cur.execute(sql.SQL("drop table if exists {}.{}").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(output_table)
+                ))
+            elif self.db.table_exists(output_table,schema):
+                raise psycopg2.ProgrammingError("Table %s.%s already exists" % (schema,output_table))
         # try:
         #     self._create_destination_table(conn,schema,output_table,dry=dry)
         # except:
@@ -61,13 +64,22 @@ class Destinations():
         tables = sql.SQL("")
         for cat in self.config["bna"]["destinations"]:
             cat_cols, tab_cols = self._concat_dests(conn,cat,dry)
-        columns += cat_cols
-        tables += tab_cols
+            columns += cat_cols
+            tables += tab_cols
+
+        if "schema" in self.config["bna"]["boundary"]:
+            boundary_schema = self.config["bna"]["boundary"]["schema"]
+        else:
+            boundary_schema = self.db.get_schema(self.config["bna"]["boundary"]["table"])
 
         subs = {
             "blocks_schema": sql.Identifier(self.blocks.schema),
             "blocks_table": sql.Identifier(self.blocks.table),
             "block_id_col": sql.Identifier(self.blocks.id_column),
+            "block_geom": sql.Identifier(self.blocks.geom),
+            "boundary_schema": sql.Identifier(boundary_schema),
+            "boundary_table": sql.Identifier(self.config["bna"]["boundary"]["table"]),
+            "boundary_geom": sql.Identifier(self.config["bna"]["boundary"]["geom"]),
             "schema": sql.Identifier(schema),
             "table": sql.Identifier(output_table),
             "columns": columns,
@@ -82,6 +94,11 @@ class Destinations():
             FROM \
                 {blocks_schema}.{blocks_table} blocks \
                 {tables} \
+            WHERE EXISTS ( \
+                select 1 \
+                from {boundary_schema}.{boundary_table} bound \
+                where st_intersects(blocks.{block_geom},bound.{boundary_geom}) \
+            ) \
         ").format(**subs)
 
         if dry:

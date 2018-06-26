@@ -412,24 +412,26 @@ class Connectivity:
         for table in [self.net_config["edges"]["table"],self.net_config["nodes"]["table"]]:
             if self.verbose:
                 print("Checking for %s in database" % table)
-
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    sql.SQL(
-                        "select * from {} limit 1"
-                    ).format(
-                        sql.Identifier(table)
-                    )
-                )
-                cur.fetchone()
-                cur.close()
-            except psycopg2.ProgrammingError:
-                conn.close()
+            if not self.db.table_exists(table):
                 return False
-
-        # no errors = tables found
-        conn.close
+        #
+        #     try:
+        #         cur = conn.cursor()
+        #         cur.execute(
+        #             sql.SQL(
+        #                 "select * from {} limit 1"
+        #             ).format(
+        #                 sql.Identifier(table)
+        #             )
+        #         )
+        #         cur.fetchone()
+        #         cur.close()
+        #     except psycopg2.ProgrammingError:
+        #         conn.close()
+        #         return False
+        #
+        # # no errors = tables found
+        # conn.close
         return True
 
 
