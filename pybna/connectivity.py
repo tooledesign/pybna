@@ -559,9 +559,18 @@ class Connectivity:
         dry -- only prepare the query language but don't execute in the database
         """
         # check tiles
-        if not tiles is None:
-            if not type(tiles) == list and not type(tiles) == tuple:
-                raise ValueError("Tile IDs must be given as an iterable")
+        if tiles is None:
+            conn = self.db.get_db_connection()
+            cur = conn.cursor()
+            cur.execute(sql.SQL("select {} from {}").format(
+                sql.Identifier(self.tiles_pkid),
+                sql.Identifier(self.config["bna"]["tiles"]["table"])
+            ))
+            tiles = []
+            for row in cur:
+                tiles.append(row[0])
+        elif not type(tiles) == list and not type(tiles) == tuple:
+            raise ValueError("Tile IDs must be given as an iterable")
 
         # drop db table or check existence if append mode set
         if not append:
@@ -569,11 +578,10 @@ class Connectivity:
         elif not self.db.table_exists(self.db_connectivity_table):
             raise ValueError("table %s not found" % self.db_connectivity_table)
 
-        # get all tile ids if list wasn't supplied
-        # !!!! still needs to be implemented`
+        tile_progress = tqdm(tiles)
 
-
-        for tile_id in tqdm(tiles):
+        for tile_id in tile_progress:
+            tile_progress.set_description("Tile id: "+str(tile_id))
             hs_link_query = self._build_db_link_query(tile_id)
             ls_link_query = self._build_db_link_query(tile_id,max_stress=self.config["bna"]["connectivity"]["max_stress"])
 
@@ -589,6 +597,8 @@ class Connectivity:
                 "vert_id_col": sql.Identifier(self.net_config["nodes"]["id_column"]),
                 "road_id": sql.Identifier("road_id"),
                 "connectivity_table": sql.Identifier(self.db_connectivity_table),
+                "conn_source_col": sql.Identifier(self.config["bna"]["connectivity"]["source_column"]),
+                "conn_target_col": sql.Identifier(self.config["bna"]["connectivity"]["target_column"]),
                 "max_trip_distance": sql.Literal(self.config["bna"]["connectivity"]["max_distance"]),
                 "max_detour": sql.Literal(self.config["bna"]["connectivity"]["max_detour"]),
                 "hs_link_query": sql.Literal(hs_link_query),
@@ -599,16 +609,24 @@ class Connectivity:
             raw = f.read()
             f.close()
 
-            q = sql.SQL(raw).format(**subs)
-
             conn = self.db.get_db_connection()
-            if dry:
-                print(q.as_string(conn))
-            else:
-                cur = conn.cursor()
-                cur.execute(q)
+
+            statements = self.db.split_sql_for_tqdm(raw)
+
+            for statement in statements:
+                statements.set_description(statement["update"])
+                q = sql.SQL(statement["query"]).format(**subs)
+
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    cur = conn.cursor()
+                    cur.execute(q)
+                    cur.close()
+
             conn.commit()
             conn.close()
+            print("\n")
 
         if not dry and not append:
             self._db_connectivity_table_create_index();

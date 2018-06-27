@@ -172,3 +172,40 @@ class DBUtils:
         except psycopg2.ProgrammingError:
             conn.close()
             return False
+
+
+    def split_sql_for_tqdm(self,sql):
+        """
+        reads in an input sql script with comments representing progress updates.
+        splits statements into a list.
+        expects comments intended for progress reporting to be terminated by a
+        semicolon. also expects sql statements to NOT begin with comments (i.e.
+        don't lead off with a comment or the whole statement will be interpreted
+        as a progress update)
+
+        args
+        sql -- the raw sql text
+
+        returns
+        tqdm object composed of a list of dictionaries where each entry has
+        two values, the query and a progress update
+        """
+        statements = [s for s in sql.split(";") if len(s.strip()) > 1]
+
+        parsed = []
+        running_entry = {
+            "update": None,
+            "query": " "
+        }
+        for statement in statements:
+            if statement.strip()[:2] == '--':
+                running_entry["update"] = statement.strip()[2:]
+            else:
+                running_entry["query"] = statement
+                parsed.append(dict(running_entry))
+                # running_entry = {
+                #     "update": " ",
+                #     "query": None
+                # }
+
+        return tqdm(parsed)
