@@ -561,20 +561,13 @@ class Connectivity:
         # check tiles
         if not tiles is None:
             if not type(tiles) == list and not type(tiles) == tuple:
-                raise ValueError("Tile IDs must be given as a list-like object")
+                raise ValueError("Tile IDs must be given as an iterable")
 
         # drop db table or check existence if append mode set
         if not append:
             self._db_connectivity_table_create(self.db_connectivity_table,overwrite=False)
-        else:
-            conn = self.db.get_db_connection()
-            cur = conn.cursor()
-            try:
-                cur.execute(sql.SQL('select 1 from {} limit 1').format(sql.Identifier(self.db_connectivity_table)))
-                cur.close()
-            except psycopg2.ProgrammingError:
-                raise ValueError("table %s not found" % self.db_connectivity_table)
-            conn.close()
+        elif not self.db.table_exists(self.db_connectivity_table):
+            raise ValueError("table %s not found" % self.db_connectivity_table)
 
         # get all tile ids if list wasn't supplied
         # !!!! still needs to be implemented`
@@ -602,7 +595,7 @@ class Connectivity:
                 "ls_link_query": sql.Literal(ls_link_query)
             }
 
-            f = open(os.path.join(self.module_dir,"sql","connectivity","connectivity.sql"))
+            f = open(os.path.join(self.module_dir,"sql","connectivity","tile_based_connectivity.sql"))
             raw = f.read()
             f.close()
 
@@ -617,7 +610,7 @@ class Connectivity:
             conn.commit()
             conn.close()
 
-        if not dry:
+        if not dry and not append:
             self._db_connectivity_table_create_index();
 
 

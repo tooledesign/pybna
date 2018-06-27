@@ -48,20 +48,11 @@ class Destinations():
                 ))
             elif self.db.table_exists(output_table,schema):
                 raise psycopg2.ProgrammingError("Table %s.%s already exists" % (schema,output_table))
-        # try:
-        #     self._create_destination_table(conn,schema,output_table,dry=dry)
-        # except:
-        #     conn.rollback()
-
-        # for destination in tqdm(self.destinations):
-
-
-
-
 
         # combine all the temporary tables into the final output
         columns = sql.SQL("")
         tables = sql.SQL("")
+        print("Calculating high and low stress destination access")
         for cat in self.config["bna"]["destinations"]:
             cat_cols, tab_cols = self._concat_dests(conn,cat,dry)
             columns += cat_cols
@@ -107,7 +98,27 @@ class Destinations():
             if self.verbose:
                 print("Compiling destination data for all sources into output table")
             cur.execute(q)
+
+        # now use the results to calculate scores
+        print("Calculating scores")
+        cases = sql.SQL("")
+        for cat in self.config["bna"]["destinations"]:
+            cat_case = self._concat_scores(conn,cat)
+            cases += cat_case
+
+        cases = sql.SQL(cases.as_string(conn)[1:])
+        subs["cases"] = cases
+        q = sql.SQL(" \
+            UPDATE {schema}.{table} \
+            SET {cases} \
+        ").format(**subs)
+
+        if dry:
+            print(q.as_string(conn))
+        else:
+            cur.execute(q)
             conn.commit()
+
         cur.close()
         conn.close()
 
@@ -121,6 +132,7 @@ class Destinations():
         args
         conn -- psycopg2 connection object from the parent method
         node -- current node in the config file
+        dry -- prints sql commands instead of executing them in the db
         """
         columns = sql.SQL("")
         tables = sql.SQL("")
@@ -141,7 +153,7 @@ class Destinations():
             # set up temporary tables for results
             tbl = ''.join(random.choice(string.ascii_lowercase) for _ in range(7))
             if self.verbose:
-                print("Calculating for %s" % node["name"])
+                print("   ... "+node["name"])
             tbl_hs = tbl + "_hs"
             tbl_ls = tbl + "_ls"
 
@@ -194,5 +206,94 @@ class Destinations():
             )
 
         return columns, tables
+
+
+    def _concat_scores(self,conn,node):
+        """
+        Concatenates the update logic for all fields together
+
+        args
+        conn -- psycopg2 connection object from the parent method
+        node -- current node in the config file
+        """
+        columns = sql.SQL("")
+
+        if "subcats" in node:
+            for subcat in node["subcats"]:
+                subcolumn = self._concat_scores(conn,subcat)
+                columns += subcolumn
+            col_name = sql.Identifier(node["name"] + "_score")
+            columns += sql.SQL(",NULL::float as {}").format(col_name)
+
+        if "blocks" in node:
+            # set up destination object
+            destination = DestinationCategory(self, node, os.path.join(self.module_dir,"sql","destinations"), self.verbose, self.debug)
+            if self.verbose:
+                print("   ... "+node["name"])
+            if "breaks" not in node:
+                node["breaks"] = {}
+            columns += sql.SQL(",{} = ").format(sql.Identifier(destination.score_column_name))
+            columns += self._concat_case(
+                destination.hs_column_name,
+                destination.ls_column_name,
+                node["breaks"],
+                node["maxpoints"]
+            )
+
+        return columns
+
+
+    def _concat_case(self,hs_column,ls_column,breaks,maxpoints):
+        """
+        Builds a case statement for comparing high stress and low stress destination
+        counts using defined break points
+
+        args
+        hs_column -- the name of the column with high stress destination counts
+        ls_column -- the name of the column with low stress destination counts
+        breaks -- a dictionary of break points
+
+        returns
+        a composed psycopg2 SQL object representing a full CASE ... END statement
+        """
+        subs = {
+            "hs_column": sql.Identifier(hs_column),
+            "ls_column": sql.Identifier(ls_column),
+            "maxpoints": sql.Literal(maxpoints),
+            "break": sql.Literal(0)
+        }
+
+        case = sql.SQL(" \
+            CASE \
+            WHEN COALESCE({hs_column}) = 0 THEN NULL \
+            WHEN {hs_column} = {ls_column} THEN {maxpoints} \
+            WHEN {ls_column} = 0 THEN 0 \
+        ").format(**subs)
+
+        cumul_score = 0
+        prev_score = 0
+        for b in sorted(breaks.items()):
+            subs["break"] = sql.Literal(b[0])
+            subs["score"] = sql.Literal(b[1])
+            subs["cumul_score"] = sql.Literal(cumul_score)
+            subs["prev_score"] = sql.Literal(prev_score)
+
+            case += sql.SQL(" \
+                WHEN {ls_column} = {break} THEN {score} + {cumul_score} \
+                WHEN {ls_column} < {break} \
+                    THEN ({ls_column}::FLOAT/{break}) * ({score} - {cumul_score}) \
+            ").format(**subs)
+
+            cumul_score += b[1]
+            prev_score = b[1]
+
+        if maxpoints == cumul_score:
+            case += sql.SQL("WHEN {ls_column} > {break} THEN {maxpoints}").format(**subs)
+        if maxpoints > cumul_score:
+            case += sql.SQL("ELSE {maxpoints} + (({ls_column} - {break})/({hs_column} - {break})) * ({maxpoints} - {cumul_score})").format(**subs)
+        case += sql.SQL(" END")
+
+        return case
+
 
 # b._concat_dests(b.config["bna"]["destinations"][1])

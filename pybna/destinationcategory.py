@@ -43,6 +43,10 @@ class DestinationCategory:
         self.verbose = verbose
         self.debug = debug
 
+        self.hs_column_name = self.category + "_hs"
+        self.ls_column_name = self.category + "_ls"
+        self.score_column_name = self.category + "_score"
+
         self.ls_population = None
         self.hs_population = None
 
