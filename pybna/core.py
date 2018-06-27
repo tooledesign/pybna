@@ -12,8 +12,8 @@ import pickle
 from tqdm import tqdm
 from blocks import Blocks
 
-from scenario import Scenario
-from destinations import Destinations
+# from scenario import Scenario
+# from destinations import Destinations
 
 
 class Core():

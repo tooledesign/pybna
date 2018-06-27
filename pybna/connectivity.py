@@ -355,13 +355,14 @@ class Connectivity:
         cleanup_query = f.read()
         f.close()
 
-        cur = self.conn.cursor()
+        conn = self.db.get_db_connection()
+        cur = conn.cursor()
 
         # create
         print("Creating network tables")
         q = sql.SQL(create_query).format(**net_subs)
         if dry:
-            print(q.as_string(self.conn))
+            print(q.as_string(conn))
         else:
             cur.execute(q)
 
@@ -369,7 +370,7 @@ class Connectivity:
         print("Adding network nodes")
         q = sql.SQL(nodes_query).format(**net_subs)
         if dry:
-            print(q.as_string(self.conn))
+            print(q.as_string(conn))
         else:
             cur.execute(q)
 
@@ -386,7 +387,7 @@ class Connectivity:
                 q = sql.SQL(statement).format(**net_subs)
 
                 if dry:
-                    print(q.as_string(self.conn))
+                    print(q.as_string(conn))
                 else:
                     cur.execute(q)
 
@@ -394,12 +395,13 @@ class Connectivity:
         print("Finishing up network")
         q = sql.SQL(cleanup_query).format(**net_subs)
         if dry:
-            print(q.as_string(self.conn))
+            print(q.as_string(conn))
         else:
             cur.execute(q)
 
-        self.conn.commit()
-        del cur
+        conn.commit()
+        cur.close()
+        conn.close()
 
 
     def check_db_network(self):
