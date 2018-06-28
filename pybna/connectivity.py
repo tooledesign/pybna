@@ -581,8 +581,10 @@ class Connectivity:
             raise ValueError("table %s not found" % self.db_connectivity_table)
 
         tile_progress = tqdm(tiles)
+        failed_tiles = list()
 
         for tile_id in tile_progress:
+            failure = False
             tile_progress.set_description("Tile id: "+str(tile_id))
             hs_link_query = self._build_db_link_query(tile_id)
             ls_link_query = self._build_db_link_query(tile_id,max_stress=self.config["bna"]["connectivity"]["max_stress"])
@@ -622,13 +624,25 @@ class Connectivity:
                 if dry:
                     print(q.as_string(conn))
                 else:
-                    cur = conn.cursor()
-                    cur.execute(q)
-                    cur.close()
+                    try:
+                        cur = conn.cursor()
+                        cur.execute(q)
+                        cur.close()
+                    except psycopg2.OperationalError:
+                        print("Tile %s failed" % str(tile_id))
+                        failed_tiles.append(tile_id)
+                        failure = True
+                        break
 
-            conn.commit()
+            if not failure:
+                conn.commit()
             conn.close()
-            print("\n")
+
+        print("\n\n------------------------------------")
+        print("Process completed with %i failed tiles" % len(failed_tiles))
+        if len(failed_tiles) > 0:
+            print(failed_tiles)
+        print("------------------------------------\n")
 
         if not dry and not append:
             self._db_connectivity_table_create_index();
