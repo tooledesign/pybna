@@ -13,6 +13,7 @@ from scipy.sparse import coo_matrix
 import pandas as pd
 import geopandas as gpd
 from tqdm import tqdm
+import time
 
 
 class Connectivity:
@@ -632,6 +633,7 @@ class Connectivity:
                         print("Tile %s failed" % str(tile_id))
                         failed_tiles.append(tile_id)
                         failure = True
+                        time.sleep(60)
                         break
 
             if not failure:
