@@ -577,7 +577,7 @@ class Connectivity:
 
         # drop db table or check existence if append mode set
         if not append:
-            self._db_connectivity_table_create(self.db_connectivity_table,overwrite=False)
+            self._db_connectivity_table_create(overwrite=False)
         elif not self.db.table_exists(self.db_connectivity_table):
             raise ValueError("table %s not found" % self.db_connectivity_table)
 

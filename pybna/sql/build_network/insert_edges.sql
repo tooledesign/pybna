@@ -22,7 +22,7 @@ INSERT INTO pg_temp.e
 SELECT
     i.int_id,
     source.road_id,
-    source.one_way,
+    source.{one_way},
     ST_Azimuth(
         ST_LineInterpolatePoint(source.geom,0.1),
         ST_Startpoint(source.geom)
@@ -32,7 +32,7 @@ SELECT
     source.{tf_seg_stress},
     source.{tf_int_stress},
     target.road_id,
-    target.one_way,
+    target.{one_way},
     ST_Azimuth(
         ST_Startpoint(target.geom),
         ST_LineInterpolatePoint(target.geom,0.1)
@@ -54,7 +54,7 @@ INSERT INTO pg_temp.e
 SELECT
     i.int_id,
     source.road_id,
-    source.one_way,
+    source.{one_way},
     ST_Azimuth(
         ST_LineInterpolatePoint(source.geom,0.1),
         ST_Startpoint(source.geom)
@@ -64,7 +64,7 @@ SELECT
     source.{tf_seg_stress},
     source.{tf_int_stress},
     target.road_id,
-    target.one_way,
+    target.{one_way},
     ST_Azimuth(
         ST_Endpoint(target.geom),
         ST_LineInterpolatePoint(target.geom,0.9)
@@ -86,7 +86,7 @@ INSERT INTO pg_temp.e
 SELECT
     i.int_id,
     source.road_id,
-    source.one_way,
+    source.{one_way},
     ST_Azimuth(
         ST_LineInterpolatePoint(source.geom,0.9),
         ST_Endpoint(source.geom)
@@ -96,7 +96,7 @@ SELECT
     source.{ft_seg_stress},
     source.{ft_int_stress},
     target.road_id,
-    target.one_way,
+    target.{one_way},
     ST_Azimuth(
         ST_Startpoint(target.geom),
         ST_LineInterpolatePoint(target.geom,0.1)
@@ -118,7 +118,7 @@ INSERT INTO pg_temp.e
 SELECT
     i.int_id,
     source.road_id,
-    source.one_way,
+    source.{one_way},
     ST_Azimuth(
         ST_LineInterpolatePoint(source.geom,0.9),
         ST_Endpoint(source.geom)
@@ -128,7 +128,7 @@ SELECT
     source.{ft_seg_stress},
     source.{ft_int_stress},
     target.road_id,
-    target.one_way,
+    target.{one_way},
     ST_Azimuth(
         ST_Endpoint(target.geom),
         ST_LineInterpolatePoint(target.geom,0.9)
