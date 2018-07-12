@@ -111,6 +111,8 @@ class pyBNA(Destinations,Connectivity,Core):
         if force_net_build:
             print("Building network tables in database")
             self.build_db_network()
+        elif self.debug:
+            pass
         elif not self.check_db_network():
             print("Network tables not found in database...building")
             self.build_db_network()
