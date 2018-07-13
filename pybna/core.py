@@ -60,12 +60,12 @@ class Core():
         if self.debug:
             print(q.as_string(conn))
 
-        return gpd.GeoDataFrame.from_postgis(
-            q,
-            conn,
-            geom_col="geom",
-            index_col="id"
-        )
+        # return gpd.GeoDataFrame.from_postgis(
+        #     q,
+        #     conn,
+        #     geom_col="geom",
+        #     index_col="id"
+        # )
 
 
     def make_tiles(self,max_blocks=5000,schema=None,overwrite=False):
