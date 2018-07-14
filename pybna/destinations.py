@@ -80,7 +80,8 @@ class Destinations():
         q = sql.SQL(" \
             SELECT \
                 blocks.{block_id_col} \
-                {columns} \
+                {columns}, \
+                NULL::FLOAT AS overall_score \
             INTO {schema}.{table} \
             FROM \
                 {blocks_schema}.{blocks_table} blocks \
@@ -89,7 +90,8 @@ class Destinations():
                 select 1 \
                 from {boundary_schema}.{boundary_table} bound \
                 where st_intersects(blocks.{block_geom},bound.{boundary_geom}) \
-            ) \
+            ); \
+            ALTER TABLE {schema}.{table} ADD PRIMARY KEY ({block_id_col}); \
         ").format(**subs)
 
         if dry:
@@ -100,7 +102,7 @@ class Destinations():
             cur.execute(q)
 
         # now use the results to calculate scores
-        print("Calculating scores")
+        print("Calculating destination scores")
         cases = sql.SQL("")
         for cat in self.config["bna"]["destinations"]:
             cat_case = self._concat_scores(conn,cat)
@@ -117,9 +119,18 @@ class Destinations():
             print(q.as_string(conn))
         else:
             cur.execute(q)
-            conn.commit()
+            cur.close()
 
-        cur.close()
+        # finally set any category scores
+        print("Calculating category scores")
+
+        # set up the overall score by copying the destinations configuration
+        # and adding an "overall" category with all main categories underneath it
+        overall_config = {"name": "overall"}
+        overall_config["subcats"] = self.config["bna"]["destinations"]
+        self._category_scores(conn,overall_config,subs,dry)
+
+        conn.commit()
         conn.close()
 
 
@@ -223,7 +234,6 @@ class Destinations():
                 subcolumn = self._concat_scores(conn,subcat)
                 columns += subcolumn
             col_name = sql.Identifier(node["name"] + "_score")
-            columns += sql.SQL(",NULL::float as {}").format(col_name)
 
         if "blocks" in node:
             # set up destination object
@@ -296,4 +306,91 @@ class Destinations():
         return case
 
 
+    def _category_scores(self,conn,node,subs,dry=False):
+        """
+        Iteratively calculates category scores from all component subcategories
+        using the weights defined in the config file.
+        Will first calculate any subcategories which themselves have subcategories.
+
+        args
+        conn -- psycopg2 connection object from the parent method
+        node -- current node in the destination tree
+        subs -- list of SQL substitutions from the parent method
+        dry -- outputs all SQL commands to stdout instead of executing in the DB
+        """
+        if "subcats" in node:
+            for subcat in node["subcats"]:
+                self._category_scores(conn,subcat,subs,dry)
+
+            if self.verbose:
+                print("   ... %s" % node["name"])
+
+            num = []
+            den = []
+            check_zero = []
+            check_null = []
+            for subcat in node["subcats"]:
+                # get maxpoints if not given
+                if "maxpoints" not in subcat:
+                    subcat["maxpoints"] = self._get_maxpoints(subcat)
+
+                num.append(sql.SQL("{}*coalesce({},0)::float/{}").format(
+                    sql.Literal(subcat["weight"]),
+                    sql.Identifier(subcat["name"]+"_score"),
+                    sql.Literal(subcat["maxpoints"])
+                ))
+                den.append(sql.SQL("case when {} is null then 0 else {} end").format(
+                    sql.Identifier(subcat["name"]+"_score"),
+                    sql.Literal(subcat["weight"])
+                ))
+                check_zero.append(sql.SQL("coalesce({},0) = 0").format(
+                    sql.Identifier(subcat["name"]+"_score")
+                ))
+                check_null.append(sql.SQL("{} is null").format(
+                    sql.Identifier(subcat["name"]+"_score")
+                ))
+
+            subs["this_column"] = sql.Identifier(node["name"] + "_score")
+            subs["check_null"] = sql.SQL(" and ").join(check_null)
+            subs["check_zero"] = sql.SQL(" and ").join(check_zero)
+            subs["numerator"] = sql.SQL(" + ").join(num)
+            subs["denominator"] = sql.SQL(" + ").join(den)
+            q = sql.SQL(" \
+                update {schema}.{table} \
+                set \
+                    {this_column} = \
+                        case \
+                            when {check_null} then null \
+                            when {check_zero} then 0 \
+                            else ({numerator})::FLOAT/({denominator}) \
+                            end \
+            ").format(**subs)
+
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur = conn.cursor()
+                cur.execute(q)
+                cur.close()
+            # how to deal with cats that don't have a "hs" column to read for
+            # coalesce purposes?
+
+
+    def _get_maxpoints(self,node):
+        """
+        calculates a maximum score for main categories composed of subcategories
+        using the weights assigned to the subcategories.
+
+        args
+        node -- current branch of the destination tree
+        """
+        maxpoints = 0
+
+        if "subcats" in node:
+            for subcat in node["subcats"]:
+                maxpoints += self._get_maxpoints(subcat)
+        else:
+            maxpoints += node["weight"]
+
+        return maxpoints
 # b._concat_dests(b.config["bna"]["destinations"][1])

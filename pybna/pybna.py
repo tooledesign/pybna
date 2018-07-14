@@ -106,6 +106,8 @@ class pyBNA(Destinations,Connectivity,Core):
                         tiles_columns = tile_config["columns"]
                     else:
                         tiles_columns = list()
+                    if not self.db.table_exists(tiles_table_name):
+                        self.make_tiles()
                     self.tiles = self.get_tiles(tiles_table_name,tiles_table_geom_col,tiles_columns)
 
         if force_net_build:

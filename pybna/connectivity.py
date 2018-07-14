@@ -63,7 +63,7 @@ class Connectivity:
 
         # drop db table or check existence if append mode set
         if not append:
-            self._db_connectivity_table_create(self.db_connectivity_table,overwrite=False)
+            self._db_connectivity_table_create(overwrite=False)
         else:
             conn = self.db.get_db_connection()
             cur = conn.cursor()
