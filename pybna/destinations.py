@@ -24,7 +24,7 @@ class Destinations():
     blocks = None
 
 
-    def score_destinations(self,output_table,schema=None,overwrite=False,dry=False):
+    def score_destinations(self,output_table,schema=None,with_geoms=False,overwrite=False,dry=False):
         """
         Creates a new db table of scores for each block
 
@@ -129,6 +129,9 @@ class Destinations():
         overall_config = {"name": "overall"}
         overall_config["subcats"] = self.config["bna"]["destinations"]
         self._category_scores(conn,overall_config,subs,dry)
+
+        if with_geoms:
+            self._copy_block_geoms(conn,subs,dry)
 
         conn.commit()
         conn.close()
@@ -247,13 +250,14 @@ class Destinations():
                 destination.hs_column_name,
                 destination.ls_column_name,
                 node["breaks"],
-                node["maxpoints"]
+                node["maxpoints"],
+                node["method"]
             )
 
         return columns
 
 
-    def _concat_case(self,hs_column,ls_column,breaks,maxpoints):
+    def _concat_case(self,hs_column,ls_column,breaks,maxpoints,method):
         """
         Builds a case statement for comparing high stress and low stress destination
         counts using defined break points
@@ -262,6 +266,7 @@ class Destinations():
         hs_column -- the name of the column with high stress destination counts
         ls_column -- the name of the column with low stress destination counts
         breaks -- a dictionary of break points
+        method -- the method to use for calculation (count, percentage)
 
         returns
         a composed psycopg2 SQL object representing a full CASE ... END statement
@@ -281,26 +286,38 @@ class Destinations():
         ").format(**subs)
 
         cumul_score = 0
-        prev_score = 0
+        prev_break = 0
         for b in sorted(breaks.items()):
             subs["break"] = sql.Literal(b[0])
+            subs["prev_break"] = sql.Literal(prev_break)
             subs["score"] = sql.Literal(b[1])
             subs["cumul_score"] = sql.Literal(cumul_score)
-            subs["prev_score"] = sql.Literal(prev_score)
+            if method == "count":
+                subs["val"] = sql.SQL("{ls_column}").format(**subs)
+            elif method == "percentage":
+                subs["val"] = sql.SQL("({ls_column}::FLOAT/{hs_column})").format(**subs)
 
             case += sql.SQL(" \
-                WHEN {ls_column} = {break} THEN {score} + {cumul_score} \
-                WHEN {ls_column} < {break} \
-                    THEN ({ls_column}::FLOAT/{break}) * ({score} - {cumul_score}) \
+                WHEN {val} = {break} THEN {score} + {cumul_score} \
+                WHEN {val} < {break} \
+                    THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score}) \
             ").format(**subs)
 
-            cumul_score += b[1]
-            prev_score = b[1]
+            prev_break = b[0]
+            if method == "count":       # parks score is calculating wrong on 311090002021011
+                cumul_score += b[1]
+            elif method == "percentage":
+                cumul_score = b[1]
 
+        subs["cumul_score"] = sql.Literal(cumul_score)
         if maxpoints == cumul_score:
-            case += sql.SQL("WHEN {ls_column} > {break} THEN {maxpoints}").format(**subs)
+            case += sql.SQL("WHEN {val} > {break} THEN {maxpoints}").format(**subs)
         if maxpoints > cumul_score:
-            case += sql.SQL("ELSE {maxpoints} + (({ls_column} - {break})/({hs_column} - {break})) * ({maxpoints} - {cumul_score})").format(**subs)
+            if method == "count":
+                case += sql.SQL("ELSE {cumul_score} + (({ls_column} - {break})::FLOAT/({hs_column} - {break})) * ({maxpoints} - {cumul_score})").format(**subs)
+            elif method == "percentage":
+                case += sql.SQL("ELSE {cumul_score} + (({ls_column}::FLOAT/{hs_column}) - {break})::FLOAT * ({maxpoints} - {cumul_score})").format(**subs)
+
         case += sql.SQL(" END")
 
         return case
@@ -325,12 +342,14 @@ class Destinations():
             if self.verbose:
                 print("   ... %s" % node["name"])
 
+            if "maxpoints" not in node:
+                node["maxpoints"] = self._get_maxpoints(subcat)
+
             num = []
             den = []
             check_zero = []
             check_null = []
             for subcat in node["subcats"]:
-                # get maxpoints if not given
                 if "maxpoints" not in subcat:
                     subcat["maxpoints"] = self._get_maxpoints(subcat)
 
@@ -355,6 +374,7 @@ class Destinations():
             subs["check_zero"] = sql.SQL(" and ").join(check_zero)
             subs["numerator"] = sql.SQL(" + ").join(num)
             subs["denominator"] = sql.SQL(" + ").join(den)
+            subs["maxpoints"] = sql.Literal(node["maxpoints"])
             q = sql.SQL(" \
                 update {schema}.{table} \
                 set \
@@ -362,7 +382,7 @@ class Destinations():
                         case \
                             when {check_null} then null \
                             when {check_zero} then 0 \
-                            else ({numerator})::FLOAT/({denominator}) \
+                            else {maxpoints} * ({numerator})::FLOAT/({denominator}) \
                             end \
             ").format(**subs)
 
@@ -372,8 +392,6 @@ class Destinations():
                 cur = conn.cursor()
                 cur.execute(q)
                 cur.close()
-            # how to deal with cats that don't have a "hs" column to read for
-            # coalesce purposes?
 
 
     def _get_maxpoints(self,node):
@@ -384,13 +402,43 @@ class Destinations():
         args
         node -- current branch of the destination tree
         """
-        maxpoints = 0
-
-        if "subcats" in node:
+        if "maxpoints" in node:
+            return node["maxpoints"]
+        elif "subcats" in node:
             for subcat in node["subcats"]:
                 maxpoints += self._get_maxpoints(subcat)
         else:
-            maxpoints += node["weight"]
+            return node["weight"]
 
-        return maxpoints
-# b._concat_dests(b.config["bna"]["destinations"][1])
+
+    def _copy_block_geoms(self,conn,subs,dry=False):
+        """
+        Copies the geometries from the block table to the output table of destination
+        scores.
+
+        args
+        conn -- psycopg2 connection object from the parent method
+        subs -- list of SQL substitutions from the parent method
+        """
+        # get geometry type from block table
+        subs["type"] = sql.SQL(
+            self.db.get_column_type(
+                self.blocks.table,
+                self.blocks.geom,
+                self.blocks.schema
+            )
+        )
+        subs["sidx_name"] = sql.Identifier("sidx_")+subs["table"]
+
+        f = open(os.path.join(self.module_dir,"sql","destinations","add_geoms.sql"))
+        raw = f.read()
+        f.close()
+
+        q = sql.SQL(raw).format(**subs)
+
+        if dry:
+            print(q.as_string(conn))
+        else:
+            cur = conn.cursor()
+            cur.execute(q)
+            cur.close()
