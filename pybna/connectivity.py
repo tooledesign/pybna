@@ -576,9 +576,9 @@ class Connectivity:
             raise ValueError("Tile IDs must be given as an iterable")
 
         # drop db table or check existence if append mode set
-        if not append:
+        if not append and not dry:
             self._db_connectivity_table_create(overwrite=False)
-        elif not self.db.table_exists(self.db_connectivity_table):
+        elif not self.db.table_exists(self.db_connectivity_table) and not dry:
             raise ValueError("table %s not found" % self.db_connectivity_table)
 
         tile_progress = tqdm(tiles)

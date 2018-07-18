@@ -303,7 +303,8 @@ class Core():
         pass
 
 
-    def travel_sheds(self,block_ids,out_table,schema=None,overwrite=False,dry=False):
+    def travel_sheds(self,block_ids,out_table,schema=None,composite=True,
+                     overwrite=False,dry=False):
         """
         Creates a new DB table showing the high- and low-stress travel sheds
         for the block(s) identified by block_ids. If more than one block is
@@ -313,6 +314,8 @@ class Core():
         args
         block_ids -- the ids to use building travel sheds
         out_table -- the table to save travel sheds to
+        schema -- the db schema to save the table to (defaults to where census blocks are stored)
+        composite -- whether to save the output as a composite of all blocks or as individual sheds for each block
         overwrite -- whether to overwrite an existing table
         """
         conn = self.db.get_db_connection()
@@ -328,26 +331,11 @@ class Core():
                 sql.Identifier(out_table)
             ))
 
-        if not dry:
-            cur.execute(
-                sql.SQL(
-                    "create table {}.{} ( \
-                        id serial primary key, \
-                        geom geometry(multipolygon,{}), \
-                        source_blockid text, \
-                        target_blockid text, \
-                        low_stress boolean, \
-                        high_stress boolean \
-                    )"
-                ).format(
-                    sql.Identifier(schema),
-                    sql.Identifier(out_table),
-                    sql.Literal(self.srid)
-                )
-            )
-
         # read in the raw query language
-        f = open(os.path.join(self.module_dir,"sql","travel_shed.sql"))
+        if composite:
+            f = open(os.path.join(self.module_dir,"sql","travel_shed_composite.sql"))
+        else:
+            f = open(os.path.join(self.module_dir,"sql","travel_shed.sql"))
         raw = f.read()
         f.close()
 
@@ -355,29 +343,30 @@ class Core():
         sidx = "sidx_" + out_table + "_geom"
         idx = "idx_" + out_table + "_source_blockid"
 
-        for block in tqdm(block_ids):
-            # compose the query
-            subs = {
-                "schema": sql.Identifier(schema),
-                "table": sql.Identifier(out_table),
-                "geom": sql.Identifier(self.config["bna"]["blocks"]["geom"]),
-                "blocks_schema": sql.Identifier(self.blocks.schema),
-                "blocks": sql.Identifier(self.blocks.table),
-                "connectivity": sql.Identifier(self.config["bna"]["connectivity"]["table"]),
-                "block_id_col": sql.Identifier(self.config["bna"]["blocks"]["id_column"]),
-                "source_blockid": sql.Identifier("source_blockid10"),
-                "target_blockid": sql.Identifier("target_blockid10"),
-                "block_id": sql.Literal(block),
-                "sidx": sql.Identifier(sidx),
-                "idx": sql.Identifier(idx)
-            }
+        # for block in tqdm(block_ids):
+        # compose the query
+        subs = {
+            "schema": sql.Identifier(schema),
+            "table": sql.Identifier(out_table),
+            "geom": sql.Identifier(self.config["bna"]["blocks"]["geom"]),
+            "blocks_schema": sql.Identifier(self.blocks.schema),
+            "blocks": sql.Identifier(self.blocks.table),
+            "connectivity": sql.Identifier(self.config["bna"]["connectivity"]["table"]),
+            "block_id_col": sql.Identifier(self.config["bna"]["blocks"]["id_column"]),
+            "source_blockid": sql.Identifier("source_blockid10"),
+            "target_blockid": sql.Identifier("target_blockid10"),
+            "block_ids": sql.Literal(block_ids),
+            "sidx": sql.Identifier(sidx),
+            "idx": sql.Identifier(idx)
+        }
 
-            q = sql.SQL(raw).format(**subs)
+        q = sql.SQL(raw).format(**subs)
 
-            if dry:
-                print(q.as_string(conn))
-            else:
-                cur.execute(q)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            cur.execute(q)
 
         conn.commit()
-        del cur
+        cur.close()
+        conn.close()
