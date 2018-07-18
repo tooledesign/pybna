@@ -91,12 +91,28 @@ WHERE
         tmp_allverts.start_vid = source_vert.{vert_id_col}
         AND tmp_allverts.end_vid = target_vert.{vert_id_col}
     )
+    AND source.id != target.id
 ORDER BY
     source_id,
     target_id,
     agg_cost ASC;
 
 DROP TABLE pg_temp.tmp_allverts;
+
+INSERT INTO tmp_lostress
+SELECT
+    source.id AS source_id,
+    target.id AS target_id,
+    0
+FROM
+    tmp_allblocks source,
+    tmp_allblocks target,
+    {tiles_table} tile
+WHERE
+    tile.{tile_id_col}={tile_id}
+    AND ST_Intersects(source.geom,tile.{tile_geom_col})
+    AND source.id = target.id;
+
 CREATE INDEX tidx_lostress ON tmp_lostress (source_id,target_id);
 ANALYZE tmp_lostress;
 
