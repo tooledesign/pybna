@@ -5,6 +5,7 @@ import os
 import yaml
 import psycopg2
 from psycopg2 import sql
+import numpy as np
 import pandas as pd
 import geopandas as gpd
 import pickle
@@ -310,7 +311,7 @@ class Destinations():
                 cumul_score = b[1]
 
         subs["cumul_score"] = sql.Literal(cumul_score)
-        if maxpoints == cumul_score:
+        if np.isclose(maxpoints,cumul_score):
             case += sql.SQL("WHEN {val} > {break} THEN {maxpoints}").format(**subs)
         if maxpoints > cumul_score:
             if method == "count":
