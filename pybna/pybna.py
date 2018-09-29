@@ -1,21 +1,24 @@
 ###################################################################
 # pybna is a Python module that uses networkx to implement the
 # connectivity logic developed in the BNA.
+#
+# dependencies:
+#   pyyaml
+#   munch
+#   psycopg2
 ###################################################################
 import os
 import yaml
+import collections
+from munch import Munch
 import psycopg2
 from psycopg2 import sql
-import pandas as pd
-import geopandas as gpd
-import pickle
 from tqdm import tqdm
 
 from core import Core
 from connectivity import Connectivity
 from destinations import Destinations
 from dbutils import DBUtils
-import graphutils
 
 
 class pyBNA(Destinations,Connectivity,Core):
@@ -41,7 +44,7 @@ class pyBNA(Destinations,Connectivity,Core):
         self.verbose = verbose
         self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
-        self.config = yaml.safe_load(open(config))
+        self.config = self.parse_config(yaml.safe_load(open(config)))
         self.config["bna"]["connectivity"]["max_detour"] = float(100 + self.config["bna"]["connectivity"]["max_detour"])/100
         self.db_connectivity_table = self.config["bna"]["connectivity"]["table"]
         self.net_config = self.config["bna"]["network"]
@@ -90,26 +93,6 @@ class pyBNA(Destinations,Connectivity,Core):
             pass
             # self.set_destinations()
 
-        # tiles
-        if not self.debug:
-            if "tiles" in self.config["bna"]:
-                tile_config = self.config["bna"]["tiles"]
-                if "table" in tile_config and "file" in tile_config:
-                    raise ValueError("Cannot accept tile sources from both shapefile _and_ pg table")
-                if "file" in tile_config:
-                    pass
-                    # self.tiles = self._get_tiles_shp(tiles_shp_path)
-                if "table" in tile_config:
-                    tiles_table_name = tile_config["table"]
-                    tiles_table_geom_col = tile_config["geom"]
-                    if "columns" in tile_config:
-                        tiles_columns = tile_config["columns"]
-                    else:
-                        tiles_columns = list()
-                    if not self.db.table_exists(tiles_table_name):
-                        self.make_tiles()
-                    self.tiles = self.get_tiles(tiles_table_name,tiles_table_geom_col,tiles_columns)
-
         if force_net_build:
             print("Building network tables in database")
             self.build_network()
@@ -121,25 +104,21 @@ class pyBNA(Destinations,Connectivity,Core):
         elif self.verbose:
             print("Network tables found in database")
 
-        # build graphs
-        if not self.debug:
-            conn = self.db.get_db_connection()
-            # self.hs_graph = graphutils.build_graph(
-            #     conn,
-            #     self.config["bna"]["network"]["edges"],
-            #     self.config["bna"]["network"]["nodes"],
-            #     self.verbose
-            # )
-            # self.ls_graph = graphutils.build_restricted_graph(
-            #     self.hs_graph,
-            #     self.config["bna"]["connectivity"]["max_stress"]
-            # )
-            conn.close()
 
-        # get block nodes
-        # if not self.debug:
-        #     self.net_blocks = self.blocks.blocks.merge(
-        #         self._get_block_nodes(),
-        #         on="blockid"
-        #     )
-        #     self.net_blocks["graph_v"] = self.net_blocks["nodes"].apply(self._get_graph_nodes)
+    def parse_config(self,config):
+        """
+        Reads through the giant dictionary loaded from YAML and converts into
+        munches that can be accessed with dot-notation
+
+        args:
+        config -- a dictionary of configuration options
+
+        returns:
+        Munch
+        """
+
+        if isinstance(config, collections.Mapping):
+            for key, value in config.iteritems():
+                config[key] = self.parse_config(value)
+            return Munch(config)
+        return config

@@ -290,13 +290,14 @@ class Connectivity:
         cur.execute(sql.SQL("analyze {}").format(sql.Identifier(self.db_connectivity_table)));
 
 
-    def calculate_connectivity(self,tiles=None,append=False,dry=False):
+    def calculate_connectivity(self,tiles=None,network_filter=None,append=False,dry=False):
         """
         Prepares and executes queries to do connectivity analysis within the
         database. Operates on tiles and adds results as each tile completes.
 
         args
         tiles -- list of tile IDs to operate on. if empty use all tiles
+        network_filter -- filter to be applied to the road network when routing
         append -- append to existing db table instead of creating a new one
         dry -- only prepare the query language but don't execute in the database
         """
@@ -326,8 +327,8 @@ class Connectivity:
         for tile_id in tile_progress:
             failure = False
             tile_progress.set_description("Tile id: "+str(tile_id))
-            hs_link_query = self._build_db_link_query(tile_id)
-            ls_link_query = self._build_db_link_query(tile_id,max_stress=self.config["bna"]["connectivity"]["max_stress"])
+            hs_link_query = self._build_link_query(tile_id,filter=network_filter)
+            ls_link_query = self._build_link_query(tile_id,max_stress=self.config["bna"]["connectivity"]["max_stress"],filter=network_filter)
 
             subs = {
                 "blocks_table": sql.Identifier(self.config["bna"]["blocks"]["table"]),
@@ -389,7 +390,15 @@ class Connectivity:
             self._connectivity_table_create_index();
 
 
-    def _build_db_link_query(self,tile_id,max_stress=99):
+    def _build_link_query(self,tile_id,max_stress=99,filter=None):
+        """
+        Prepares the query of road network features passed to pgrouting for the
+        routing analysis.
+        """
+
+        if filter is None:
+            filter = "TRUE"
+
         conn = self.db.get_db_connection()
         cur = conn.cursor()
 
@@ -403,20 +412,15 @@ class Connectivity:
             "tile_geom_col": sql.Identifier(self.config["bna"]["tiles"]["geom"]),
             "tile_id": sql.Literal(tile_id),
             "max_trip_distance": sql.Literal(self.config["bna"]["connectivity"]["max_distance"]),
-            "max_stress": sql.Literal(max_stress)
+            "max_stress": sql.Literal(max_stress),
+            "filter": sql.SQL(filter)
         }
 
-        return sql.SQL(" \
-            SELECT \
-                link.{link_id_col}, \
-                source_vert AS source, \
-                target_vert AS target, \
-                {link_cost_col} AS cost \
-            FROM \
-                {link_table} link, \
-                {tiles_table} tile \
-            WHERE \
-                tile.{tile_id_col}={tile_id} \
-                AND ST_DWithin(tile.{tile_geom_col},link.geom,{max_trip_distance}) \
-                AND {link_stress_col} <= {max_stress} \
-        ").format(**subs).as_string(conn)
+        f = open(os.path.join(self.module_dir,"sql","connectivity","link_query.sql"))
+        raw = f.read()
+        f.close()
+
+        q = sql.SQL(raw).format(**subs).as_string(conn)
+        conn.close()
+
+        return q
