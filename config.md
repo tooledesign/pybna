@@ -27,7 +27,7 @@ The boundary tells pyBNA the extents of the area of analysis.
 
 Entry | Description | Required
 --- | --- | ---
-table | Name of the table | <center>X
+table | Name of the table | :X:
 schema | Name of the schema |
 geom | Name of the geometry column |
 
