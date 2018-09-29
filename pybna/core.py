@@ -6,9 +6,6 @@ import os
 import yaml
 import psycopg2
 from psycopg2 import sql
-import pandas as pd
-import geopandas as gpd
-import pickle
 from tqdm import tqdm
 from blocks import Blocks
 
@@ -26,46 +23,6 @@ class Core():
     blocks = None  # reference to Blocks class
     tiles = None
     tiles_pkid = None
-
-
-    def get_tiles(self,table_name,geom_col,add_columns=list()):
-        """
-        Returns a GeoDataFrame of tiles from the database
-
-        args:
-        table_name -- the name of the tiles table
-        geom_col -- the name of the geometry column
-        add_columns -- a list of additional columns to include in the dataframe (the primary key is already retrieved)
-        """
-
-        print("Fetching tiles from DB")
-        self.tiles_pkid = self.db.get_pkid_col(table_name)
-        conn = self.db.get_db_connection()
-
-        # handle additional columns
-        cols = " "
-        for c in add_columns:
-            if c == self.tiles_pkid:   # we already grab the primary key column
-                continue
-            cols = cols + sql.SQL(",{}").format(sql.Identifier(c)).as_string(conn)
-
-        # query
-        q = sql.SQL("select {} as id, {} as pkid, {} as geom %s from {};" % cols).format(
-            sql.Identifier(self.tiles_pkid),
-            sql.Identifier(self.tiles_pkid),
-            sql.Identifier(geom_col),
-            sql.Identifier(table_name)
-        )
-
-        if self.debug:
-            print(q.as_string(conn))
-
-        # return gpd.GeoDataFrame.from_postgis(
-        #     q,
-        #     conn,
-        #     geom_col="geom",
-        #     index_col="id"
-        # )
 
 
     def make_tiles(self,max_blocks=5000,schema=None,overwrite=False):
@@ -220,47 +177,13 @@ class Core():
         else:
             block_id_col = get_pkid_col(blocks_table,schema=blocks_schema)
 
-        # subs = {
-        #     "block_geom": sql.Identifier(geom),
-        #     "block_id": sql.Identifier(block_id_col),
-        #     "pop": sql.Identifier(pop),
-        #     "blocks_schema": sql.Identifier(blocks_schema),
-        #     "blocks_table": sql.Identifier(blocks_table),
-        #     "boundary_table": sql.Identifier(boundary_table),
-        #     "boundary_geom": sql.Identifier(boundary_geom)
-        # }
-        #
-        # if self.verbose:
-        #     print("Getting census blocks from %s.%s" % (blocks_schema,blocks_table))
-        #
-        # conn = self.db.get_db_connection()
-        # q = sql.SQL(" \
-        #     select b.{block_geom} as geom, b.{block_id} as blockid, b.{pop} as pop \
-        #     from {blocks_schema}.{blocks_table} b\
-        #     where exists ( \
-        #         select 1 from {boundary_table} bound \
-        #         where st_intersects(b.{block_geom},bound.{boundary_geom}) \
-        #     );"
-        # ).format(**subs)
-        #
-        # if self.debug:
-        #     print(q.as_string(conn))
-        #
         self.blocks = Blocks()
-        # self.blocks.blocks = gpd.GeoDataFrame.from_postgis(
-        #     q,
-        #     conn,
-        #     geom_col=geom
-        # )
-        # conn.close()
-
         self.blocks.table = blocks_table
         self.blocks.schema = blocks_schema
         self.blocks.id_column = block_id_col
         self.blocks.id_type = self.db.get_column_type(blocks_table,block_id_col,schema=blocks_schema)
         self.blocks.geom = geom
         self.blocks.pop_column = pop
-
 
 
     def set_destinations(self):

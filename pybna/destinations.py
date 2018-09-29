@@ -5,10 +5,6 @@ import os
 import yaml
 import psycopg2
 from psycopg2 import sql
-import numpy as np
-import pandas as pd
-import geopandas as gpd
-import pickle
 from tqdm import tqdm
 import random, string
 

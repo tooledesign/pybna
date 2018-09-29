@@ -1,8 +1,4 @@
-###################################################################
-# Subclass of geodataframe to hold information about blocks
-###################################################################
-import geopandas as gpd
-
+# Class to hold attributes about blocks
 
 class Blocks:
     """pyBNA Blocks class"""
