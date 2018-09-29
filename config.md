@@ -25,9 +25,9 @@ The second section, under the **_bna_** root, contains all the references to dat
 
 The boundary tells pyBNA the extents of the area of analysis.
 
-Entry | Description | <center>Required</center>
+Entry | Description | :Required:
 ------|-----------------------
-table | Name of the table | <center>X</center>
+table | Name of the table | :X:
 schema | Name of the schema |
 geom | Name of the geometry column |
 
@@ -46,15 +46,15 @@ geom | Name of the geometry column |
 
 This section tells pyBNA about the table of population areas used as the unit of analysis for the BNA. pyBNA was originally written to use US Census data so "block" refers to the US Census block geography, but any area can be used as long as it contains information about population. Be careful using large areas, though. Large areas are likely produce unexpected results because pyBNA assumes any destinations _within_ a block are accessible to all of its people. Larger areas may not conform with this assumption.
 
-Entry | Description | <center>Required</center>
+Entry | Description | :Required:
 ------|-----------------------
-table | Name of the table | <center>X</center>
+table | Name of the table | :X:
 schema | Name of the schema |
 id_column | Name of the table's primary key |
-population | Name of the population attribute | <center>X</center>
+population | Name of the population attribute | :X:
 geom | Name of the geometry column |
-roads_tolerance | Tolerance used when searching for roads that are associated with a block | <center>X</center>
-min_road_length | Length a roadway must share with a block area in order to be considered associated with that block | <center>X</center>
+roads_tolerance | Tolerance used when searching for roads that are associated with a block | :X:
+min_road_length | Length a roadway must share with a block area in order to be considered associated with that block | :X:
 
 ### Tiles
 
@@ -66,9 +66,9 @@ min_road_length | Length a roadway must share with a block area in order to be c
 
 Tiles are used to break the analysis up into manageable chunks. It's not necessary to provide tiles to pyBNA, but it allows you to track progress more accurately and may prevent failures due to high memory usage for larger analyses.
 
-Entry | Description | <center>Required</center>
+Entry | Description | :Required:
 ------|-----------------------
-table | Name of the table | <center>X</center>
+table | Name of the table | :X:
 schema | Name of the schema |
 geom | Name of the geometry column |
 
@@ -109,9 +109,9 @@ geom | Name of the geometry column |
 
 The network settings tell pyBNA what your road dataset looks like and designate table names to use for building a routable network.
 
-|Entry | Description | <center>Required</center>
+|Entry | Description | :Required:
 |------|-----------------------
 |<colspan=3>roads
-|table | Name of the table | <center>X</center>
+|table | Name of the table | :X:
 |schema | Name of the schema |
 |geom | Name of the geometry column |
