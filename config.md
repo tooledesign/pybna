@@ -15,7 +15,7 @@ db:
 
 The second section, under the **_bna_** root, contains all the references to data and assumptions. Entries that aren't required can often be inferred by pyBNA, however, ambiguities in your data may result in an error or unusual results.
 
-### Boundary
+### boundary
 
 ```
     boundary:
@@ -26,12 +26,12 @@ The second section, under the **_bna_** root, contains all the references to dat
 The boundary tells pyBNA the extents of the area of analysis.
 
 Entry | Description | Required
---- | --- | ---
-table | Name of the table | :X:
+:--- | :--- | :---:
+table | Name of the table | X
 schema | Name of the schema |
 geom | Name of the geometry column |
 
-### Blocks
+### blocks
 
 ```
     blocks:
@@ -47,16 +47,16 @@ geom | Name of the geometry column |
 This section tells pyBNA about the table of population areas used as the unit of analysis for the BNA. pyBNA was originally written to use US Census data so "block" refers to the US Census block geography, but any area can be used as long as it contains information about population. Be careful using large areas, though. Large areas are likely produce unexpected results because pyBNA assumes any destinations _within_ a block are accessible to all of its people. Larger areas may not conform with this assumption.
 
 Entry | Description | Required
-------|-----------------------
-table | Name of the table | <center>X
+:--- | :--- | :---:
+table | Name of the table | X
 schema | Name of the schema |
 id_column | Name of the table's primary key |
-population | Name of the population attribute | <center>X
+population | Name of the population attribute | X
 geom | Name of the geometry column |
-roads_tolerance | Tolerance used when searching for roads that are associated with a block | <center>X
-min_road_length | Length a roadway must share with a block area in order to be considered associated with that block | <center>X
+roads_tolerance | Tolerance used when searching for roads that are associated with a block | X
+min_road_length | Length a roadway must share with a block area in order to be considered associated with that block | X
 
-### Tiles
+### tiles
 
 ```
     tiles:
@@ -67,12 +67,12 @@ min_road_length | Length a roadway must share with a block area in order to be c
 Tiles are used to break the analysis up into manageable chunks. It's not necessary to provide tiles to pyBNA, but it allows you to track progress more accurately and may prevent failures due to high memory usage for larger analyses.
 
 Entry | Description | Required
-------|-----------------------
-table | Name of the table | <center>X
+:--- | :--- | :---:
+table | Name of the table | X
 schema | Name of the schema |
 geom | Name of the geometry column |
 
-### Network
+### network
 
 ```
     network:
@@ -109,9 +109,66 @@ geom | Name of the geometry column |
 
 The network settings tell pyBNA what your road dataset looks like and designate table names to use for building a routable network.
 
-|Entry | Description | Required
-|------|-----------------------
-|<colspan=3>roads
-|table | Name of the table | <center>X
-|schema | Name of the schema |
-|geom | Name of the geometry column |
+#### roads
+
+Entry | Description | Required
+:--- | :--- | :---:
+table | Name of the table | X
+schema | Name of the schema |
+geom | Name of the geometry column |
+uid | Primary key |
+source_column | ID of the intersection at the start of the line | X
+target_column | ID of the intersection at the end of the line | X
+
+oneway
+
+Entry | Description | Required
+:--- | :--- | :---:
+name | Name of the attribute holding one way designation | X
+forward | Value indicating one way in the forward direction | X
+backward | Value indicating one way in the backward direction | X
+
+segment stress
+
+Entry | Description | Required
+:--- | :--- | :---:
+forward | Segment LTS rating in the forward direction | X
+backward | Segment LTS rating in the backward direction | X
+
+crossing stress
+
+Entry | Description | Required
+:--- | :--- | :---:
+forward | Crossing LTS rating in the forward direction | X
+backward | Crossing LTS rating in the backward direction | X
+
+#### intersections
+
+Entry | Description | Required
+:--- | :--- | :---:
+table | Name of the table | X
+schema | Name of the schema |
+geom | Name of the geometry column |
+uid | Primary key |
+
+#### edges
+
+Entry | Description | Required
+:--- | :--- | :---:
+table | Name of the table | X
+schema | Name of the schema |
+source_column | Name of the attribute indicating the source node | X
+target_column | Name of the attribute indicating the target node | X
+stress_column | Name of the attribute indicating the LTS on the edge | X
+cost_column | Name of the attribute indicating the cost of the edge | X
+id_column | Primary key | X
+
+#### nodes
+
+Entry | Description | Required
+:--- | :--- | :---:
+table | Name of the table | X
+schema | Name of the schema |
+id_column | Primary key | X
+
+### connectivity
