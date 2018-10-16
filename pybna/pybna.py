@@ -93,6 +93,17 @@ class pyBNA(Destinations,Connectivity,Core):
             pass
             # self.set_destinations()
 
+        # tiles
+        if "schema" in self.config["tiles"]:
+            self.tiles_schema = self.config["tiles"]["schema"]
+        else:
+            self.tiles_schema = self.db.get_schema(self.config["tiles"]["table"])
+
+        if "id_column" in self.config["tiles"]:
+            self.tiles_pkid = self.config["tiles"]["id_column"]
+        else:
+            self.tiles_pkid = self.db.get_pkid_col(self.config["tiles"]["table"],self.tiles_schema)
+
         if force_net_build:
             print("Building network tables in database")
             self.build_network()
