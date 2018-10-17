@@ -5,6 +5,7 @@ import os
 import yaml
 import psycopg2
 from psycopg2 import sql
+import numpy as np
 from tqdm import tqdm
 import random, string
 
