@@ -25,7 +25,7 @@ class Core():
     tiles_pkid = None
 
 
-    def make_tiles(self,max_blocks=5000,schema=None,overwrite=False):
+    def make_tiles(self,table=None,max_blocks=5000,schema=None,geom=None,overwrite=False):
         """
         Creates a new tile table using the config parameters. Automatically adjusts
         tile size so no tile contains more than max_blocks number of blocks. This
@@ -34,16 +34,23 @@ class Core():
         max_blocks is satisfied.
 
         args
+        table -- the table name to use
         max_blocks -- maximum allowable number of blocks for a tile
         schema -- schema for the tiles table. if none looks for a schema in the
                     config. if none in config uses schema of the blocks.
         overwrite -- whether to overwrite an existing table
         """
+        if table is None:
+            table = self.config["bna"]["tiles"]["table"]
+
         if schema is None:
             if "schema" in self.config["bna"]["tiles"]:
                 schema = self.config["bna"]["tiles"]["schema"]
             else:
                 schema = self.db.get_schema(self.config["bna"]["blocks"]["table"])
+
+        if geom is None:
+            geom = self.config["bna"]["tiles"]["geom"]
 
         conn = self.db.get_db_connection()
         cur = conn.cursor()
@@ -51,7 +58,7 @@ class Core():
         if overwrite:
             cur.execute(sql.SQL("drop table if exists {}.{}").format(
                 sql.Identifier(schema),
-                sql.Identifier(self.config["bna"]["tiles"]["table"])
+                sql.Identifier(table)
             ))
 
         # create table
@@ -62,8 +69,8 @@ class Core():
             ) \
         ").format(
             sql.Identifier(schema),
-            sql.Identifier(self.config["bna"]["tiles"]["table"]),
-            sql.Identifier(self.config["bna"]["tiles"]["geom"]),
+            sql.Identifier(table),
+            sql.Identifier(geom),
             sql.Literal(self.srid)
         ))
 
@@ -90,13 +97,13 @@ class Core():
         xmax = row[2]
         ymax = row[3]
 
-        self._split_tiles(conn,schema,max_blocks,xmin,ymin,xmax,ymax)
+        self._split_tiles(conn,table,schema,geom,max_blocks,xmin,ymin,xmax,ymax)
         conn.commit()
         cur.close()
         conn.close()
 
 
-    def _split_tiles(self,conn,schema,max_blocks,xmin,ymin,xmax,ymax):
+    def _split_tiles(self,conn,table,schema,geom,max_blocks,xmin,ymin,xmax,ymax):
         """
         Recursive method that tests the input bounds for how many blocks are contained.
         If less than max, write the bounds to the DB as a tile. If not, split
@@ -105,7 +112,9 @@ class Core():
 
         args
         conn -- database connection object from parent method
+        table -- table name for the tiles table
         schema -- schema for the tiles table
+        geom -- the geometry column name
         max_blocks -- maximum allowable number of blocks for a tile
         xmin -- minimum x bound
         ymin -- minimum y bound
@@ -153,8 +162,8 @@ class Core():
                 select {} \
             ").format(
                 sql.Identifier(schema),
-                sql.Identifier(self.config["bna"]["tiles"]["table"]),
-                sql.Identifier(self.config["bna"]["tiles"]["geom"]),
+                sql.Identifier(table),
+                sql.Identifier(geom),
                 sql_envelope
             ))
 

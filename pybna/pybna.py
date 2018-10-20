@@ -94,14 +94,16 @@ class pyBNA(Destinations,Connectivity,Core):
             # self.set_destinations()
 
         # tiles
+        self.tiles_table = self.config["bna"]["tiles"]["table"]
         if "schema" in self.config["bna"]["tiles"]:
             self.tiles_schema = self.config["bna"]["tiles"]["schema"]
-        else:
+        elif self.db.table_exists(self.tiles_table):
             self.tiles_schema = self.db.get_schema(self.config["bna"]["tiles"]["table"])
-
+        else:
+            self.tiles_schema = None
         if "id_column" in self.config["bna"]["tiles"]:
             self.tiles_pkid = self.config["bna"]["tiles"]["id_column"]
-        else:
+        elif self.db.table_exists(self.tiles_table):
             self.tiles_pkid = self.db.get_pkid_col(self.config["bna"]["tiles"]["table"],self.tiles_schema)
 
         if force_net_build:
