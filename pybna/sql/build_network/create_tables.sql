@@ -1,14 +1,14 @@
-DROP TABLE IF EXISTS {schema}.{nodes};
-DROP TABLE IF EXISTS {schema}.{edges};
+DROP TABLE IF EXISTS {roads_schema}.{nodes};
+DROP TABLE IF EXISTS {roads_schema}.{edges};
 
-CREATE TABLE {schema}.{nodes} (
+CREATE TABLE {roads_schema}.{nodes} (
     {node_id} SERIAL PRIMARY KEY,
     road_id INTEGER,
     vert_cost INTEGER,
     geom geometry(point,{srid})
 );
 
-CREATE TABLE {schema}.{edges} (
+CREATE TABLE {roads_schema}.{edges} (
     {edge_id} SERIAL PRIMARY KEY,
     {int_id} INTEGER,
     turn_angle INTEGER,

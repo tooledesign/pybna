@@ -42,8 +42,8 @@ FROM
 WHERE
     tile.{tile_id_col}={tile_id}
     AND ST_Intersects(source.geom,tile.{tile_geom_col})
-    AND source.road_id = source_vert.{road_id}
-    AND target.road_id = target_vert.{road_id}
+    AND source.road_id = source_vert.{roads_id_col}
+    AND target.road_id = target_vert.{roads_id_col}
     AND (
         tmp_allverts.start_vid = source_vert.{vert_id_col}
         AND tmp_allverts.end_vid = target_vert.{vert_id_col}
@@ -101,8 +101,8 @@ FROM
 WHERE
     tile.{tile_id_col}={tile_id}
     AND ST_Intersects(source.geom,tile.{tile_geom_col})
-    AND source.road_id = source_vert.{road_id}
-    AND target.road_id = target_vert.{road_id}
+    AND source.road_id = source_vert.{roads_id_col}
+    AND target.road_id = target_vert.{roads_id_col}
     AND (
         tmp_allverts.start_vid = source_vert.{vert_id_col}
         AND tmp_allverts.end_vid = target_vert.{vert_id_col}

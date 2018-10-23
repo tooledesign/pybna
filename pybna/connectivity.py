@@ -89,10 +89,10 @@ class Connectivity(DBUtils):
         # set up substitutions
         net_subs = {
             "srid": sql.Literal(self.srid),
-            "schema": sql.Identifier(self.get_schema(self.net_config["roads"]["table"])),
-            "roads": sql.Identifier(self.net_config["roads"]["table"]),
-            "road_id": sql.Identifier(self.net_config["roads"]["uid"]),
-            "roads_geom": sql.Identifier(self.net_config["roads"]["geom"]),
+            "roads_schema": sql.Identifier(self.get_schema(self.net_config["roads"]["table"])),
+            "roads_table": sql.Identifier(self.net_config["roads"]["table"]),
+            "roads_id_col": sql.Identifier(self.net_config["roads"]["uid"]),
+            "roads_geom_col": sql.Identifier(self.net_config["roads"]["geom"]),
             "road_source": sql.Identifier(self.net_config["roads"]["source_column"]),
             "road_target": sql.Identifier(self.net_config["roads"]["target_column"]),
             "one_way": sql.Identifier(self.net_config["roads"]["oneway"]["name"]),
@@ -109,7 +109,13 @@ class Connectivity(DBUtils):
             "ft_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["forward"]),
             "tf_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["backward"]),
             "ft_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["forward"]),
-            "tf_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["backward"])
+            "tf_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["backward"]),
+            "blocks_schema": sql.Identifier(self.blocks.schema),
+            "blocks_table": sql.Identifier(self.blocks.table),
+            "block_id_col": sql.Identifier(self.blocks.id_column),
+            "block_geom_col": sql.Identifier(self.blocks.geom),
+            "roads_tolerance": sql.Literal(self.config["bna"]["blocks"]["roads_tolerance"]),
+            "min_road_length": sql.Literal(self.config["bna"]["blocks"]["min_road_length"])
         }
 
         # read in the raw query language
@@ -124,6 +130,9 @@ class Connectivity(DBUtils):
         f.close()
         f = open(os.path.join(self.module_dir,"sql","build_network","cleanup.sql"))
         cleanup_query = f.read()
+        f.close()
+        f = open(os.path.join(self.module_dir,"sql","build_network","associate_roads_with_blocks.sql"))
+        associate_query = f.read()
         f.close()
 
         conn = self.get_db_connection()
@@ -169,6 +178,23 @@ class Connectivity(DBUtils):
             print(q.as_string(conn))
         else:
             cur.execute(q)
+
+        # associate_roads_with_blocks
+        print("Associating roads with blocks")
+        statements = [s for s in associate_query.split(";") if len(s.strip()) > 1]
+        prog_statements = tqdm(statements)
+        for statement in prog_statements:
+            # handle progress updates
+            if statement.strip()[:2] == '--':
+                prog_statements.set_description(statement.strip()[2:])
+            else:
+                # compose the query
+                q = sql.SQL(statement).format(**net_subs)
+
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    cur.execute(q)
 
         conn.commit()
         cur.close()
@@ -317,6 +343,32 @@ class Connectivity(DBUtils):
         elif not type(tiles) == list and not type(tiles) == tuple:
             raise ValueError("Tile IDs must be given as an iterable")
 
+        # check zones
+        zones_table = None
+        zones_schema = None
+        zones_uid = None
+        zones_geom = None
+        if "zones" in self.config["bna"]["connectivity"]:
+            zones_table = self.config["bna"]["connectivity"]["zones"]["table"]
+            if "schema" in self.config["bna"]["connectivity"]["zones"]:
+                zones_schema = self.config["bna"]["connectivity"]["zones"]["schema"]
+            if "uid" in self.config["bna"]["connectivity"]["zones"]:
+                zones_uid = self.config["bna"]["connectivity"]["zones"]["uid"]
+            if "geom" in self.config["bna"]["connectivity"]["zones"]:
+                zones_geom = self.config["bna"]["connectivity"]["zones"]["geom"]
+
+            if self.table_exists(zones_table):
+                if zones_schema is None:
+                    zones_schema = self.get_schema(zones_table)
+                if zones_uid is None:
+                    zones_uid = self.get_pkid_col(zones_table,zones_schema)
+                if zones_geom is None:
+                    zones_geom = "geom"
+            else:
+                zones_schema = self.blocks.schema
+                zones_uid = "id"
+                zones_geom = "geom"
+
         # drop db table or check existence if append mode set
         if not append and not dry:
             self._connectivity_table_create(overwrite=False)
@@ -340,14 +392,25 @@ class Connectivity(DBUtils):
                 "tile_id_col": sql.Identifier(self.tiles_pkid),
                 "tile_geom_col": sql.Identifier(self.config["bna"]["tiles"]["geom"]),
                 "tile_id": sql.Literal(tile_id),
+                "intersections": sql.Identifier(self.net_config["intersections"]["table"]),
+                "int_id": sql.Identifier(self.net_config["intersections"]["uid"]),
                 "vert_table": sql.Identifier(self.net_config["nodes"]["table"]),
                 "vert_id_col": sql.Identifier(self.net_config["nodes"]["id_column"]),
-                "road_id": sql.Identifier("road_id"),
+                "roads_schema": sql.Identifier(self.get_schema(self.net_config["roads"]["table"])),
+                "roads_table": sql.Identifier(self.net_config["roads"]["table"]),
+                "roads_id_col": sql.Identifier(self.net_config["roads"]["uid"]),
+                "ft_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["forward"]),
+                "tf_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["backward"]),
+                "ft_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["forward"]),
+                "tf_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["backward"]),
+                "road_source": sql.Identifier(self.net_config["roads"]["source_column"]),
+                "road_target": sql.Identifier(self.net_config["roads"]["target_column"]),
                 "connectivity_table": sql.Identifier(self.db_connectivity_table),
                 "conn_source_col": sql.Identifier(self.config["bna"]["connectivity"]["source_column"]),
                 "conn_target_col": sql.Identifier(self.config["bna"]["connectivity"]["target_column"]),
                 "max_trip_distance": sql.Literal(self.config["bna"]["connectivity"]["max_distance"]),
                 "max_detour": sql.Literal(self.config["bna"]["connectivity"]["max_detour"]),
+                "max_stress": self.config["bna"]["connectivity"]["max_stress"],
                 "hs_link_query": sql.Literal(hs_link_query),
                 "ls_link_query": sql.Literal(ls_link_query)
             }
@@ -426,3 +489,16 @@ class Connectivity(DBUtils):
         conn.close()
 
         return q
+
+
+    def make_zones(table,schema=None,uid="id",geom="geom"):
+        """
+        Creates analysis zones that aggregate blocks into logical groupings
+        based on islands of 100% low stress connectivity
+
+        args
+        table -- table name
+        schema -- schema name
+        uid -- uid column name
+        geom -- geom column name
+        """

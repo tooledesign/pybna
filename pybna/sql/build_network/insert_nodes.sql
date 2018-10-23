@@ -1,9 +1,9 @@
-INSERT INTO {schema}.{nodes} (road_id, geom)
-SELECT  ways.{road_id},
-        ST_LineInterpolatePoint(ways.{roads_geom},0.5)
-FROM    {schema}.{roads} ways;
+INSERT INTO {roads_schema}.{nodes} (road_id, geom)
+SELECT  ways.{roads_id_col},
+        ST_LineInterpolatePoint(ways.{roads_geom_col},0.5)
+FROM    {roads_schema}.{roads_table} ways;
 
 -- index
-CREATE INDEX {node_index} ON {schema}.{nodes} USING gist (geom);
-CREATE INDEX tidx_build_net_nodes_roadid ON {schema}.{nodes} (road_id);
-ANALYZE {schema}.{nodes};
+CREATE INDEX {node_index} ON {roads_schema}.{nodes} USING gist (geom);
+CREATE INDEX tidx_build_net_nodes_roadid ON {roads_schema}.{nodes} (road_id);
+ANALYZE {roads_schema}.{nodes};

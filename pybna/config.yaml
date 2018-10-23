@@ -66,6 +66,10 @@ bna:
             id_column: vert_id
 
     connectivity:
+        zones:
+            table: "zones"
+            # schema: "automated"
+            # uid: id
         table: "neighborhood_connected_census_blocks"
         source_column: "source_blockid10"
         target_column: "target_blockid10"
