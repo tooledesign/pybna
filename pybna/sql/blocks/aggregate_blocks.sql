@@ -28,27 +28,6 @@ HAVING MAX(stress) <= 1
 CREATE INDEX tidx_ils ON tmp_ints_low_stress(int_id);
 ANALYZE tmp_ints_low_stress;
 
-DROP TABLE IF EXISTS tmp_block_nodes;
-SELECT
-    blocks.gid AS blockid,
-    array_agg(nodes.vert_id) AS nodes
-INTO TEMP TABLE tmp_block_nodes
-FROM
-    neighborhood_census_blocks blocks,
-    neighborhood_ways roads,
-    neighborhood_ways_net_vert nodes
-WHERE
-    ST_DWithin(blocks.geom,roads.geom,5)
-    AND roads.road_id = nodes.road_id
-    AND (
-            ST_Contains(ST_Buffer(blocks.geom,5),roads.geom)
-        OR  ST_Length(
-                ST_Intersection(ST_Buffer(blocks.geom,5),roads.geom)
-            ) > 35
-        )
-GROUP BY blockid
-;
-
 
 
 SELECT
