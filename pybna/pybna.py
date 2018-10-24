@@ -100,12 +100,12 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         self.tiles_table = self.config["bna"]["tiles"]["table"]
         if "schema" in self.config["bna"]["tiles"]:
             self.tiles_schema = self.config["bna"]["tiles"]["schema"]
-        else:
+        elif self.table_exists(self.tiles_table):
             self.tiles_schema = self.get_schema(self.config["bna"]["tiles"]["table"])
 
         if "id_column" in self.config["bna"]["tiles"]:
             self.tiles_pkid = self.config["bna"]["tiles"]["id_column"]
-        else:
+        elif self.table_exists(self.tiles_table):
             self.tiles_pkid = self.get_pkid_col(self.config["bna"]["tiles"]["table"],self.tiles_schema)
 
         if force_net_build:
