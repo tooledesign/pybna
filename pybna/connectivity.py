@@ -15,27 +15,29 @@ from psycopg2 import sql
 from tqdm import tqdm
 import time
 
+from dbutils import DBUtils
 
-class Connectivity:
+
+class Connectivity(DBUtils):
     """pyBNA Connectivity class"""
 
-    config = None
-    net_config = None
-    verbose = None
-    debug = None
-    db = None  # reference to DBUtils class
-    srid = None
-    blocks = None  # reference to Blocks class
-    tiles = None
-    net_blocks = None
-    hs_graph = None
-    ls_graph = None
-    module_dir = None
-    db_connectivity_table = None
-    tiles_pkid = None
+    def __init__(self):
+        DBUtils.__init__(self,"")
+        self.config = None
+        self.net_config = None
+        self.verbose = None
+        self.debug = None
+        self.srid = None
+        self.blocks = None  # reference to Blocks class
+        self.tiles = None
+        self.net_blocks = None
+        self.module_dir = None
+        self.db_connectivity_table = None
+        self.tiles_pkid = None
+        self.db_connection_string = None
 
-    # register pandas apply with tqdm for progress bar
-    tqdm.pandas(desc="Evaluating connectivity")
+        # register pandas apply with tqdm for progress bar
+        # tqdm.pandas(desc="Evaluating connectivity")
 
 
     def _get_block_nodes(self):
@@ -45,7 +47,7 @@ class Connectivity:
             "blocks": sql.Identifier(self.blocks.table),
             "block_id": sql.Identifier(self.blocks.id_column),
             "block_geom": sql.Identifier(self.blocks.geom),
-            "roads_schema": sql.Identifier(self.db.get_schema(self.net_config["roads"]["table"])),
+            "roads_schema": sql.Identifier(self.get_schema(self.net_config["roads"]["table"])),
             "roads": sql.Identifier(self.net_config["roads"]["table"]),
             "road_id": sql.Identifier(self.net_config["roads"]["uid"]),
             "road_geom": sql.Identifier(self.net_config["roads"]["geom"]),
@@ -60,7 +62,7 @@ class Connectivity:
         raw = f.read()
         f.close()
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         q = sql.SQL(raw).format(**subs).as_string(conn)
 
         if self.debug:
@@ -87,7 +89,7 @@ class Connectivity:
         # set up substitutions
         net_subs = {
             "srid": sql.Literal(self.srid),
-            "schema": sql.Identifier(self.db.get_schema(self.net_config["roads"]["table"])),
+            "schema": sql.Identifier(self.get_schema(self.net_config["roads"]["table"])),
             "roads": sql.Identifier(self.net_config["roads"]["table"]),
             "road_id": sql.Identifier(self.net_config["roads"]["uid"]),
             "roads_geom": sql.Identifier(self.net_config["roads"]["geom"]),
@@ -124,7 +126,7 @@ class Connectivity:
         cleanup_query = f.read()
         f.close()
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
 
         # create
@@ -179,11 +181,11 @@ class Connectivity:
 
         returns True if they exist, False if they don't
         """
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         for table in [self.net_config["edges"]["table"],self.net_config["nodes"]["table"]]:
             if self.verbose:
                 print("Checking for %s in database" % table)
-            if not self.db.table_exists(table):
+            if not self.table_exists(table):
                 return False
         #
         #     try:
@@ -210,7 +212,7 @@ class Connectivity:
         """
         Creates the connectivity table in the database
         """
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
         if overwrite:
             cur.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(self.db_connectivity_table)))
@@ -243,7 +245,7 @@ class Connectivity:
         """
         Drops indexes on the connectivity table
         """
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
         cur.execute("\
             SELECT indexrelid::regclass::text \
@@ -273,7 +275,7 @@ class Connectivity:
         source = self.config["bna"]["connectivity"]["source_column"]
         target = self.config["bna"]["connectivity"]["target_column"]
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
         if overwrite:
             self._connectivity_table_drop_index()
@@ -303,7 +305,7 @@ class Connectivity:
         """
         # check tiles
         if tiles is None:
-            conn = self.db.get_db_connection()
+            conn = self.get_db_connection()
             cur = conn.cursor()
             cur.execute(sql.SQL("select {} from {}").format(
                 sql.Identifier(self.tiles_pkid),
@@ -318,7 +320,7 @@ class Connectivity:
         # drop db table or check existence if append mode set
         if not append and not dry:
             self._connectivity_table_create(overwrite=False)
-        elif not self.db.table_exists(self.db_connectivity_table) and not dry:
+        elif not self.table_exists(self.db_connectivity_table) and not dry:
             raise ValueError("table %s not found" % self.db_connectivity_table)
 
         tile_progress = tqdm(tiles)
@@ -354,9 +356,9 @@ class Connectivity:
             raw = f.read()
             f.close()
 
-            conn = self.db.get_db_connection()
+            conn = self.get_db_connection()
 
-            statements = self.db.split_sql_for_tqdm(raw)
+            statements = self.split_sql_for_tqdm(raw)
 
             for statement in statements:
                 statements.set_description(statement["update"])
@@ -399,7 +401,7 @@ class Connectivity:
         if filter is None:
             filter = "TRUE"
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
 
         subs = {

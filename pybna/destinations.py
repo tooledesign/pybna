@@ -9,17 +9,20 @@ import numpy as np
 from tqdm import tqdm
 import random, string
 
+from dbutils import DBUtils
 from destinationcategory import DestinationCategory
 
 
-class Destinations():
+class Destinations(DBUtils):
     """pyBNA Destinations class"""
-    config = None
-    verbose = None
-    debug = None
-    db = None              # reference to DBUtils class
-    srid = None
-    blocks = None
+
+    def __init__(self):
+        DBUtils.__init__(self,"")
+        self.config = None
+        self.verbose = None
+        self.debug = None
+        self.srid = None
+        self.blocks = None
 
 
     def score_destinations(self,output_table,schema=None,with_geoms=False,overwrite=False,dry=False):
@@ -35,7 +38,7 @@ class Destinations():
         if schema is None:
             schema = self.blocks.schema
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
 
         if not dry:
@@ -44,7 +47,7 @@ class Destinations():
                     sql.Identifier(schema),
                     sql.Identifier(output_table)
                 ))
-            elif self.db.table_exists(output_table,schema):
+            elif self.table_exists(output_table,schema):
                 raise psycopg2.ProgrammingError("Table %s.%s already exists" % (schema,output_table))
 
         # combine all the temporary tables into the final output
@@ -59,7 +62,7 @@ class Destinations():
         if "schema" in self.config["bna"]["boundary"]:
             boundary_schema = self.config["bna"]["boundary"]["schema"]
         else:
-            boundary_schema = self.db.get_schema(self.config["bna"]["boundary"]["table"])
+            boundary_schema = self.get_schema(self.config["bna"]["boundary"]["table"])
 
         subs = {
             "blocks_schema": sql.Identifier(self.blocks.schema),
@@ -420,7 +423,7 @@ class Destinations():
         """
         # get geometry type from block table
         subs["type"] = sql.SQL(
-            self.db.get_column_type(
+            self.get_column_type(
                 self.blocks.table,
                 self.blocks.geom,
                 self.blocks.schema

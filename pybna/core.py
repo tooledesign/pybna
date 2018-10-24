@@ -8,21 +8,24 @@ import psycopg2
 from psycopg2 import sql
 from tqdm import tqdm
 from blocks import Blocks
+from dbutils import DBUtils
 
 # from scenario import Scenario
 # from destinations import Destinations
 
 
-class Core():
+class Core(DBUtils):
     """pyBNA Core class"""
-    config = None
-    verbose = None
-    debug = None
-    db = None  # reference to DBUtils class
-    srid = None
-    blocks = None  # reference to Blocks class
-    tiles = None
-    tiles_pkid = None
+
+    def __init__(self):
+        DBUtils.__init__(self,"")
+        self.config = None
+        self.verbose = None
+        self.debug = None
+        self.srid = None
+        self.blocks = None  # reference to Blocks class
+        self.tiles = None
+        self.tiles_pkid = None
 
 
     def make_tiles(self,table=None,max_blocks=5000,schema=None,geom=None,overwrite=False):
@@ -47,12 +50,12 @@ class Core():
             if "schema" in self.config["bna"]["tiles"]:
                 schema = self.config["bna"]["tiles"]["schema"]
             else:
-                schema = self.db.get_schema(self.config["bna"]["blocks"]["table"])
+                schema = self.get_schema(self.config["bna"]["blocks"]["table"])
 
         if geom is None:
             geom = self.config["bna"]["tiles"]["geom"]
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
 
         if overwrite:
@@ -180,7 +183,7 @@ class Core():
         if "schema" in self.config["bna"]["blocks"]:
             blocks_schema = self.config["bna"]["blocks"]["schema"]
         else:
-            blocks_schema = self.db.get_schema(blocks_table)
+            blocks_schema = self.get_schema(blocks_table)
         if "id_column" in self.config["bna"]["blocks"]:
             block_id_col = self.config["bna"]["blocks"]["id_column"]
         else:
@@ -190,7 +193,7 @@ class Core():
         self.blocks.table = blocks_table
         self.blocks.schema = blocks_schema
         self.blocks.id_column = block_id_col
-        self.blocks.id_type = self.db.get_column_type(blocks_table,block_id_col,schema=blocks_schema)
+        self.blocks.id_type = self.get_column_type(blocks_table,block_id_col,schema=blocks_schema)
         self.blocks.geom = geom
         self.blocks.pop_column = pop
 
@@ -200,7 +203,7 @@ class Core():
         if self.verbose:
             print('Adding destinations')
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
 
         for v in self.config["bna"]["destinations"]:
@@ -250,7 +253,7 @@ class Core():
         composite -- whether to save the output as a composite of all blocks or as individual sheds for each block
         overwrite -- whether to overwrite an existing table
         """
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
 
         if schema is None:
             schema = self.blocks.schema

@@ -21,7 +21,7 @@ from destinations import Destinations
 from dbutils import DBUtils
 
 
-class pyBNA(Destinations,Connectivity,Core):
+class pyBNA(DBUtils,Destinations,Connectivity,Core):
     """Parent BNA class that glues together the Core, Connectivity, and Destinations classes"""
 
     def __init__(self, config="config.yaml", force_net_build=False,
@@ -41,6 +41,9 @@ class pyBNA(Destinations,Connectivity,Core):
 
         return: pyBNA object
         """
+        Destinations.__init__(self)
+        Connectivity.__init__(self)
+        Core.__init__(self)
         self.verbose = verbose
         self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
@@ -66,15 +69,15 @@ class pyBNA(Destinations,Connectivity,Core):
             user = self.config["db"]["user"]
         if password is None:
             password = self.config["db"]["password"]
-        self.db_connection_string = " ".join([
+        db_connection_string = " ".join([
             "dbname=" + db_name,
             "user=" + user,
             "host=" + host,
             "password=" + password
         ])
         if self.debug:
-            print("DB connection: %s" % self.db_connection_string)
-        self.db = DBUtils(self.db_connection_string)
+            print("DB connection: %s" % db_connection_string)
+        DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
 
         # blocks
         if not self.debug:
@@ -84,7 +87,7 @@ class pyBNA(Destinations,Connectivity,Core):
         if "srid" in self.config:
             self.srid = self.config["srid"]
         elif not self.debug:
-            self.srid = self.db.get_srid(self.blocks.table)
+            self.srid = self.get_srid(self.blocks.table)
 
         # destinations
         self.destinations = dict()
@@ -97,14 +100,13 @@ class pyBNA(Destinations,Connectivity,Core):
         self.tiles_table = self.config["bna"]["tiles"]["table"]
         if "schema" in self.config["bna"]["tiles"]:
             self.tiles_schema = self.config["bna"]["tiles"]["schema"]
-        elif self.db.table_exists(self.tiles_table):
-            self.tiles_schema = self.db.get_schema(self.config["bna"]["tiles"]["table"])
         else:
-            self.tiles_schema = None
+            self.tiles_schema = self.get_schema(self.config["bna"]["tiles"]["table"])
+
         if "id_column" in self.config["bna"]["tiles"]:
             self.tiles_pkid = self.config["bna"]["tiles"]["id_column"]
-        elif self.db.table_exists(self.tiles_table):
-            self.tiles_pkid = self.db.get_pkid_col(self.config["bna"]["tiles"]["table"],self.tiles_schema)
+        else:
+            self.tiles_pkid = self.get_pkid_col(self.config["bna"]["tiles"]["table"],self.tiles_schema)
 
         if force_net_build:
             print("Building network tables in database")
