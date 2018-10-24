@@ -97,6 +97,11 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
             # self.set_destinations()
 
         # tiles
+        if "table" in self.config.bna.tiles:
+            self.tiles_exist = True
+        else:
+            self.tiles_exist = False
+
         self.tiles_table = self.config["bna"]["tiles"]["table"]
         if "schema" in self.config["bna"]["tiles"]:
             self.tiles_schema = self.config["bna"]["tiles"]["schema"]
@@ -119,6 +124,8 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         elif self.verbose:
             print("Network tables found in database")
 
+        self.sql_subs = self.make_subs(self.config)
+
 
     def parse_config(self,config):
         """
@@ -137,3 +144,123 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
                 config[key] = self.parse_config(value)
             return Munch(config)
         return config
+
+
+    def make_subs(self, config):
+        """
+        Constructs universal SQL substitutions from all of the config
+        parameters.
+
+        returns:
+        dictionary of SQL substitutions
+        """
+        blocks = config.bna.blocks
+        tiles = config.bna.tiles
+        network = config.bna.network
+        connectivity = config.bna.connectivity
+
+        # blocks
+        if "schema" in blocks:
+            blocks_schema = blocks.schema
+        else:
+            blocks_schema = self.get_schema(blocks.table)
+        if "uid" in blocks:
+            blocks_id_col = blocks.uid
+        else:
+            blocks_id_col = self.get_pkid_col(blocks.table,blocks_schema)
+        if "geom" in blocks:
+            blocks_geom_col = blocks.geom
+        else:
+            blocks_geom_col = "geom"
+
+        # tiles
+        if self.tiles_exist:
+            tiles_table = tiles.table
+            if "schema" in tiles:
+                tiles_schema = tiles.schema
+            elif self.table_exists(tiles_table):
+                tiles_schema = self.get_schema(tiles_table)
+            else:
+                tiles_schema = blocks_schema
+
+            if self.table_exists(tiles_table,tiles_schema):
+                if "uid" in tiles:
+                    tiles_id_col = tiles.uid
+                else:
+                    tiles_id_col = self.get_pkid_col(tiles_table,tiles_schema)
+                if "geom" in tiles:
+                    tiles_geom_col = tiles.geom
+                else:
+                    tiles_geom_col = "geom"
+            else:
+                if "uid" in tiles:
+                    tiles_id_col = tiles.uid
+                else:
+                    tiles_id_col = "id"
+                if "geom" in tiles:
+                    tile_geom_col = tiles.geom
+                else:
+                    tile_geom_col = "geom"
+
+        else:
+            tiles_table = " "
+            tiles_schema = " "
+            tile_id_col = " "
+            tile_geom_col = " "
+
+        # network
+
+
+        subs = {
+            "blocks_table": sql.Identifier(blocks.table),
+            "blocks_schema": sql.Identifier(blocks_schema),
+            "blocks_id_col": sql.Identifier(blocks_id_col),
+            "blocks_geom_col": sql.Identifier(blocks_geom_col),
+            "blocks_population_col": sql.Identifier(blocks.population),
+            "tiles_table": sql.Identifier(tiles_table),
+            "tiles_schema": sql.Identifier(tiles_schema),
+            "tiles_id_col": sql.Identifier(tiles_id_col),
+            "tiles_geom_col": sql.Identifier(tiles_geom_col),
+            "roads_table": sql.Identifier(network.roads.table)
+            "roads_schema":
+            "roads_id_col":
+            "roads_geom_col":
+            "roads_source_col": sql.Identifier(self.config.network.roads.source_column)
+            "roads_target_col": sql.Identifier(self.config.network.roads.target_column)
+            "roads_oneway_col": sql.Identifier(self.config.network.roads.oneway.name)
+            "roads_oneway_fwd": sql.Literal(self.config.network.roads.oneway.forward)
+            "roads_oneway_bwd": sql.Literal(self.config.network.roads.oneway.backward)
+            "roads_stress_seg_fwd": sql.Identifier(self.config.network.roads.stress.segment.forward)
+            "roads_stress_seg_bwd": sql.Identifier(self.config.network.roads.stress.segment.backward)
+            "roads_stress_cross_fwd": sql.Identifier(self.config.network.roads.stress.crossing.forward)
+            "roads_stress_cross_bwd": sql.Identifier(self.config.network.roads.stress.crossing.backward)
+            "ints_table": sql.Identifier(self.config.network.intersections.table)
+            "ints_schema":
+            "ints_id_col":
+            "ints_geom_col":
+            "edges_table": sql.Identifier(self.config.network.edges.table)
+            "edges_schema":
+            "edges_id_col":
+            "edges_geom_col":
+            "edges_source_col": sql.Identifier(self.config.network.edges.source_column)
+            "edges_target_col": sql.Identifier(self.config.network.edges.target_column)
+            "edges_stress_col": sql.Identifier(self.config.network.edges.stress_column)
+            "edges_cost_col": sql.Identifier(self.config.network.edges.cost_column)
+            "nodes_table": sql.Identifier(self.config.network.nodes.table)
+            "nodes_schema":
+            "nodes_id_col":
+            "nodes_geom_col":
+            "zones_table": sql.Identifier(self.config.connectivity.zones.table)
+            "zones_schema":
+            "zones_id_col":
+            "zones_geom_col":
+            "connectivity_table": sql.Identifier(self.config.connectivity.table)
+            "connectivity_schema":
+            "connectivity_source_col": sql.Identifier(self.config.connectivity.source_column)
+            "connectivity_target_col": sql.Identifier(self.config.connectivity.target_column)
+            "connectivity_max_distance": sql.Literal(self.config.connectivity.max_distance)
+            "connectivity_max_detour": sql.Literal(self.config.connectivity.max_detour)
+            "connectivity_max_stress": sql.Literal(self.config.connectivity.max_stress)
+        }
+
+        return subs

@@ -489,16 +489,3 @@ class Connectivity(DBUtils):
         conn.close()
 
         return q
-
-
-    def make_zones(table,schema=None,uid="id",geom="geom"):
-        """
-        Creates analysis zones that aggregate blocks into logical groupings
-        based on islands of 100% low stress connectivity
-
-        args
-        table -- table name
-        schema -- schema name
-        uid -- uid column name
-        geom -- geom column name
-        """

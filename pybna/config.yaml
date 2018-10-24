@@ -23,7 +23,7 @@ bna:
     blocks:
         table: "neighborhood_census_blocks"
         # schema: "generated"
-        id_column: "blockid10"
+        uid: "blockid10"
         population: "pop10"
         geom: "geom"
         roads_tolerance: 15     # determines whether a road is considered "connected" to a block
