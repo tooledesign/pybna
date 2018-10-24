@@ -21,7 +21,6 @@ class DestinationCategory:
         return: None
         """
         self.bna = bna
-        self.db = bna.db
         self.config = config
         self.query_path = query_path
         self.category = self.config["name"]
@@ -29,12 +28,12 @@ class DestinationCategory:
         if "schema" in self.config:
             self.schema = self.config["schema"]
         else:
-            self.schema = self.db.get_schema(self.table)
+            self.schema = self.bna.get_schema(self.table)
         self.blocks_col = self.config["blocks"]
         if "uid" in self.config:
             self.id_column = self.config["uid"]
         else:
-            self.id_column = self.db.get_pkid_col(self.table)
+            self.id_column = self.bna.get_pkid_col(self.table)
         if "geom" in self.config:
             self.geom_col = self.config["geom"]
         else:
@@ -71,7 +70,7 @@ class DestinationCategory:
     #     if self.verbose:
     #         print('Getting destinations for %s from %s' % (self.category,table))
     #
-    #     conn = self.db.get_db_connection()
+    #     conn = self.bna.get_db_connection()
     #     cur = conn.cursor()
     #
     #     subs = {
@@ -121,7 +120,7 @@ class DestinationCategory:
     #
     #     q = q.format(**subs)
     #
-    #     conn = self.db.get_db_connection()
+    #     conn = self.bna.get_db_connection()
     #     if dry:
     #         print(q.as_string(conn))
     #     else:
@@ -164,6 +163,6 @@ class DestinationCategory:
         raw = f.read()
         f.close()
 
-        conn = self.db.get_db_connection()
+        conn = self.bna.get_db_connection()
         return sql.SQL(sql.SQL(raw).format(**subs).as_string(conn))
         conn.close()
