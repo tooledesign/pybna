@@ -102,16 +102,17 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         else:
             self.tiles_exist = False
 
-        self.tiles_table = self.config["bna"]["tiles"]["table"]
-        if "schema" in self.config["bna"]["tiles"]:
-            self.tiles_schema = self.config["bna"]["tiles"]["schema"]
-        elif self.table_exists(self.tiles_table):
-            self.tiles_schema = self.get_schema(self.config["bna"]["tiles"]["table"])
+        # zones
+        if "table" in self.config.bna.connectivity.zones:
+            self.zones_exist = True
+        else:
+            self.zones_exist = False
 
-        if "id_column" in self.config["bna"]["tiles"]:
-            self.tiles_pkid = self.config["bna"]["tiles"]["id_column"]
-        elif self.table_exists(self.tiles_table):
-            self.tiles_pkid = self.get_pkid_col(self.config["bna"]["tiles"]["table"],self.tiles_schema)
+        # default schema
+        if "schema" in self.config.blocks:
+            self.default_schema = self.config.blocks.schema
+        else:
+            self.default_schema = self.get_schema(self.config.blocks.table)
 
         if force_net_build:
             print("Building network tables in database")
@@ -124,7 +125,7 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         elif self.verbose:
             print("Network tables found in database")
 
-        self.sql_subs = self.make_subs(self.config)
+        self.sql_subs = self.make_sql_substitutions(self.config)
 
 
     def parse_config(self,config):
@@ -146,7 +147,7 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         return config
 
 
-    def make_subs(self, config):
+    def make_sql_substitutions(self, config):
         """
         Constructs universal SQL substitutions from all of the config
         parameters.
@@ -205,13 +206,114 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         else:
             tiles_table = " "
             tiles_schema = " "
-            tile_id_col = " "
-            tile_geom_col = " "
+            tiles_id_col = " "
+            tiles_geom_col = " "
 
-        # network
+        # roads
+        if "schema" in network.roads:
+            roads_schema = network.roads.schema
+        else:
+            roads_schema = self.get_schema(network.roads.table)
+        if "uid" in network.roads:
+            roads_id_col = network.roads.uid
+        else:
+            roads_id_col = self.get_pkid_col(network.roads.table,roads_schema)
+        if "geom" in network.roads:
+            roads_geom_col = network.roads.geom
+        else:
+            roads_geom_col = "geom"
 
+        # intersections
+        if "schema" in network.intersections:
+            ints_schema = network.intersections.schema
+        else:
+            ints_schema = self.get_schema(network.intersections.table)
+        if "uid" in network.intersections:
+            ints_id_col = network.intersections.uid
+        else:
+            ints_id_col = self.get_pkid_col(network.intersections.table,ints_schema)
+        if "geom" in network.intersections:
+            ints_geom_col = network.intersections.geom
+        else:
+            ints_geom_col = "geom"
+
+        # edges
+        if "schema" in network.edges:
+            edges_schema = network.edges.schema
+        else:
+            edges_schema = self.get_schema(network.edges.table)
+        if "uid" in network.edges:
+            edges_id_col = network.edges.uid
+        else:
+            edges_id_col = self.get_pkid_col(network.edges.table,edges_schema)
+        if "geom" in network.edges:
+            edges_geom_col = network.edges.geom
+        else:
+            edges_geom_col = "geom"
+
+        # nodes
+        if "schema" in network.nodes:
+            nodes_schema = network.nodes.schema
+        else:
+            nodes_schema = self.get_schema(network.nodes.table)
+        if "uid" in network.nodes:
+            nodes_id_col = network.nodes.uid
+        else:
+            nodes_id_col = self.get_pkid_col(network.nodes.table,nodes_schema)
+        if "geom" in network.nodes:
+            nodes_geom_col = network.nodes.geom
+        else:
+            nodes_geom_col = "geom"
+
+        # zones
+        if self.zones_exist:
+            zones_table = connectivity.zones.table
+            if "schema" in connectivity.zones:
+                zones_schema = connectivity.zones.schema
+            elif self.table_exists(zones_table):
+                zones_schema = self.get_schema(zones_table)
+            else:
+                zones_schema = blocks_schema
+
+            if self.table_exists(zones_table,zones_schema):
+                if "uid" in connectivity.zones:
+                    zones_id_col = connectivity.zones.uid
+                else:
+                    zones_id_col = self.get_pkid_col(zones_table,zones_schema)
+                if "geom" in connectivity.zones:
+                    zones_geom_col = connectivity.zones.geom
+                else:
+                    zones_geom_col = "geom"
+            else:
+                if "uid" in connectivity.zones:
+                    zones_id_col = connectivity.zones.uid
+                else:
+                    zones_id_col = "id"
+                if "geom" in connectivity.zones:
+                    tile_geom_col = connectivity.zones.geom
+                else:
+                    tile_geom_col = "geom"
+
+        else:
+            zones_table = " "
+            zones_schema = " "
+            zones_id_col = " "
+            zones_geom_col = " "
+
+        # connectivity
+        if "schema" in connectivity:
+            connectivity_schema = connectivity.schema
+        else:
+            connectivity_schema = blocks_schema
+
+        # srid
+        if "srid" in config:
+            srid = config.srid
+        else:
+            srid = self.get_srid(blocks.table,blocks_schema)
 
         subs = {
+            "srid": sql.Literal(srid),
             "blocks_table": sql.Identifier(blocks.table),
             "blocks_schema": sql.Identifier(blocks_schema),
             "blocks_id_col": sql.Identifier(blocks_id_col),
@@ -221,46 +323,46 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
             "tiles_schema": sql.Identifier(tiles_schema),
             "tiles_id_col": sql.Identifier(tiles_id_col),
             "tiles_geom_col": sql.Identifier(tiles_geom_col),
-            "roads_table": sql.Identifier(network.roads.table)
-            "roads_schema":
-            "roads_id_col":
-            "roads_geom_col":
-            "roads_source_col": sql.Identifier(self.config.network.roads.source_column)
-            "roads_target_col": sql.Identifier(self.config.network.roads.target_column)
-            "roads_oneway_col": sql.Identifier(self.config.network.roads.oneway.name)
-            "roads_oneway_fwd": sql.Literal(self.config.network.roads.oneway.forward)
-            "roads_oneway_bwd": sql.Literal(self.config.network.roads.oneway.backward)
-            "roads_stress_seg_fwd": sql.Identifier(self.config.network.roads.stress.segment.forward)
-            "roads_stress_seg_bwd": sql.Identifier(self.config.network.roads.stress.segment.backward)
-            "roads_stress_cross_fwd": sql.Identifier(self.config.network.roads.stress.crossing.forward)
-            "roads_stress_cross_bwd": sql.Identifier(self.config.network.roads.stress.crossing.backward)
-            "ints_table": sql.Identifier(self.config.network.intersections.table)
-            "ints_schema":
-            "ints_id_col":
-            "ints_geom_col":
-            "edges_table": sql.Identifier(self.config.network.edges.table)
-            "edges_schema":
-            "edges_id_col":
-            "edges_geom_col":
-            "edges_source_col": sql.Identifier(self.config.network.edges.source_column)
-            "edges_target_col": sql.Identifier(self.config.network.edges.target_column)
-            "edges_stress_col": sql.Identifier(self.config.network.edges.stress_column)
-            "edges_cost_col": sql.Identifier(self.config.network.edges.cost_column)
-            "nodes_table": sql.Identifier(self.config.network.nodes.table)
-            "nodes_schema":
-            "nodes_id_col":
-            "nodes_geom_col":
-            "zones_table": sql.Identifier(self.config.connectivity.zones.table)
-            "zones_schema":
-            "zones_id_col":
-            "zones_geom_col":
-            "connectivity_table": sql.Identifier(self.config.connectivity.table)
-            "connectivity_schema":
-            "connectivity_source_col": sql.Identifier(self.config.connectivity.source_column)
-            "connectivity_target_col": sql.Identifier(self.config.connectivity.target_column)
-            "connectivity_max_distance": sql.Literal(self.config.connectivity.max_distance)
-            "connectivity_max_detour": sql.Literal(self.config.connectivity.max_detour)
-            "connectivity_max_stress": sql.Literal(self.config.connectivity.max_stress)
+            "roads_table": sql.Identifier(network.roads.table),
+            "roads_schema": sql.Identifier(roads_schema),
+            "roads_id_col": sql.Identifier(roads_id_col),
+            "roads_geom_col": sql.Identifier(roads_geom_col),
+            "roads_source_col": sql.Identifier(network.roads.source_column),
+            "roads_target_col": sql.Identifier(network.roads.target_column),
+            "roads_oneway_col": sql.Identifier(network.roads.oneway.name),
+            "roads_oneway_fwd": sql.Literal(network.roads.oneway.forward),
+            "roads_oneway_bwd": sql.Literal(network.roads.oneway.backward),
+            "roads_stress_seg_fwd": sql.Identifier(network.roads.stress.segment.forward),
+            "roads_stress_seg_bwd": sql.Identifier(network.roads.stress.segment.backward),
+            "roads_stress_cross_fwd": sql.Identifier(network.roads.stress.crossing.forward),
+            "roads_stress_cross_bwd": sql.Identifier(network.roads.stress.crossing.backward),
+            "ints_table": sql.Identifier(network.intersections.table),
+            "ints_schema": sql.Identifier(ints_schema),
+            "ints_id_col": sql.Identifier(ints_id_col),
+            "ints_geom_col": sql.Identifier(ints_geom_col),
+            "edges_table": sql.Identifier(network.edges.table),
+            "edges_schema": sql.Identifier(edges_schema),
+            "edges_id_col": sql.Identifier(edges_id_col),
+            "edges_geom_col": sql.Identifier(edges_geom_col),
+            "edges_source_col": sql.Identifier(network.edges.source_column),
+            "edges_target_col": sql.Identifier(network.edges.target_column),
+            "edges_stress_col": sql.Identifier(network.edges.stress_column),
+            "edges_cost_col": sql.Identifier(network.edges.cost_column),
+            "nodes_table": sql.Identifier(network.nodes.table),
+            "nodes_schema": sql.Identifier(nodes_schema),
+            "nodes_id_col": sql.Identifier(nodes_id_col),
+            "nodes_geom_col": sql.Identifier(nodes_geom_col),
+            "zones_table": sql.Identifier(zones_table),
+            "zones_schema": sql.Identifier(zones_schema),
+            "zones_id_col": sql.Identifier(zones_id_col),
+            "zones_geom_col": sql.Identifier(zones_geom_col),
+            "connectivity_table": sql.Identifier(connectivity.table),
+            "connectivity_schema": sql.Identifier(connectivity_schema),
+            "connectivity_source_col": sql.Identifier(connectivity.source_column),
+            "connectivity_target_col": sql.Identifier(connectivity.target_column),
+            "connectivity_max_distance": sql.Literal(connectivity.max_distance),
+            "connectivity_max_detour": sql.Literal(connectivity.max_detour),
+            "connectivity_max_stress": sql.Literal(connectivity.max_stress)
         }
 
         return subs
