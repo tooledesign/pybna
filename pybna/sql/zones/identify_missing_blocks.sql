@@ -6,8 +6,8 @@ SELECT
 FROM tmp_block_nodes blocks
 WHERE NOT EXISTS (
     SELECT 1
-    FROM tmp_zones
-    WHERE blocks.block_id = ANY(tmp_zones.block_ids)
+    FROM {zones_schema}.{zones_table} zones
+    WHERE blocks.block_id = ANY(zones.block_ids)
 )
 LIMIT 1
 ;

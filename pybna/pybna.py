@@ -18,10 +18,11 @@ from tqdm import tqdm
 from core import Core
 from connectivity import Connectivity
 from destinations import Destinations
+from zones import Zones
 from dbutils import DBUtils
 
 
-class pyBNA(DBUtils,Destinations,Connectivity,Core):
+class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
     """Parent BNA class that glues together the Core, Connectivity, and Destinations classes"""
 
     def __init__(self, config="config.yaml", force_net_build=False,
@@ -103,16 +104,19 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
             self.tiles_exist = False
 
         # zones
-        if "table" in self.config.bna.connectivity.zones:
-            self.zones_exist = True
+        if "zones" in self.config.bna.connectivity:
+            if "table" in self.config.bna.connectivity.zones:
+                self.zones_exist = True
+            else:
+                self.zones_exist = False
         else:
             self.zones_exist = False
 
         # default schema
-        if "schema" in self.config.blocks:
-            self.default_schema = self.config.blocks.schema
+        if "schema" in self.config.bna.blocks:
+            self.default_schema = self.config.bna.blocks.schema
         else:
-            self.default_schema = self.get_schema(self.config.blocks.table)
+            self.default_schema = self.get_schema(self.config.bna.blocks.table)
 
         if force_net_build:
             print("Building network tables in database")
@@ -240,28 +244,40 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         # edges
         if "schema" in network.edges:
             edges_schema = network.edges.schema
-        else:
+        elif self.table_exists(network.edges.table):
             edges_schema = self.get_schema(network.edges.table)
+        else:
+            edges_schema = roads_schema
         if "uid" in network.edges:
             edges_id_col = network.edges.uid
-        else:
+        elif self.table_exists(network.edges.table,edges_schema):
             edges_id_col = self.get_pkid_col(network.edges.table,edges_schema)
+        else:
+            edges_id_col = "edge_id"
         if "geom" in network.edges:
             edges_geom_col = network.edges.geom
+        elif self.table_exists(network.edges.table,edges_schema):
+            edges_geom_col = "geom"
         else:
             edges_geom_col = "geom"
 
         # nodes
         if "schema" in network.nodes:
             nodes_schema = network.nodes.schema
-        else:
+        elif self.table_exists(network.nodes.table):
             nodes_schema = self.get_schema(network.nodes.table)
+        else:
+            nodes_schema = roads_schema
         if "uid" in network.nodes:
             nodes_id_col = network.nodes.uid
-        else:
+        elif self.table_exists(network.nodes.table,nodes_schema):
             nodes_id_col = self.get_pkid_col(network.nodes.table,nodes_schema)
+        else:
+            nodes_id_col = "node_id"
         if "geom" in network.nodes:
             nodes_geom_col = network.nodes.geom
+        elif self.table_exists(network.nodes.table,nodes_schema):
+            nodes_geom_col = "geom"
         else:
             nodes_geom_col = "geom"
 
@@ -310,7 +326,7 @@ class pyBNA(DBUtils,Destinations,Connectivity,Core):
         if "srid" in config:
             srid = config.srid
         else:
-            srid = self.get_srid(blocks.table,blocks_schema)
+            srid = self.get_srid(blocks.table,schema=blocks_schema)
 
         subs = {
             "srid": sql.Literal(srid),

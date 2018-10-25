@@ -1,10 +1,9 @@
-DROP TABLE IF EXISTS tmp_zones;
 SELECT
-    array_agg({block_id_col}) AS block_ids,
-    ST_Union({block_geom_col}) AS geom
-INTO TEMP TABLE tmp_zones
+    array_agg({blocks_id_col}) AS block_ids,
+    ST_Union({blocks_geom_col})::geometry(multipolygon,{srid}) AS {zones_geom_col}
+INTO {zones_schema}.{zones_table}
 FROM {blocks_schema}.{blocks_table}
 WHERE FALSE
 ;
 
-DELETE FROM tmp_zones;
+DELETE FROM {zones_schema}.{zones_table};

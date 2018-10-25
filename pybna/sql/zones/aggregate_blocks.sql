@@ -15,27 +15,26 @@ FROM pgr_drivingdistance(
         WHERE
             link.int_id = tmp_ints_low_stress.int_id',
         {source_nodes},
-        {max_trip_distance},
+        {connectivity_max_distance},
         directed:=FALSE
     ) shed
 ;
 
 DROP TABLE IF EXISTS tmp_matches;
 SELECT DISTINCT
-    b.{block_id_col} AS block_id,
-    b.{block_geom_col} AS geom
+    b.block_id,
+    b.geom
 INTO TEMP TABLE tmp_matches
 FROM
     tmp_block_nodes b,
-    {roads_schema}.{nodes} nodes,
     tmp_routes
-WHERE tmp_routes.node = ANY(b.nodes)
+WHERE tmp_routes.node = ANY(b.node_ids)
 ;
 
-INSERT INTO tmp_zones
+INSERT INTO {zones_schema}.{zones_table}
 SELECT
     array_agg(block_id),
-    ST_Union(geom)
+    ST_Multi(ST_Union(geom))
 FROM tmp_matches
 ;
 

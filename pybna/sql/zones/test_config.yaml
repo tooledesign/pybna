@@ -1,0 +1,218 @@
+#############################################
+# Default configuration file for pyBNA
+#
+# Optional settings are commented out
+# In general, optional parameters can be
+# deduced through code so you'd only
+# want to specify these if you have an
+# unusual circumstance
+#############################################
+srid: 7599
+
+db:
+    host: "192.168.40.225"
+    dbname: "madison_mpo_bna"
+    user: "gis"
+    password: "gis"
+
+bna:
+    boundary:
+        table: "boundary"
+        geom: "geom"
+
+    blocks:
+        table: "blocks"
+        # schema: "generated"
+        id_column: "BLOCKID10"
+        uid: "BLOCKID10"
+        population: "POP10"
+        geom: "geom"
+        roads_tolerance: 45     # determines whether a road is considered "connected" to a block
+        min_road_length: 90     # determines whether a road is considered "connected" to a block
+
+    tiles:
+        table: "grid"
+        geom: "geom"
+
+    network:
+        roads:
+            table: "bna_test_streets"
+            geom: "geom"
+            uid: "id"
+            source_column: "source_int"
+            target_column: "target_int"
+            oneway: {name: "oneway", forward: "ft", backward: "tf"}
+            stress:
+                segment:
+                    forward: stress
+                    backward: stress
+                crossing:
+                    forward: stress
+                    backward: stress
+        intersections:
+            table: "bna_test_streets_intersections"
+            geom: "geom"
+            uid: "id"
+        edges:
+            table: "bna_test_net_link"
+            source_column: "source_vert"
+            target_column: "target_vert"
+            stress_column: "link_stress"
+            cost_column: "link_cost"
+            id_column: link_id
+        nodes:
+            table: "bna_test_net_vert"
+            id_column: vert_id
+
+    connectivity:
+        zones:
+            table: "zones"
+            # schema: "automated"
+            # uid: id
+        table: "test_conn"
+        source_column: "source_blockid10"
+        target_column: "target_blockid10"
+        max_distance: 8800
+        max_detour: 25      # given as a whole number percentage (i.e. 25 == 25%)
+        max_stress: 2
+
+    destinations:
+      - name: people
+        weight: 15
+        table: neighborhood_census_blocks
+        method: percentage
+        datafield: pop10
+        maxpoints: 100
+        breaks: {0.03: 10, 0.2: 40, 0.5: 80}
+        uid: gid
+        blocks: blockid10
+      - name: opportunity
+        weight: 20
+        subcats:
+          - name: employment
+            weight: 35
+            table: neighborhood_census_block_jobs
+            method: percentage
+            datafield: jobs
+            maxpoints: 100
+            breaks: {0.03: 10, 0.2: 40, 0.5: 80}
+            uid: id
+            blocks: blockid10
+          - name: schools
+            weight: 35
+            table: neighborhood_schools
+            method: count
+            maxpoints: 100
+            breaks: {1: 30, 2: 20, 3: 20}
+            uid: id
+            blocks: blockid10
+          - name: colleges
+            weight: 10
+            table: neighborhood_colleges
+            method: count
+            maxpoints: 100
+            breaks: {1: 70}
+            uid: id
+            blocks: blockid10
+          - name: universities
+            weight: 20
+            table: neighborhood_universities
+            method: count
+            maxpoints: 100
+            breaks: {1: 70}
+            uid: id
+            blocks: blockid10
+      - name: core_services
+        weight: 20
+        subcats:
+          - name: doctors
+            weight: 20
+            table: neighborhood_doctors
+            method: count
+            maxpoints: 100
+            breaks: {1: 40, 2: 20, 3: 10}
+            uid: id
+            blocks: blockid10
+          - name: dentists
+            weight: 10
+            table: neighborhood_dentists
+            method: count
+            maxpoints: 100
+            breaks: {1: 40, 2: 20, 3: 10}
+            uid: id
+            blocks: blockid10
+          - name: hospitals
+            weight: 20
+            table: neighborhood_hospitals
+            method: count
+            maxpoints: 100
+            breaks: {1: 70}
+            uid: id
+            blocks: blockid10
+          - name: pharmacies
+            weight: 10
+            table: neighborhood_pharmacies
+            method: count
+            maxpoints: 100
+            breaks: {1: 40, 2: 20, 3: 10}
+            uid: id
+            blocks: blockid10
+          - name: supermarkets
+            weight: 25
+            table: neighborhood_supermarkets
+            method: count
+            maxpoints: 100
+            breaks: {1: 60, 2: 20}
+            uid: id
+            blocks: blockid10
+          - name: social_services
+            weight: 15
+            table: neighborhood_social_services
+            method: count
+            maxpoints: 100
+            breaks: {1: 70}
+            uid: id
+            blocks: blockid10
+      - name: recreation
+        weight: 15
+        subcats:
+          - name: parks
+            weight: 40
+            table: neighborhood_parks
+            method: count
+            maxpoints: 100
+            breaks: {1: 30, 2: 20, 3: 20}
+            uid: id
+            blocks: blockid10
+        #   - name: trails
+        #     weight: 35
+        #     table: neighborhood_paths
+        #     method: count
+        #     maxpoints: 100
+        #     breaks: {1: 70, 2: 20}
+        #     method: trails
+        #     blocks: blockid10
+          - name: community_centers
+            weight: 25
+            table: neighborhood_community_centers
+            method: count
+            maxpoints: 100
+            breaks: {1: 40, 2: 20, 3: 10}
+            uid: id
+            blocks: blockid10
+      - name: retail
+        weight: 15
+        table: neighborhood_retail
+        method: count
+        maxpoints: 100
+        breaks: {1: 40, 2: 20, 3: 10}
+        uid: id
+        blocks: blockid10
+      - name: transit
+        weight: 15
+        table: neighborhood_transit
+        method: count
+        maxpoints: 100
+        breaks: {1: 60}
+        uid: id
+        blocks: blockid10
