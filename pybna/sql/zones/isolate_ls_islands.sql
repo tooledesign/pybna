@@ -32,7 +32,7 @@ INTO TEMP TABLE tmp_ints_all_stress
 FROM
     tmp_ints_filtered i,
     tmp_roads_filtered r
-WHERE i.{ints_id_col} = r.source
+WHERE i.int_id = r.source
 UNION
 SELECT
     i.int_id,
@@ -40,7 +40,7 @@ SELECT
 FROM
     tmp_ints_filtered i,
     tmp_roads_filtered r
-WHERE i.{ints_id_col} = r.target
+WHERE i.int_id = r.target
 ;
 
 DROP TABLE IF EXISTS tmp_ints_low_stress;

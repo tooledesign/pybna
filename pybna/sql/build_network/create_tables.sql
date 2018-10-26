@@ -1,16 +1,16 @@
-DROP TABLE IF EXISTS {roads_schema}.{nodes};
-DROP TABLE IF EXISTS {roads_schema}.{edges};
+DROP TABLE IF EXISTS {nodes_schema}.{nodes_table};
+DROP TABLE IF EXISTS {edges_schema}.{edges_table};
 
-CREATE TABLE {roads_schema}.{nodes} (
-    {node_id} SERIAL PRIMARY KEY,
+CREATE TABLE {nodes_schema}.{nodes_table} (
+    {nodes_id_col} SERIAL PRIMARY KEY,
     road_id INTEGER,
     vert_cost INTEGER,
-    geom geometry(point,{srid})
+    {nodes_geom_col} geometry(point,{srid})
 );
 
-CREATE TABLE {roads_schema}.{edges} (
-    {edge_id} SERIAL PRIMARY KEY,
-    {int_id} INTEGER,
+CREATE TABLE {edges_schema}.{edges_table} (
+    {edges_id_col} SERIAL PRIMARY KEY,
+    {ints_id_col} INTEGER,
     turn_angle INTEGER,
     int_crossing BOOLEAN,
     int_stress INTEGER,
@@ -28,5 +28,5 @@ CREATE TABLE {roads_schema}.{edges} (
     target_stress INTEGER,
     link_cost INTEGER,
     link_stress INTEGER,
-    geom geometry(linestring,{srid})
+    {edges_geom_col} geometry(linestring,{srid})
 );

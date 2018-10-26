@@ -1,8 +1,8 @@
 -- buffering blocks;
 DROP TABLE IF EXISTS tmp_blocks;
 SELECT
-    blocks.{block_id_col} AS id,
-    ST_Buffer(blocks.{block_geom_col},{roads_tolerance}) AS geom
+    blocks.{blocks_id_col} AS id,
+    ST_Buffer(blocks.{blocks_geom_col},{blocks_roads_tolerance}) AS geom
 INTO TEMP TABLE tmp_blocks
 FROM
     {blocks_schema}.{blocks_table} blocks
@@ -33,7 +33,7 @@ INTO TEMP TABLE tmp_blkrds2
 FROM tmp_blkrds1
 WHERE
     ST_Contains(block_geom,road_geom)
-    OR ST_Length(ST_Intersection(block_geom,road_geom)) > {min_road_length}
+    OR ST_Length(ST_Intersection(block_geom,road_geom)) > {blocks_min_road_length}
 GROUP BY block_id
 ;
 
@@ -45,5 +45,5 @@ SET road_ids = NULL
 UPDATE {blocks_schema}.{blocks_table} blocks
 SET road_ids = tmp_blkrds2.road_ids
 FROM tmp_blkrds2
-WHERE blocks.{block_id_col} = tmp_blkrds2.block_id
+WHERE blocks.{blocks_id_col} = tmp_blkrds2.block_id
 ;

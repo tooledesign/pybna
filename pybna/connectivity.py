@@ -87,60 +87,23 @@ class Connectivity(DBUtils):
             print("Building network in database")
 
         # set up substitutions
-        net_subs = {
-            "srid": sql.Literal(self.srid),
-            "roads_schema": sql.Identifier(self.get_schema(self.net_config["roads"]["table"])),
-            "roads_table": sql.Identifier(self.net_config["roads"]["table"]),
-            "roads_id_col": sql.Identifier(self.net_config["roads"]["uid"]),
-            "roads_geom_col": sql.Identifier(self.net_config["roads"]["geom"]),
-            "road_source": sql.Identifier(self.net_config["roads"]["source_column"]),
-            "road_target": sql.Identifier(self.net_config["roads"]["target_column"]),
-            "one_way": sql.Identifier(self.net_config["roads"]["oneway"]["name"]),
-            "forward": sql.Literal(self.net_config["roads"]["oneway"]["forward"]),
-            "backward": sql.Literal(self.net_config["roads"]["oneway"]["backward"]),
-            "intersections": sql.Identifier(self.net_config["intersections"]["table"]),
-            "int_id": sql.Identifier(self.net_config["intersections"]["uid"]),
-            "nodes": sql.Identifier(self.net_config["nodes"]["table"]),
-            "node_id": sql.Identifier(self.net_config["nodes"]["id_column"]),
-            "node_index": sql.Identifier("sidx_"+self.net_config["nodes"]["table"]),
-            "edges": sql.Identifier(self.net_config["edges"]["table"]),
-            "edge_id": sql.Identifier(self.net_config["edges"]["id_column"]),
-            "edge_index": sql.Identifier("sidx_"+self.net_config["edges"]["table"]),
-            "ft_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["forward"]),
-            "tf_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["backward"]),
-            "ft_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["forward"]),
-            "tf_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["backward"]),
-            "blocks_schema": sql.Identifier(self.blocks.schema),
-            "blocks_table": sql.Identifier(self.blocks.table),
-            "block_id_col": sql.Identifier(self.blocks.id_column),
-            "block_geom_col": sql.Identifier(self.blocks.geom),
-            "roads_tolerance": sql.Literal(self.config["bna"]["blocks"]["roads_tolerance"]),
-            "min_road_length": sql.Literal(self.config["bna"]["blocks"]["min_road_length"])
-        }
+        subs = dict(self.sql_subs)
+        subs["nodes_index"] = sql.Identifier("sidx_"+self.config.bna.network.nodes.table)
+        subs["edges_index"] = sql.Identifier("sidx_"+self.config.bna.network.edges.table)
 
         # read in the raw query language
-        f = open(os.path.join(self.module_dir,"sql","build_network","create_tables.sql"))
-        create_query = f.read()
-        f.close()
-        f = open(os.path.join(self.module_dir,"sql","build_network","insert_nodes.sql"))
-        nodes_query = f.read()
-        f.close()
-        f = open(os.path.join(self.module_dir,"sql","build_network","insert_edges.sql"))
-        edges_query = f.read()
-        f.close()
-        f = open(os.path.join(self.module_dir,"sql","build_network","cleanup.sql"))
-        cleanup_query = f.read()
-        f.close()
-        f = open(os.path.join(self.module_dir,"sql","build_network","associate_roads_with_blocks.sql"))
-        associate_query = f.read()
-        f.close()
+        create_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","create_tables.sql"))
+        nodes_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","insert_nodes.sql"))
+        edges_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","insert_edges.sql"))
+        cleanup_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","cleanup.sql"))
+        associate_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","associate_roads_with_blocks.sql"))
 
         conn = self.get_db_connection()
         cur = conn.cursor()
 
         # create
         print("Creating network tables")
-        q = sql.SQL(create_query).format(**net_subs)
+        q = sql.SQL(create_query).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
@@ -148,7 +111,7 @@ class Connectivity(DBUtils):
 
         # nodes
         print("Adding network nodes")
-        q = sql.SQL(nodes_query).format(**net_subs)
+        q = sql.SQL(nodes_query).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
@@ -164,7 +127,7 @@ class Connectivity(DBUtils):
                 prog_statements.set_description(statement.strip()[2:])
             else:
                 # compose the query
-                q = sql.SQL(statement).format(**net_subs)
+                q = sql.SQL(statement).format(**subs)
 
                 if dry:
                     print(q.as_string(conn))
@@ -173,7 +136,7 @@ class Connectivity(DBUtils):
 
         # cleanup
         print("Finishing up network")
-        q = sql.SQL(cleanup_query).format(**net_subs)
+        q = sql.SQL(cleanup_query).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
@@ -189,7 +152,7 @@ class Connectivity(DBUtils):
                 prog_statements.set_description(statement.strip()[2:])
             else:
                 # compose the query
-                q = sql.SQL(statement).format(**net_subs)
+                q = sql.SQL(statement).format(**subs)
 
                 if dry:
                     print(q.as_string(conn))

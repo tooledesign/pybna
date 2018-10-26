@@ -5,15 +5,15 @@ SELECT *
 INTO TEMP TABLE tmp_routes
 FROM pgr_drivingdistance(
         'SELECT
-            link.link_id AS id,
-            source_vert AS source,
-            target_vert AS target,
-            link_cost AS cost
+            edges.{edges_id_col} AS id,
+            edges.{edges_source_col} AS source,
+            edges.{edges_target_col} AS target,
+            edges.{edges_cost_col} AS cost
         FROM
-            neighborhood_ways_net_link link,
+            {edges_schema}.{edges_table} edges,
             tmp_ints_low_stress
         WHERE
-            link.int_id = tmp_ints_low_stress.int_id',
+            edges.{ints_id_col} = tmp_ints_low_stress.int_id',
         {source_nodes},
         {connectivity_max_distance},
         directed:=FALSE
@@ -28,7 +28,13 @@ INTO TEMP TABLE tmp_matches
 FROM
     tmp_block_nodes b,
     tmp_routes
-WHERE tmp_routes.node = ANY(b.node_ids)
+WHERE
+    tmp_routes.node = ANY(b.node_ids)
+    AND NOT EXISTS (
+        SELECT 1
+        FROM {zones_schema}.{zones_table} zones
+        WHERE b.block_id = ANY(zones.block_ids)
+    )
 ;
 
 INSERT INTO {zones_schema}.{zones_table}

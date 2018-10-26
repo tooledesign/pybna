@@ -21,7 +21,7 @@ bna:
         geom: "geom"
 
     blocks:
-        table: "blocks"
+        table: "bna_test_blocks"
         # schema: "generated"
         id_column: "BLOCKID10"
         uid: "BLOCKID10"

@@ -118,6 +118,8 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
         else:
             self.default_schema = self.get_schema(self.config.bna.blocks.table)
 
+        self.sql_subs = self.make_sql_substitutions(self.config)
+
         if force_net_build:
             print("Building network tables in database")
             self.build_network()
@@ -129,7 +131,6 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
         elif self.verbose:
             print("Network tables found in database")
 
-        self.sql_subs = self.make_sql_substitutions(self.config)
 
 
     def parse_config(self,config):
@@ -187,25 +188,18 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
                 tiles_schema = self.get_schema(tiles_table)
             else:
                 tiles_schema = blocks_schema
-
-            if self.table_exists(tiles_table,tiles_schema):
-                if "uid" in tiles:
-                    tiles_id_col = tiles.uid
-                else:
-                    tiles_id_col = self.get_pkid_col(tiles_table,tiles_schema)
-                if "geom" in tiles:
-                    tiles_geom_col = tiles.geom
-                else:
-                    tiles_geom_col = "geom"
+            if "uid" in tiles:
+                tiles_id_col = tiles.uid
+            elif self.table_exists(tiles_table,tiles_schema):
+                tiles_id_col = self.get_pkid_col(tiles_table,tiles_schema)
             else:
-                if "uid" in tiles:
-                    tiles_id_col = tiles.uid
-                else:
-                    tiles_id_col = "id"
-                if "geom" in tiles:
-                    tile_geom_col = tiles.geom
-                else:
-                    tile_geom_col = "geom"
+                tiles_id_col = "id"
+            if "geom" in tiles:
+                tiles_geom_col = tiles.geom
+            elif self.table_exists(tiles_table,tiles_schema):
+                tiles_geom_col = "geom"
+            else:
+                tiles_geom_col = "geom"
 
         else:
             tiles_table = " "
@@ -290,26 +284,18 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
                 zones_schema = self.get_schema(zones_table)
             else:
                 zones_schema = blocks_schema
-
-            if self.table_exists(zones_table,zones_schema):
-                if "uid" in connectivity.zones:
-                    zones_id_col = connectivity.zones.uid
-                else:
-                    zones_id_col = self.get_pkid_col(zones_table,zones_schema)
-                if "geom" in connectivity.zones:
-                    zones_geom_col = connectivity.zones.geom
-                else:
-                    zones_geom_col = "geom"
+            if "uid" in connectivity.zones:
+                zones_id_col = connectivity.zones.uid
+            elif self.table_exists(zones_table,zones_schema):
+                zones_id_col = self.get_pkid_col(zones_table,zones_schema)
             else:
-                if "uid" in connectivity.zones:
-                    zones_id_col = connectivity.zones.uid
-                else:
-                    zones_id_col = "id"
-                if "geom" in connectivity.zones:
-                    tile_geom_col = connectivity.zones.geom
-                else:
-                    tile_geom_col = "geom"
-
+                zones_id_col = "id"
+            if "geom" in connectivity.zones:
+                zones_geom_col = connectivity.zones.geom
+            elif self.table_exists(zones_table,zones_schema):
+                zones_geom_col = "geom"
+            else:
+                zones_geom_col = "geom"
         else:
             zones_table = " "
             zones_schema = " "
@@ -335,6 +321,8 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
             "blocks_id_col": sql.Identifier(blocks_id_col),
             "blocks_geom_col": sql.Identifier(blocks_geom_col),
             "blocks_population_col": sql.Identifier(blocks.population),
+            "blocks_roads_tolerance": sql.Literal(blocks.roads_tolerance),
+            "blocks_min_road_length": sql.Literal(blocks.min_road_length),
             "tiles_table": sql.Identifier(tiles_table),
             "tiles_schema": sql.Identifier(tiles_schema),
             "tiles_id_col": sql.Identifier(tiles_id_col),
