@@ -26,9 +26,9 @@ FROM
     scratch.bna_test_blocks blocks
 WHERE
     ST_Intersects(z.geom,blocks."geom")
-    AND ST_Area(ST_Intersection(z.geom,blocks."geom")) > (ST_Area(z.geom) * 0.1)
+    AND ST_Area(ST_Intersection(z.geom,blocks."geom")) > (ST_Area(z.geom) * 0.03)
     AND ST_Area(ST_Intersection(z.geom,blocks."geom")) > (ST_Area(blocks."geom") * 0.1)
-    AND blocks."POP10" <= 0
+    AND blocks."POP10" <= 5
 GROUP BY z.id
 HAVING SUM(ST_Area(blocks."geom")) >= (ST_Area(z.geom) * 0.5)
 ;
@@ -158,10 +158,13 @@ SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
     tmp_blockzones,
+    scratch.zones zones,
     tmp_block_nodes_unnest existing_nodes,
     tmp_block_nodes_unnest candidate_nodes
 WHERE
-    existing_nodes.block_id = tmp_blockzones.block_id
+    tmp_blockzones.block_id = ANY(zones.block_ids)
+    AND existing_nodes.node_id = ANY(zones.node_ids)
+    AND existing_nodes.block_id = tmp_blockzones.block_id
     AND candidate_nodes.block_id = tmp_blockzones.block_id
 ORDER BY
     tmp_blockzones.zone_id,
@@ -195,10 +198,13 @@ SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
     tmp_blockzones,
+    scratch.zones zones,
     tmp_block_nodes_unnest existing_nodes,
     tmp_block_nodes_unnest candidate_nodes
 WHERE
-    existing_nodes.block_id = tmp_blockzones.block_id
+    tmp_blockzones.block_id = ANY(zones.block_ids)
+    AND existing_nodes.node_id = ANY(zones.node_ids)
+    AND existing_nodes.block_id = tmp_blockzones.block_id
     AND candidate_nodes.block_id = tmp_blockzones.block_id
 ORDER BY
     tmp_blockzones.zone_id,
@@ -232,10 +238,13 @@ SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
     tmp_blockzones,
+    scratch.zones zones,
     tmp_block_nodes_unnest existing_nodes,
     tmp_block_nodes_unnest candidate_nodes
 WHERE
-    existing_nodes.block_id = tmp_blockzones.block_id
+    tmp_blockzones.block_id = ANY(zones.block_ids)
+    AND existing_nodes.node_id = ANY(zones.node_ids)
+    AND existing_nodes.block_id = tmp_blockzones.block_id
     AND candidate_nodes.block_id = tmp_blockzones.block_id
 ORDER BY
     tmp_blockzones.zone_id,
@@ -269,10 +278,13 @@ SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
     tmp_blockzones,
+    scratch.zones zones,
     tmp_block_nodes_unnest existing_nodes,
     tmp_block_nodes_unnest candidate_nodes
 WHERE
-    existing_nodes.block_id = tmp_blockzones.block_id
+    tmp_blockzones.block_id = ANY(zones.block_ids)
+    AND existing_nodes.node_id = ANY(zones.node_ids)
+    AND existing_nodes.block_id = tmp_blockzones.block_id
     AND candidate_nodes.block_id = tmp_blockzones.block_id
 ORDER BY
     tmp_blockzones.zone_id,
