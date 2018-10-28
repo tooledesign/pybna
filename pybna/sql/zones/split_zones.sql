@@ -69,18 +69,25 @@ ALTER TABLE scratch.zones ADD COLUMN id SERIAL PRIMARY KEY;
 
 -- add nodes to zones starting with all nodes for single-block zones,
 -- then for multi-block zones take the one closest to the center and then
--- four additional nodes distributed around the zone
+-- four additional nodes distributed around the zone.
+-- uses multiples of roads_tolerance to prioritize interior nodes
 DROP TABLE IF EXISTS tmp_blockzones;
 SELECT
     id AS zone_id,
     unnest(block_ids) AS block_id,
-    ST_Centroid(geom) AS geom
+    ST_Centroid(geom) AS centroid,
+    ST_Buffer(geom,(-1 * 15)) AS inner_1, --roads_tolerance
+    ST_Buffer(geom,(-3 * 15)) AS inner_2,
+    ST_Buffer(geom,(-6 * 15)) AS inner_3
 INTO TEMP TABLE tmp_blockzones
 FROM scratch.zones
 WHERE array_length(block_ids,1) > 1
 ;
 CREATE INDEX tidx_tmp_blockzones_block_id ON tmp_blockzones (block_id);
-CREATE INDEX tsidx_tmp_blockzones ON tmp_blockzones USING GIST (geom);
+CREATE INDEX tsidx_tmp_blockzones_centroid ON tmp_blockzones USING GIST (centroid);
+CREATE INDEX tsidx_tmp_blockzones_inner_1 ON tmp_blockzones USING GIST (inner_1);
+CREATE INDEX tsidx_tmp_blockzones_inner_2 ON tmp_blockzones USING GIST (inner_2);
+CREATE INDEX tsidx_tmp_blockzones_inner_3 ON tmp_blockzones USING GIST (inner_3);
 ANALYZE tmp_blockzones;
 
 DROP TABLE IF EXISTS tmp_blockunnest;
@@ -140,7 +147,7 @@ FROM
 WHERE tmp_block_nodes_unnest.block_id = tmp_blockzones.block_id
 ORDER BY
     tmp_blockzones.zone_id,
-    ST_Distance(tmp_blockzones.geom,tmp_block_nodes_unnest.geom)
+    ST_Distance(tmp_blockzones.centroid,tmp_block_nodes_unnest.geom)
 ;
 
 UPDATE scratch.zones zones
@@ -154,6 +161,9 @@ DROP TABLE IF EXISTS tmp_zone_node_dist;
 SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
     tmp_blockzones.zone_id,
     candidate_nodes.node_id,
+    ST_Intersects(tmp_blockzones.inner_3,candidate_nodes.geom) AS inner_3,
+    ST_Intersects(tmp_blockzones.inner_2,candidate_nodes.geom) AS inner_2,
+    ST_Intersects(tmp_blockzones.inner_1,candidate_nodes.geom) AS inner_1,
     ST_Distance(existing_nodes.geom,candidate_nodes.geom) AS dist
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
@@ -180,6 +190,9 @@ INTO TEMP TABLE tmp_zone_node
 FROM tmp_zone_node_dist
 ORDER BY
     zone_id,
+    inner_3 DESC,
+    inner_2 DESC,
+    inner_1 DESC,
     dist DESC
 ;
 
@@ -194,6 +207,9 @@ DROP TABLE IF EXISTS tmp_zone_node_dist;
 SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
     tmp_blockzones.zone_id,
     candidate_nodes.node_id,
+    ST_Intersects(tmp_blockzones.inner_3,candidate_nodes.geom) AS inner_3,
+    ST_Intersects(tmp_blockzones.inner_2,candidate_nodes.geom) AS inner_2,
+    ST_Intersects(tmp_blockzones.inner_1,candidate_nodes.geom) AS inner_1,
     ST_Distance(existing_nodes.geom,candidate_nodes.geom) AS dist
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
@@ -206,6 +222,7 @@ WHERE
     AND existing_nodes.node_id = ANY(zones.node_ids)
     AND existing_nodes.block_id = tmp_blockzones.block_id
     AND candidate_nodes.block_id = tmp_blockzones.block_id
+    AND array_length(zones.block_ids,1) > 3
 ORDER BY
     tmp_blockzones.zone_id,
     candidate_nodes.node_id,
@@ -220,6 +237,9 @@ INTO TEMP TABLE tmp_zone_node
 FROM tmp_zone_node_dist
 ORDER BY
     zone_id,
+    inner_3 DESC,
+    inner_2 DESC,
+    inner_1 DESC,
     dist DESC
 ;
 
@@ -234,6 +254,9 @@ DROP TABLE IF EXISTS tmp_zone_node_dist;
 SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
     tmp_blockzones.zone_id,
     candidate_nodes.node_id,
+    ST_Intersects(tmp_blockzones.inner_3,candidate_nodes.geom) AS inner_3,
+    ST_Intersects(tmp_blockzones.inner_2,candidate_nodes.geom) AS inner_2,
+    ST_Intersects(tmp_blockzones.inner_1,candidate_nodes.geom) AS inner_1,
     ST_Distance(existing_nodes.geom,candidate_nodes.geom) AS dist
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
@@ -246,6 +269,7 @@ WHERE
     AND existing_nodes.node_id = ANY(zones.node_ids)
     AND existing_nodes.block_id = tmp_blockzones.block_id
     AND candidate_nodes.block_id = tmp_blockzones.block_id
+    AND array_length(zones.block_ids,1) > 5
 ORDER BY
     tmp_blockzones.zone_id,
     candidate_nodes.node_id,
@@ -260,6 +284,9 @@ INTO TEMP TABLE tmp_zone_node
 FROM tmp_zone_node_dist
 ORDER BY
     zone_id,
+    inner_3 DESC,
+    inner_2 DESC,
+    inner_1 DESC,
     dist DESC
 ;
 
@@ -274,6 +301,9 @@ DROP TABLE IF EXISTS tmp_zone_node_dist;
 SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
     tmp_blockzones.zone_id,
     candidate_nodes.node_id,
+    ST_Intersects(tmp_blockzones.inner_3,candidate_nodes.geom) AS inner_3,
+    ST_Intersects(tmp_blockzones.inner_2,candidate_nodes.geom) AS inner_2,
+    ST_Intersects(tmp_blockzones.inner_1,candidate_nodes.geom) AS inner_1,
     ST_Distance(existing_nodes.geom,candidate_nodes.geom) AS dist
 INTO TEMP TABLE tmp_zone_node_dist
 FROM
@@ -286,6 +316,7 @@ WHERE
     AND existing_nodes.node_id = ANY(zones.node_ids)
     AND existing_nodes.block_id = tmp_blockzones.block_id
     AND candidate_nodes.block_id = tmp_blockzones.block_id
+    AND array_length(zones.block_ids,1) > 7
 ORDER BY
     tmp_blockzones.zone_id,
     candidate_nodes.node_id,
@@ -300,6 +331,56 @@ INTO TEMP TABLE tmp_zone_node
 FROM tmp_zone_node_dist
 ORDER BY
     zone_id,
+    inner_3 DESC,
+    inner_2 DESC,
+    inner_1 DESC,
+    dist DESC
+;
+
+UPDATE scratch.zones zones
+SET node_ids = tmp_zone_node.node_id || zones.node_ids
+FROM tmp_zone_node
+WHERE zones.id = tmp_zone_node.zone_id
+;
+
+-- furthest from centroid (round 5)
+DROP TABLE IF EXISTS tmp_zone_node_dist;
+SELECT DISTINCT ON (tmp_blockzones.zone_id, candidate_nodes.node_id)
+    tmp_blockzones.zone_id,
+    candidate_nodes.node_id,
+    ST_Intersects(tmp_blockzones.inner_3,candidate_nodes.geom) AS inner_3,
+    ST_Intersects(tmp_blockzones.inner_2,candidate_nodes.geom) AS inner_2,
+    ST_Intersects(tmp_blockzones.inner_1,candidate_nodes.geom) AS inner_1,
+    ST_Distance(existing_nodes.geom,candidate_nodes.geom) AS dist
+INTO TEMP TABLE tmp_zone_node_dist
+FROM
+    tmp_blockzones,
+    scratch.zones zones,
+    tmp_block_nodes_unnest existing_nodes,
+    tmp_block_nodes_unnest candidate_nodes
+WHERE
+    tmp_blockzones.block_id = ANY(zones.block_ids)
+    AND existing_nodes.node_id = ANY(zones.node_ids)
+    AND existing_nodes.block_id = tmp_blockzones.block_id
+    AND candidate_nodes.block_id = tmp_blockzones.block_id
+    AND array_length(zones.block_ids,1) > 11
+ORDER BY
+    tmp_blockzones.zone_id,
+    candidate_nodes.node_id,
+    ST_Distance(existing_nodes.geom,candidate_nodes.geom) ASC
+;
+
+DROP TABLE IF EXISTS tmp_zone_node;
+SELECT DISTINCT ON (zone_id)
+    zone_id,
+    node_id
+INTO TEMP TABLE tmp_zone_node
+FROM tmp_zone_node_dist
+ORDER BY
+    zone_id,
+    inner_3 DESC,
+    inner_2 DESC,
+    inner_1 DESC,
     dist DESC
 ;
 
