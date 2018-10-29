@@ -20,25 +20,42 @@ class Zones(DBUtils):
         self.default_schema = None
 
 
-    def make_zones(self,table,schema=None,uid="id",geom="geom",roads_filter=None,dry=False):
+    def make_zones_from_network(self,table=None,schema=None,uid=None,geom=None,roads_filter=None,dry=False):
         """
         Creates analysis zones that aggregate blocks into logical groupings
-        based on islands of 100% low stress connectivity
+        based on islands in the road network formed by high stress links and
+        other road attributes as given by the roads_filter.
 
         args
-        table -- table name
-        schema -- schema name
-        uid -- uid column name
-        geom -- geom column name
+        table -- table name (default: table name given in config)
+        schema -- schema name (default: schema name given in config)
+        uid -- uid column name (default: uid in config, or "id" if not in config)
+        geom -- geom column name (default: geom in config, or "geom" if not in config)
         roads_filter -- SQL filter applied to the roads table (used e.g. to make
             sure zones don't span arterial roads)
-        ints_filter -- SQL filter applied to the intersections table (used e.g.
-            to make sure zones don't encompass 6-leg intersections)
         """
         print("Grouping blocks into zones")
 
+        if table is None:
+            table = self.config.connectivity.zones.table
+
         if schema is None:
-            schema = self.default_schema
+            if "schema" in self.config.connectivity.zones:
+                schema = self.connectivity.zones.schema
+            else:
+                schema = self.default_schema
+
+        if uid is None:
+            if "uid" in self.config.connectivity.zones:
+                uid = self.config.connectivity.zones.uid
+            else:
+                uid = "id"
+
+        if geom is None:
+            if "geom" in self.config.connectivity.zones:
+                geom = self.config.connectivity.zones.geom
+            else:
+                geom = "geom"
 
         if roads_filter is None:
             roads_filter = "TRUE"
