@@ -151,3 +151,63 @@ class Zones(DBUtils):
         conn.commit()
         cur.close()
         conn.close()
+
+
+    def make_zones_from_network(self,in_table,in_schema=None,out_table=None,out_schema=None,uid=None,geom=None,dry=False):
+        """
+        Creates analysis zones that aggregate blocks into logical groupings
+        based on polygons from another table.
+
+        args
+        out_table -- table name for output zones (default: table name given in config)
+        out_schema -- schema name (default: schema name given in config)
+        uid -- uid column name (default: uid in config, or "id" if not in config)
+        geom -- geom column name (default: geom in config, or "geom" if not in config)
+        """
+        print("Grouping blocks into zones")
+
+        if not self.table_exists(in_table):
+            raise ValueError("No table found at %s" % in_table)
+
+        if in_schema is None:
+            in_schema = self.get_schema(in_table)
+
+        in_uid = self.get_pkid_col(in_table,schema=in_schema)
+        in_geom = "geom" # future: add get_geom to dbutils
+
+        if out_table is None:
+            table = self.config.connectivity.zones.table
+
+        if out_schema is None:
+            if "schema" in self.config.connectivity.zones:
+                schema = self.connectivity.zones.schema
+            else:
+                schema = self.default_schema
+
+        if uid is None:
+            if "uid" in self.config.connectivity.zones:
+                uid = self.config.connectivity.zones.uid
+            else:
+                uid = "id"
+
+        if geom is None:
+            if "geom" in self.config.connectivity.zones:
+                geom = self.config.connectivity.zones.geom
+            else:
+                geom = "geom"
+
+        # build subs
+        subs = dict(self.sql_subs)
+        subs["in_table"] = sql.Identifier(in_table)
+        subs["in_schema"] = sql.Identifier(in_schema)
+        subs["in_uid"] = sql.Identifier(in_uid)
+        subs["in_geom"] = sql.Identifier(in_geom)
+        subs["zones_table"] = sql.Identifier(out_table)
+        subs["zones_schema"] = sql.Identifier(out_schema)
+        subs["zones_id_col"] = sql.Identifier(uid)
+        subs["zones_geom_col"] = sql.Identifier(geom)
+        subs["zones_index"] = sql.Identifier("sidx_" + out_table)
+
+
+    def make_zones_no_aggregation():
+        pass
