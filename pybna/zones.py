@@ -33,27 +33,28 @@ class Zones(DBUtils):
         geom -- geom column name (default: geom in config, or "geom" if not in config)
         roads_filter -- SQL filter applied to the roads table (used e.g. to make
             sure zones don't span arterial roads)
+        dry - output SQL statements without running anything on the DB
         """
         print("Grouping blocks into zones")
 
         if table is None:
-            table = self.config.connectivity.zones.table
+            table = self.config.bna.connectivity.zones.table
 
         if schema is None:
-            if "schema" in self.config.connectivity.zones:
+            if "schema" in self.config.bna.connectivity.zones:
                 schema = self.connectivity.zones.schema
             else:
                 schema = self.default_schema
 
         if uid is None:
-            if "uid" in self.config.connectivity.zones:
-                uid = self.config.connectivity.zones.uid
+            if "uid" in self.config.bna.connectivity.zones:
+                uid = self.config.bna.connectivity.zones.uid
             else:
                 uid = "id"
 
         if geom is None:
-            if "geom" in self.config.connectivity.zones:
-                geom = self.config.connectivity.zones.geom
+            if "geom" in self.config.bna.connectivity.zones:
+                geom = self.config.bna.connectivity.zones.geom
             else:
                 geom = "geom"
 
@@ -70,17 +71,13 @@ class Zones(DBUtils):
         subs["zones_index"] = sql.Identifier("sidx_" + table)
 
         # read in the raw queries
-        query_01 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","01_create_prelim_zones.sql"))
-        query_02 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","02_remove_bad_zones.sql"))
-        query_03 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","03_aggregate_blocks.sql"))
-        query_04 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","04_unnest.sql"))
-        query_05 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","05_set_nodes_closest_to_center.sql"))
-        query_06 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","06_set_nodes_furthest_apart.sql"))
-        query_07 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","07_clean_up.sql"))
+        query_01 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","from_network","01_create_prelim_zones.sql"))
+        query_02 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","from_network","02_remove_bad_zones.sql"))
+        query_03 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","from_network","03_aggregate_blocks.sql"))
+        query_07 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","from_network","07_clean_up.sql"))
 
         conn = self.get_db_connection()
         cur = conn.cursor()
-        cur2 = conn.cursor()
 
         # create preliminary zones
         q = sql.SQL(query_01).format(**subs)
@@ -108,6 +105,200 @@ class Zones(DBUtils):
             if self.verbose:
                 print("Aggregating blocks")
             cur.execute(q)
+
+        # match nodes
+        self._associate_nodes_with_zones(conn,subs,dry)
+
+        # clean up
+        q = sql.SQL(query_07).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            if self.verbose:
+                print("Cleaning up")
+            cur.execute(q)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+
+    def make_zones_from_table(self,in_table,in_schema=None,out_table=None,out_schema=None,uid=None,geom=None,dry=False):
+        """
+        Creates analysis zones that aggregate blocks into logical groupings
+        based on polygons from another table.
+
+        args
+        out_table -- table name for output zones (default: table name given in config)
+        out_schema -- schema name (default: schema name given in config)
+        uid -- uid column name (default: uid in config, or "id" if not in config)
+        geom -- geom column name (default: geom in config, or "geom" if not in config)
+        dry - output SQL statements without running anything on the DB
+        """
+        print("Grouping blocks into zones")
+
+        if not self.table_exists(in_table):
+            raise ValueError("No table found at %s" % in_table)
+
+        if in_schema is None:
+            in_schema = self.get_schema(in_table)
+
+        in_uid = self.get_pkid_col(in_table,schema=in_schema)
+        in_geom = "geom" # future: add get_geom to dbutils
+
+        if out_table is None:
+            table = self.config.bna.connectivity.zones.table
+
+        if out_schema is None:
+            if "schema" in self.config.bna.connectivity.zones:
+                schema = self.connectivity.zones.schema
+            else:
+                schema = self.default_schema
+
+        if uid is None:
+            if "uid" in self.config.bna.connectivity.zones:
+                uid = self.config.bna.connectivity.zones.uid
+            else:
+                uid = "id"
+
+        if geom is None:
+            if "geom" in self.config.bna.connectivity.zones:
+                geom = self.config.bna.connectivity.zones.geom
+            else:
+                geom = "geom"
+
+        # build subs
+        subs = dict(self.sql_subs)
+        subs["in_table"] = sql.Identifier(in_table)
+        subs["in_schema"] = sql.Identifier(in_schema)
+        subs["in_uid"] = sql.Identifier(in_uid)
+        subs["in_geom"] = sql.Identifier(in_geom)
+        subs["zones_table"] = sql.Identifier(out_table)
+        subs["zones_schema"] = sql.Identifier(out_schema)
+        subs["zones_id_col"] = sql.Identifier(uid)
+        subs["zones_geom_col"] = sql.Identifier(geom)
+        subs["zones_index"] = sql.Identifier("sidx_" + out_table)
+
+        # read in the raw queries
+        query_01 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","from_table","01_aggregate_blocks.sql"))
+        query_07 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","from_table","07_clean_up.sql"))
+
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+
+        # create zones from source table
+        q = sql.SQL(query_01).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            if self.verbose:
+                print("Making zones")
+            cur.execute(q)
+
+        # match nodes
+        self._associate_nodes_with_zones(conn,subs,dry)
+
+        # clean up
+        q = sql.SQL(query_07).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            if self.verbose:
+                print("Cleaning up")
+            cur.execute(q)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+
+    def make_zones_no_aggregation(self,table=None,schema=None,uid=None,geom=None,dry=False):
+        """
+        Creates analysis zones simply as copies of blocks
+
+        args
+        table -- table name (default: table name given in config)
+        schema -- schema name (default: schema name given in config)
+        uid -- uid column name (default: uid in config, or "id" if not in config)
+        geom -- geom column name (default: geom in config, or "geom" if not in config)
+        dry - output SQL statements without running anything on the DB
+        """
+        print("Copying blocks to zones")
+
+        if table is None:
+            table = self.config.bna.connectivity.zones.table
+
+        if schema is None:
+            if "schema" in self.config.bna.connectivity.zones:
+                schema = self.connectivity.zones.schema
+            else:
+                schema = self.default_schema
+
+        if uid is None:
+            if "uid" in self.config.bna.connectivity.zones:
+                uid = self.config.bna.connectivity.zones.uid
+            else:
+                uid = "id"
+
+        if geom is None:
+            if "geom" in self.config.bna.connectivity.zones:
+                geom = self.config.bna.connectivity.zones.geom
+            else:
+                geom = "geom"
+
+        # build subs
+        subs = dict(self.sql_subs)
+        subs["zones_table"] = sql.Identifier(table)
+        subs["zones_schema"] = sql.Identifier(schema)
+        subs["zones_id_col"] = sql.Identifier(uid)
+        subs["zones_geom_col"] = sql.Identifier(geom)
+        subs["zones_index"] = sql.Identifier("sidx_" + table)
+
+        # read in the raw queries
+        query_01 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","no_agg","01_copy_blocks.sql"))
+        query_07 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","no_agg","07_clean_up.sql"))
+
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+
+        # copy blocks into zones
+        q = sql.SQL(query_01).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            if self.verbose:
+                print("Copying blocks")
+            cur.execute(q)
+
+        # clean up
+        q = sql.SQL(query_07).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            if self.verbose:
+                print("Cleaning up")
+            cur.execute(q)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+
+    def _associate_nodes_with_zones(self,conn,subs,dry=False):
+        """
+        Runs queries to associate network nodes with zones
+
+        args:
+
+        conn - a psycopg2 connection
+        subs - a dictionary of SQL substitutions
+        dry - output SQL statements without running anything on the DB
+        """
+        query_04 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes","04_unnest.sql"))
+        query_05 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes","05_set_nodes_closest_to_center.sql"))
+        query_06 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes","06_set_nodes_furthest_apart.sql"))
+
+        cur = conn.cursor()
 
         # unnest arrays for faster node matching
         q = sql.SQL(query_04).format(**subs)
@@ -139,75 +330,4 @@ class Zones(DBUtils):
             else:
                 cur.execute(q)
 
-        # clean up
-        q = sql.SQL(query_07).format(**subs)
-        if dry:
-            print(q.as_string(conn))
-        else:
-            if self.verbose:
-                print("Cleaning up")
-            cur.execute(q)
-
-        conn.commit()
         cur.close()
-        conn.close()
-
-
-    def make_zones_from_network(self,in_table,in_schema=None,out_table=None,out_schema=None,uid=None,geom=None,dry=False):
-        """
-        Creates analysis zones that aggregate blocks into logical groupings
-        based on polygons from another table.
-
-        args
-        out_table -- table name for output zones (default: table name given in config)
-        out_schema -- schema name (default: schema name given in config)
-        uid -- uid column name (default: uid in config, or "id" if not in config)
-        geom -- geom column name (default: geom in config, or "geom" if not in config)
-        """
-        print("Grouping blocks into zones")
-
-        if not self.table_exists(in_table):
-            raise ValueError("No table found at %s" % in_table)
-
-        if in_schema is None:
-            in_schema = self.get_schema(in_table)
-
-        in_uid = self.get_pkid_col(in_table,schema=in_schema)
-        in_geom = "geom" # future: add get_geom to dbutils
-
-        if out_table is None:
-            table = self.config.connectivity.zones.table
-
-        if out_schema is None:
-            if "schema" in self.config.connectivity.zones:
-                schema = self.connectivity.zones.schema
-            else:
-                schema = self.default_schema
-
-        if uid is None:
-            if "uid" in self.config.connectivity.zones:
-                uid = self.config.connectivity.zones.uid
-            else:
-                uid = "id"
-
-        if geom is None:
-            if "geom" in self.config.connectivity.zones:
-                geom = self.config.connectivity.zones.geom
-            else:
-                geom = "geom"
-
-        # build subs
-        subs = dict(self.sql_subs)
-        subs["in_table"] = sql.Identifier(in_table)
-        subs["in_schema"] = sql.Identifier(in_schema)
-        subs["in_uid"] = sql.Identifier(in_uid)
-        subs["in_geom"] = sql.Identifier(in_geom)
-        subs["zones_table"] = sql.Identifier(out_table)
-        subs["zones_schema"] = sql.Identifier(out_schema)
-        subs["zones_id_col"] = sql.Identifier(uid)
-        subs["zones_geom_col"] = sql.Identifier(geom)
-        subs["zones_index"] = sql.Identifier("sidx_" + out_table)
-
-
-    def make_zones_no_aggregation():
-        pass
