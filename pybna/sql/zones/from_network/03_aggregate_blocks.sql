@@ -18,7 +18,7 @@ DELETE FROM {zones_schema}.{zones_table};
 INSERT INTO {zones_schema}.{zones_table}
 SELECT
     array_agg(blocks.{blocks_id_col}) AS block_ids,
-    ST_Union(blocks.{blocks_geom_col}) AS {zones_geom_col},
+    ST_Multi(ST_Union(blocks.{blocks_geom_col})) AS {zones_geom_col},
     NULL
 FROM
     tmp_prelim_zones z,
