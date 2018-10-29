@@ -20,7 +20,7 @@ class Zones(DBUtils):
         self.default_schema = None
 
 
-    def make_zones(self,table,schema=None,uid="id",geom="geom",roads_filter=None,ints_filter=None,dry=False):
+    def make_zones(self,table,schema=None,uid="id",geom="geom",roads_filter=None,dry=False):
         """
         Creates analysis zones that aggregate blocks into logical groupings
         based on islands of 100% low stress connectivity
@@ -43,13 +43,9 @@ class Zones(DBUtils):
         if roads_filter is None:
             roads_filter = "TRUE"
 
-        if ints_filter is None:
-            ints_filter = "TRUE"
-
         # build subs
         subs = dict(self.sql_subs)
         subs["roads_filter"] = sql.SQL(roads_filter)
-        subs["ints_filter"] = sql.SQL(ints_filter)
         subs["zones_table"] = sql.Identifier(table)
         subs["zones_schema"] = sql.Identifier(schema)
         subs["zones_id_col"] = sql.Identifier(uid)
@@ -57,81 +53,77 @@ class Zones(DBUtils):
         subs["zones_index"] = sql.Identifier("sidx_" + table)
 
         # read in the raw queries
-        create_zones_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","create_zones.sql"))
-        block_nodes_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes_with_blocks.sql"))
-        ls_islands_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","isolate_ls_islands.sql"))
-        missing_blocks_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","identify_missing_blocks.sql"))
-        total_missing_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","total_missing_blocks.sql"))
-        aggregate_blocks_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","aggregate_blocks.sql"))
-        remaining_blocks_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","add_remaining_blocks.sql"))
-        clean_up_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","clean_up.sql"))
+        query_01 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","01_create_prelim_zones.sql"))
+        query_02 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","02_remove_bad_zones.sql"))
+        query_03 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","03_aggregate_blocks.sql"))
+        query_04 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","04_unnest.sql"))
+        query_05 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","05_set_nodes_closest_to_center.sql"))
+        query_06 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","06_set_nodes_furthest_apart.sql"))
+        query_07 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","agg_blocks","07_clean_up.sql"))
 
         conn = self.get_db_connection()
         cur = conn.cursor()
         cur2 = conn.cursor()
 
-        # create zones
-        q = sql.SQL(create_zones_query).format(**subs)
+        # create preliminary zones
+        q = sql.SQL(query_01).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
             if self.verbose:
-                print("Creating zones table")
+                print("Making preliminary zones")
             cur.execute(q)
 
-        # associate blocks with nodes
-        q = sql.SQL(block_nodes_query).format(**subs)
+        # remove bad zones
+        q = sql.SQL(query_02).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
             if self.verbose:
-                print("Associating blocks with nodes")
+                print("Removing bad prelim zones")
             cur.execute(q)
 
-        # set up low stress islands
-        q = sql.SQL(ls_islands_query).format(**subs)
+        # aggregate blocks
+        q = sql.SQL(query_03).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
             if self.verbose:
-                print("Identifying low stress islands")
+                print("Aggregating blocks")
             cur.execute(q)
 
-        # build zones by grabbing a block that hasn't yet been
-        # assigned to a zone and building a zone around it
+        # unnest arrays for faster node matching
+        q = sql.SQL(query_04).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            if self.verbose:
+                print("Preparing for node matching")
+            cur.execute(q)
+
+        # set nodes
         if self.verbose:
-            print("Stitching blocks together into zones")
-        mbq = sql.SQL(missing_blocks_query).format(**subs)
-        tbq = sql.SQL(total_missing_query).format(**subs)
-        remain = -1
-        if dry:
-            print(mbq.as_string(conn))
-        else:
-            cur.execute(mbq)
-            conn.commit()
-            while cur.rowcount > 0:
-                cur2.execute(tbq)
-                missing_blocks = cur2.fetchone()[0]
-                if missing_blocks != remain:
-                    remain = missing_blocks
-                    row = cur.fetchone()
-                    subs["source_nodes"] = sql.Literal(row[1])
-                    abq = sql.SQL(aggregate_blocks_query).format(**subs)
-                    cur2.execute(abq)
-                    conn.commit()
-                    cur.execute(mbq)
-        if dry:
-            subs["source_nodes"] = sql.Literal([1])
-            abq = sql.SQL(aggregate_blocks_query).format(**subs)
-            print(abq.as_string(conn))
+            print("Setting network nodes on zones")
 
-        # add any remaining blocks that didn't get picked up
-        if not dry:
-            q = sql.SQL(remaining_blocks_query).format(**subs)
+        q = sql.SQL(query_05).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
             cur.execute(q)
+
+        for i in [1,3,5,7,11]:
+            # iterate the script that distributes nodes throughout
+            # the zone, adding more nodes to zones with higher
+            # numbers of constituent blocks
+            subs["num_blocks"] = sql.Literal(i)
+            q = sql.SQL(query_06).format(**subs)
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur.execute(q)
 
         # clean up
-        q = sql.SQL(clean_up_query).format(**subs)
+        q = sql.SQL(query_07).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
@@ -140,6 +132,5 @@ class Zones(DBUtils):
             cur.execute(q)
 
         conn.commit()
-        cur2.close()
         cur.close()
         conn.close()
