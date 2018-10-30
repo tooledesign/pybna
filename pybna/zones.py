@@ -42,7 +42,7 @@ class Zones(DBUtils):
 
         if schema is None:
             if "schema" in self.config.bna.connectivity.zones:
-                schema = self.connectivity.zones.schema
+                schema = self.config.bna.connectivity.zones.schema
             else:
                 schema = self.default_schema
 
@@ -123,6 +123,22 @@ class Zones(DBUtils):
         conn.close()
 
 
+    def make_zones_from_lines(self,in_table,zones_table,in_schema=None,zones_schema=None,lines_filter=None):
+        """
+        Creates analysis zones that aggregate blocks into logical groupings based
+        on islands formed with lines as provided in the input table. Lines should
+        be topologically connected with no intersecting lines.
+
+        args
+        in_table -- the table of input lines
+        zones_table -- the table name to save zones to
+        in_schema -- the schema of the input lines table (default: inferred)
+        zones_schema -- the schema of the zones table (default: same schema as the blocks table)
+        lines_filter -- a filter to apply to the lines table
+        """
+        pass
+
+
     def make_zones_from_table(self,in_table,in_schema=None,out_table=None,out_schema=None,uid=None,geom=None,dry=False):
         """
         Creates analysis zones that aggregate blocks into logical groupings
@@ -151,7 +167,7 @@ class Zones(DBUtils):
 
         if out_schema is None:
             if "schema" in self.config.bna.connectivity.zones:
-                schema = self.connectivity.zones.schema
+                schema = self.config.bna.connectivity.zones.schema
             else:
                 schema = self.default_schema
 
@@ -230,7 +246,7 @@ class Zones(DBUtils):
 
         if schema is None:
             if "schema" in self.config.bna.connectivity.zones:
-                schema = self.connectivity.zones.schema
+                schema = self.config.bna.connectivity.zones.schema
             else:
                 schema = self.default_schema
 
@@ -331,3 +347,54 @@ class Zones(DBUtils):
                 cur.execute(q)
 
         cur.close()
+
+
+    def associate_blocks_with_zones(self,table=None,schema=None,geom=None,dry=False):
+        """
+        Runs queries to associate blocks with zones
+
+        args:
+        table -- the zones table (default: as defined in config)
+        schema -- the schema of the zones table (default: as defined in config)
+        dry - output SQL statements without running anything on the DB
+        """
+        if table is None:
+            table = self.config.bna.connectivity.zones.table
+
+        if schema is None:
+            if "schema" in self.config.bna.connectivity.zones:
+                schema = self.config.bna.connectivity.zones.schema
+            else:
+                schema = self.default_schema
+
+        if uid is None:
+            if "uid" in self.config.bna.connectivity.zones:
+                uid = self.config.bna.connectivity.zones.uid
+            else:
+                uid = "id"
+
+        if geom is None:
+            if "geom" in self.config.bna.connectivity.zones:
+                geom = self.config.bna.connectivity.zones.geom
+            else:
+                geom = "geom"
+
+        subs = dict(self.sql_subs)
+        subs["zones_table"] = sql.Identifier(table)
+        subs["zones_schema"] = sql.Identifier(schema)
+        subs["zones_id_col"] = sql.Identifier(uid)
+        subs["zones_geom_col"] = sql.Identifier(geom)
+
+        query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_blocks","aggregate_blocks.sql"))
+
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+
+        q = sql.SQL(query).format(**subs)
+        
+        if dry:
+            print(q.as_string(conn))
+        else:
+            cur.execute(q)
+            cur.close()
+            conn.commit()
