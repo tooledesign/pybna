@@ -368,6 +368,7 @@ class Connectivity(DBUtils):
 
                 # if dry, break after one go-round so we don't overload the output
                 if dry:
+                    tile_progress.close()
                     break
 
             if not dry:

@@ -18,4 +18,5 @@ FROM
     tmp_tile
 WHERE
     ST_Intersects(tmp_tile.geom,zones.{zones_geom_col})
+    AND ST_Intersects(tmp_tile.geom,ST_Centroid(zones.{zones_geom_col}))
 ;

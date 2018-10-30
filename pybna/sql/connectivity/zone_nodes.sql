@@ -1,15 +1,15 @@
-DROP TABLE IF EXISTS tmp_tilezones;
-SELECT
-    zones.{zones_id_col} AS id,
-    zones.node_ids
-INTO TEMP TABLE tmp_tilezones
-FROM
-    {zones_schema}.{zones_table} zones,
-    tmp_tile
-WHERE
-    zones.node_ids IS NOT NULL
-    AND ST_Intersects(tmp_tile.geom,zones.{zones_geom_col})
-;
+-- DROP TABLE IF EXISTS tmp_tilezones;
+-- SELECT
+--     zones.{zones_id_col} AS id,
+--     zones.node_ids
+-- INTO TEMP TABLE tmp_tilezones
+-- FROM
+--     {zones_schema}.{zones_table} zones,
+--     tmp_tile
+-- WHERE
+--     zones.node_ids IS NOT NULL
+--     AND ST_Intersects(tmp_tile.geom,zones.{zones_geom_col})
+-- ;
 
 
 DROP TABLE IF EXISTS tmp_zone_nodes;
