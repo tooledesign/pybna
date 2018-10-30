@@ -150,26 +150,18 @@ class Connectivity(DBUtils):
         conn = self.get_db_connection()
         cur = conn.cursor()
         if overwrite:
-            cur.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(self.db_connectivity_table)))
+            cur.execute(
+                sql.SQL(
+                    'DROP TABLE IF EXISTS {connectivity_schema}.{connectivity_table}'
+                ).format(**self.sql_subs)
         try:
-            cur.execute(sql.SQL(
-                'create table {}.{} ( \
-                    id serial primary key, \
-                    {} varchar(15), \
-                    {} varchar(15), \
-                    high_stress BOOLEAN, \
-                    low_stress BOOLEAN \
-                )'
-            ).format(
-                sql.Identifier(self.blocks.schema),
-                sql.Identifier(self.db_connectivity_table),
-                sql.Identifier(self.config["bna"]["connectivity"]["source_column"]),
-                sql.Identifier(self.config["bna"]["connectivity"]["target_column"])
-            ))
+            raw = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","create_table.sql"))
+            q = sql.SQL(raw).format(**self.sql_subs)
+            cur.execute(q)
         except psycopg2.ProgrammingError:
             conn.rollback()
             conn.close()
-            raise ValueError("Table %s already exists" % self.db_connectivity_table)
+            raise ValueError("Table %s already exists" % self.config.bna.connectivity.table)
         cur.close()
         conn.commit()
         conn.close()
@@ -189,7 +181,15 @@ class Connectivity(DBUtils):
                 AND d.deptype = 'i' \
             WHERE  i.indrelid = {}::regclass \
             AND    d.objid IS NULL \
-        ").format(sql.Literal(self.db_connectivity_table))
+        ").format(
+            sql.Literal(
+                "'" +
+                self.config.bna.connectivity.schema +
+                "'.'" +
+                self.config.bna.connectivity.table +
+                "'"
+            )
+        )
         for row in cur:
             if row[0] is None:
                 pass
@@ -207,8 +207,9 @@ class Connectivity(DBUtils):
         """
         Creates index on the connectivity table
         """
-        source = self.config["bna"]["connectivity"]["source_column"]
-        target = self.config["bna"]["connectivity"]["target_column"]
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
+        subs["connectivity_index"] = sql.Identifier("idx_" + self.config.bna.connectivity.table + "_low_stress")
 
         conn = self.get_db_connection()
         cur = conn.cursor()
@@ -216,15 +217,12 @@ class Connectivity(DBUtils):
             self._connectivity_table_drop_index()
 
         cur.execute(sql.SQL(" \
-            CREATE INDEX {} ON {} ({},{}) WHERE low_stress \
-        ").format(
-            sql.Identifier("idx_" + self.db_connectivity_table + "_low_stress"),
-            sql.Identifier(self.db_connectivity_table),
-            sql.Identifier(source),
-            sql.Identifier(target)
-        ))
+            CREATE INDEX {connectivity_index} \
+            ON {connectivity_schema}.{connectivity_table} ({connectivity_source_col},{connectivity_target_col}) \
+            WHERE low_stress \
+        ").format(**subs))
         conn.commit()
-        cur.execute(sql.SQL("analyze {}").format(sql.Identifier(self.db_connectivity_table)));
+        cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
     def calculate_connectivity(self,tiles=None,network_filter=None,append=False,dry=False):
@@ -267,10 +265,11 @@ class Connectivity(DBUtils):
 
         # get raw queries
         q_filter_zones_to_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","filter_zones_to_tile.sql"))
+        q_zone_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","zone_nodes.sql"))
         q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","network_subset.sql"))
-        q_zone_cost = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","zone_cost.sql"))
-
-
+        q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","distance_table.sql"))
+        q_cost_to_zones = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","cost_to_zones.sql"))
+        q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","combine_cost_matrices.sql"))
 
         tile_progress = tqdm(tiles)
         failed_tiles = list()
@@ -285,6 +284,13 @@ class Connectivity(DBUtils):
 
             # filter zones to tile
             q = sql.SQL(q_filter_zones_to_tile).format(**subs)
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur.execute(q)
+
+            # flatten zones and nodes
+            q = sql.SQL(q_zone_nodes).format(**subs)
             if dry:
                 print(q.as_string(conn))
             else:
@@ -309,7 +315,7 @@ class Connectivity(DBUtils):
                 cur.execute(q)
 
             # retrieve zones and loop through
-            cur.execute("select id, node_ids from pg_temp.tmp_allzones")
+            cur.execute("select id, node_ids from pg_temp.tmp_tilezones")
             for zone in cur:
                 zone[0] = zone_id
                 zone[1] = node_ids
@@ -318,39 +324,46 @@ class Connectivity(DBUtils):
 
                 # get hs zone costs
                 subs["net_table"] = sql.Identifier("tmp_hs_net")
-                subs["cost_table"] = sql.Identifier("tmp_hs_cost")
-                q = sql.SQL(q_zone_cost).format(**subs)
-
-                # get ls zone costs
-                subs["net_table"] = sql.Identifier("tmp_ls_net")
-                subs["cost_table"] = sql.Identifier("tmp_ls_cost")
-                q = sql.SQL(q_zone_cost).format(**subs)
-
-                # build combined cost table and write to connectivity table
-
-
-
-            statements = self.split_sql_for_tqdm(raw)
-
-            for statement in statements:
-                statements.set_description(statement["update"])
-                q = sql.SQL(statement["query"]).format(**subs)
-
+                subs["distance_table"] = sql.Identifier("tmp_hs_distance")
+                subs["cost_to_zones"] = sql.Identifier("tmp_hs_cost_to_zones")
+                q = sql.SQL(q_distance_table).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
-                    try:
-                        cur = conn.cursor()
-                        cur.execute(q)
-                        cur.close()
-                    except psycopg2.OperationalError:
-                        print("Tile %s failed" % str(tile_id))
-                        failed_tiles.append(tile_id)
-                        failure = True
-                        time.sleep(60)
-                        break
+                    cur.execute(q)
+                q = sql.SQL(q_cost_to_zones).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    cur.execute(q)
 
-            if not failure:
+                # get ls zone costs
+                subs["net_table"] = sql.Identifier("tmp_ls_net")
+                subs["distance_table"] = sql.Identifier("tmp_ls_distance")
+                subs["cost_to_zones"] = sql.Identifier("tmp_ls_cost_to_zones")
+                q = sql.SQL(q_distance_table).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    cur.execute(q)
+                q = sql.SQL(q_cost_to_zones).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    cur.execute(q)
+
+                # build combined cost table and write to connectivity table
+                q = sql.SQL(q_combine).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    cur.execute(q)
+
+                # if dry, break after one go-round so we don't overload the output
+                if dry:
+                    break
+
+            if not dry:
                 conn.commit()
             conn.close()
 

@@ -8,11 +8,11 @@ WHERE {tiles_id_col} = {tile_id}
 ;
 
 -- filtering zones to tile;
-DROP TABLE IF EXISTS tmp_allzones;
+DROP TABLE IF EXISTS tmp_tilezones;
 SELECT
     zones.{zones_id_col} AS id,
     zones.node_ids
-INTO TEMP TABLE tmp_allzones
+INTO TEMP TABLE tmp_tilezones
 FROM
     {zones_schema}.{zones_table} zones,
     tmp_tile
