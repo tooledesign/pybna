@@ -22,7 +22,7 @@ SELECT
     unnest(zones.block_ids) AS block_id
 INTO TEMP TABLE tmp_zone_blocks
 FROM
-    {zones_schema}.{zones_table} zones
+    {zones_schema}.{zones_table} zones,
     tmp_tile
 WHERE ST_DWithin(zones.{zones_geom_col},tmp_tile.geom,{connectivity_max_distance})
 ;
@@ -33,10 +33,10 @@ ANALYZE tmp_zone_blocks;
 -- build connectivity table
 DROP TABLE IF EXISTS tmp_connectivity;
 SELECT
-    ozones.block_id,
-    dzones.block_id,
-    (hs_cost IS NOT NULL)::BOOLEAN,
-    (hs_cost IS NULL OR ls_cost <= ({connectivity_max_detour} * hs_cost))::BOOLEAN
+    ozones.block_id AS source,
+    dzones.block_id AS target,
+    (hs_cost IS NOT NULL)::BOOLEAN AS hs,
+    (hs_cost IS NULL OR ls_cost <= ({connectivity_max_detour} * hs_cost))::BOOLEAN AS ls
 INTO TEMP TABLE tmp_connectivity
 FROM
     tmp_zone_blocks ozones,

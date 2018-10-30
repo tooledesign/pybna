@@ -1,5 +1,5 @@
 DROP TABLE IF EXISTS {cost_to_zones};
-SELECT DISTINCT ON (id)
+SELECT DISTINCT ON (tmp_zone_nodes.id)
     tmp_zone_nodes.id,
     agg_cost
 INTO TEMP TABLE {cost_to_zones}

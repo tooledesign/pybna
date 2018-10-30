@@ -5,7 +5,7 @@ SELECT
 INTO TEMP TABLE {distance_table}
 FROM pgr_drivingdistance(
         'SELECT * FROM {net_table}',
-        {node_ids},
+        {node_ids}::INTEGER[],
         {connectivity_max_distance},
         equicost:=TRUE,
         directed:=TRUE

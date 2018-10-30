@@ -154,6 +154,7 @@ class Connectivity(DBUtils):
                 sql.SQL(
                     'DROP TABLE IF EXISTS {connectivity_schema}.{connectivity_table}'
                 ).format(**self.sql_subs)
+            )
         try:
             raw = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","create_table.sql"))
             q = sql.SQL(raw).format(**self.sql_subs)
@@ -315,10 +316,16 @@ class Connectivity(DBUtils):
                 cur.execute(q)
 
             # retrieve zones and loop through
-            cur.execute("select id, node_ids from pg_temp.tmp_tilezones")
-            for zone in cur:
-                zone[0] = zone_id
-                zone[1] = node_ids
+            if dry:
+                zones = [(-100,[-200])]
+            else:
+                cur.execute("select id, node_ids from pg_temp.tmp_tilezones")
+                zones = cur.fetchall()
+
+            tile_progress = tqdm(zones)
+            for zone in tile_progress:
+                zone_id = zone[0]
+                node_ids = zone[1]
                 subs["zone_id"] = sql.Literal(zone_id)
                 subs["node_ids"] = sql.Literal(node_ids)
 

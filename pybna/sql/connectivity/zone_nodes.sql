@@ -7,7 +7,8 @@ FROM
     {zones_schema}.{zones_table} zones,
     tmp_tile
 WHERE
-    ST_Intersects(tmp_tile.geom,zones.{zones_geom_col})
+    zones.node_ids IS NOT NULL
+    AND ST_Intersects(tmp_tile.geom,zones.{zones_geom_col})
 ;
 
 
@@ -17,7 +18,7 @@ SELECT
     unnest(zones.node_ids) AS node_id
 INTO TEMP TABLE tmp_zone_nodes
 FROM
-    {zones_schema}.{zones_table} zones
+    {zones_schema}.{zones_table} zones,
     tmp_tile
 WHERE ST_DWithin(zones.{zones_geom_col},tmp_tile.geom,{connectivity_max_distance})
 ;
