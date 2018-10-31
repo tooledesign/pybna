@@ -183,7 +183,7 @@ class Zones(DBUtils):
                 out_geom = "geom"
 
         if lines_filter is None:
-            lines_filter = True
+            lines_filter = "TRUE"
 
         # build subs
         subs = dict(self.sql_subs)
