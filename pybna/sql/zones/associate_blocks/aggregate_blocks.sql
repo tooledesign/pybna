@@ -1,4 +1,4 @@
-UDPATE {zones_schema}.{zones_table}
+UPDATE {zones_schema}.{zones_table}
 SET block_ids = NULL
 ;
 
@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS tmp_zones_blocks;
 SELECT DISTINCT ON (block_id)
     zones.{zones_id_col} AS zone_id,
     blocks.{blocks_id_col} AS block_id
+INTO TEMP TABLE tmp_zones_blocks
 FROM
     {zones_schema}.{zones_table} zones,
     {blocks_schema}.{blocks_table} blocks

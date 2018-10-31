@@ -349,13 +349,15 @@ class Zones(DBUtils):
         cur.close()
 
 
-    def associate_blocks_with_zones(self,table=None,schema=None,geom=None,dry=False):
+    def associate_blocks_with_zones(self,table=None,schema=None,uid=None,geom=None,dry=False):
         """
         Runs queries to associate blocks with zones
 
         args:
-        table -- the zones table (default: as defined in config)
-        schema -- the schema of the zones table (default: as defined in config)
+        table -- table name (default: table name given in config)
+        schema -- schema name (default: schema name given in config)
+        uid -- uid column name (default: uid in config, or primary key if not in config)
+        geom -- geom column name (default: geom in config, or "geom" if not in config)
         dry - output SQL statements without running anything on the DB
         """
         if table is None:
@@ -371,7 +373,7 @@ class Zones(DBUtils):
             if "uid" in self.config.bna.connectivity.zones:
                 uid = self.config.bna.connectivity.zones.uid
             else:
-                uid = "id"
+                uid = self.get_pkid_col(table,schema)
 
         if geom is None:
             if "geom" in self.config.bna.connectivity.zones:
@@ -391,7 +393,7 @@ class Zones(DBUtils):
         cur = conn.cursor()
 
         q = sql.SQL(query).format(**subs)
-        
+
         if dry:
             print(q.as_string(conn))
         else:
