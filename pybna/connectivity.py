@@ -273,10 +273,9 @@ class Connectivity(DBUtils):
         q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","combine_cost_matrices.sql"))
 
         tile_progress = tqdm(tiles)
-        failed_tiles = list()
+        failed_zones = list()
 
         for tile_id in tile_progress:
-            failure = False
             tile_progress.set_description("Tile id: "+str(tile_id))
             subs["tile_id"] = sql.Literal(tile_id)
 
@@ -322,8 +321,9 @@ class Connectivity(DBUtils):
                 cur.execute("select id, node_ids from pg_temp.tmp_tilezones")
                 zones = cur.fetchall()
 
-            tile_progress = tqdm(zones)
-            for zone in tile_progress:
+            zone_progress = tqdm(zones)
+            for zone in zone_progress:
+                failure = False
                 zone_id = zone[0]
                 node_ids = zone[1]
                 subs["zone_id"] = sql.Literal(zone_id)
@@ -333,16 +333,34 @@ class Connectivity(DBUtils):
                 subs["net_table"] = sql.Identifier("tmp_hs_net")
                 subs["distance_table"] = sql.Identifier("tmp_hs_distance")
                 subs["cost_to_zones"] = sql.Identifier("tmp_hs_cost_to_zones")
+
                 q = sql.SQL(q_distance_table).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
-                    cur.execute(q)
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_zones.append(zone_id)
+                        time.sleep(5)
+                        continue
+
                 q = sql.SQL(q_cost_to_zones).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
-                    cur.execute(q)
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_zones.append(zone_id)
+                        time.sleep(5)
+                        continue
 
                 # get ls zone costs
                 subs["net_table"] = sql.Identifier("tmp_ls_net")
@@ -352,23 +370,47 @@ class Connectivity(DBUtils):
                 if dry:
                     print(q.as_string(conn))
                 else:
-                    cur.execute(q)
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_zones.append(zone_id)
+                        time.sleep(5)
+                        continue
                 q = sql.SQL(q_cost_to_zones).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
-                    cur.execute(q)
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_zones.append(zone_id)
+                        time.sleep(5)
+                        continue
 
                 # build combined cost table and write to connectivity table
                 q = sql.SQL(q_combine).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
-                    cur.execute(q)
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_zones.append(zone_id)
+                        time.sleep(5)
+                        continue
 
                 # if dry, break after one go-round so we don't overload the output
                 if dry:
-                    tile_progress.close()
+                    zone_progress.close()
                     break
 
             if not dry:
@@ -376,9 +418,9 @@ class Connectivity(DBUtils):
             conn.close()
 
         print("\n\n------------------------------------")
-        print("Process completed with %i failed tiles" % len(failed_tiles))
-        if len(failed_tiles) > 0:
-            print(failed_tiles)
+        print("Process completed with %i failed tiles" % len(failed_zones))
+        if len(failed_zones) > 0:
+            print(failed_zones)
         print("------------------------------------\n")
 
         if not dry and not append:
