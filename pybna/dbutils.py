@@ -226,3 +226,30 @@ class DBUtils:
         query = f.read()
         f.close()
         return query
+
+
+    def drop_table(self,table,schema=None,conn=None):
+        """
+        Drops the given table from the database
+
+        args:
+        table -- table name
+        schema -- schema name (default: inferred)
+        conn -- a psycopg2 connection object (default: create new connection)
+        """
+        transaction = True
+        if conn is None:
+            transaction = False
+            conn = self.get_db_connection
+        cur = conn.cursor()
+
+        if schema is None:
+            cur.execute("drop table if exists {}").format(sql.Identifier(table))
+        else:
+            cur.execute("drop table if exists {}.{}").format(
+                sql.Identifier(schema),
+                sql.Identifier(table)
+            )
+
+        if not transaction:
+            conn.commit()

@@ -184,8 +184,8 @@ class Core(DBUtils):
             blocks_schema = self.config["bna"]["blocks"]["schema"]
         else:
             blocks_schema = self.get_schema(blocks_table)
-        if "id_column" in self.config["bna"]["blocks"]:
-            block_id_col = self.config["bna"]["blocks"]["id_column"]
+        if "uid" in self.config["bna"]["blocks"]:
+            block_id_col = self.config["bna"]["blocks"]["uid"]
         else:
             block_id_col = get_pkid_col(blocks_table,schema=blocks_schema)
 

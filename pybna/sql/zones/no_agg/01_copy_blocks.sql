@@ -1,5 +1,5 @@
 -- set up table structure
-DROP TABLE IF EXISTS {zones_schema}.{zones_table};
+
 SELECT
     array_agg(blocks.{blocks_id_col}) AS block_ids,
     ST_Multi(ST_Union(blocks.{blocks_geom_col}))::geometry(multipolygon,{srid}) AS {zones_geom_col},
