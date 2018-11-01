@@ -418,7 +418,7 @@ class Connectivity(DBUtils):
             conn.close()
 
         print("\n\n------------------------------------")
-        print("Process completed with %i failed tiles" % len(failed_zones))
+        print("Process completed with %i failed zones" % len(failed_zones))
         if len(failed_zones) > 0:
             print(failed_zones)
         print("------------------------------------\n")
