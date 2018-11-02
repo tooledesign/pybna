@@ -26,6 +26,7 @@ class Core(DBUtils):
         self.blocks = None  # reference to Blocks class
         self.tiles = None
         self.tiles_pkid = None
+        self.default_schema = None
 
 
     def make_tiles(self,table=None,max_blocks=5000,schema=None,geom=None,overwrite=False):
@@ -256,7 +257,7 @@ class Core(DBUtils):
         conn = self.get_db_connection()
 
         if schema is None:
-            schema = self.blocks.schema
+            schema = self.default_schema
 
         cur = conn.cursor()
 
