@@ -26,6 +26,7 @@ class Core(DBUtils):
         self.blocks = None  # reference to Blocks class
         self.tiles = None
         self.tiles_pkid = None
+        self.sql_subs = None
         self.default_schema = None
 
 
@@ -259,50 +260,32 @@ class Core(DBUtils):
         if schema is None:
             schema = self.default_schema
 
-        cur = conn.cursor()
 
         if overwrite and not dry:
-            cur.execute(sql.SQL('drop table if exists {}.{}').format(
-                sql.Identifier(schema),
-                sql.Identifier(out_table)
-            ))
+            self.drop_table(out_table,conn=conn,schema=schema)
 
         # read in the raw query language
         if composite:
-            f = open(os.path.join(self.module_dir,"sql","travel_shed_composite.sql"))
+            query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","travel_shed_composite.sql"))
         else:
-            f = open(os.path.join(self.module_dir,"sql","travel_shed.sql"))
-        raw = f.read()
-        f.close()
+            query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","travel_shed.sql"))
 
         # set global sql vars
-        sidx = "sidx_" + out_table + "_geom"
-        idx = "idx_" + out_table + "_source_blockid"
+        subs = dict(self.sql_subs)
+        subs["table"] = sql.Identifier(out_table)
+        subs["schema"] = sql.Identifier(schema)
+        subs["block_ids"] = sql.Literal(block_ids)
+        subs["sidx"] = sql.Identifier("sidx_" + out_table + "_geom")
+        subs["idx"] = sql.Identifier(out_table + "_source_blockid")
 
-        # for block in tqdm(block_ids):
-        # compose the query
-        subs = {
-            "schema": sql.Identifier(schema),
-            "table": sql.Identifier(out_table),
-            "geom": sql.Identifier(self.config["bna"]["blocks"]["geom"]),
-            "blocks_schema": sql.Identifier(self.blocks.schema),
-            "blocks": sql.Identifier(self.blocks.table),
-            "connectivity": sql.Identifier(self.config["bna"]["connectivity"]["table"]),
-            "block_id_col": sql.Identifier(self.config["bna"]["blocks"]["id_column"]),
-            "source_blockid": sql.Identifier("source_blockid10"),
-            "target_blockid": sql.Identifier("target_blockid10"),
-            "block_ids": sql.Literal(block_ids),
-            "sidx": sql.Identifier(sidx),
-            "idx": sql.Identifier(idx)
-        }
-
-        q = sql.SQL(raw).format(**subs)
+        q = sql.SQL(query).format(**subs)
 
         if dry:
             print(q.as_string(conn))
         else:
+            cur = conn.cursor()
             cur.execute(q)
+            cur.close()
 
         conn.commit()
-        cur.close()
         conn.close()
