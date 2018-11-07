@@ -36,7 +36,11 @@ SELECT
     ozones.block_id AS source,
     dzones.block_id AS target,
     (hs_cost IS NOT NULL)::BOOLEAN AS hs,
-    (hs_cost IS NULL OR ls_cost <= ({connectivity_max_detour} * hs_cost))::BOOLEAN AS ls
+    (
+        hs_cost IS NULL
+        OR ls_cost <= {connectivity_detour_agnostic_threshold}
+        OR ls_cost <= ({connectivity_max_detour} * hs_cost)
+    )::BOOLEAN AS ls
 INTO TEMP TABLE tmp_connectivity
 FROM
     tmp_zone_blocks ozones,

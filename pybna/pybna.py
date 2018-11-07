@@ -366,6 +366,7 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
             "connectivity_target_col": sql.Identifier(connectivity.target_column),
             "connectivity_max_distance": sql.Literal(connectivity.max_distance),
             "connectivity_max_detour": sql.Literal(connectivity.max_detour),
+            "connectivity_detour_agnostic_threshold": sql.Literal(connectivity.detour_agnostic_threshold),
             "connectivity_max_stress": sql.Literal(connectivity.max_stress)
         }
 
