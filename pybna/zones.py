@@ -400,7 +400,7 @@ class Zones(DBUtils):
         cur = conn.cursor()
 
         if overwrite:
-            self.drop_table(out_table,out_schema,conn=conn)
+            self.drop_table(table,schema,conn=conn)
 
         # copy blocks into zones
         q = sql.SQL(query_01).format(**subs)
