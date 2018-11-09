@@ -149,9 +149,9 @@ WHERE
 -- building network from valid connections;
 INSERT INTO {edges_schema}.{edges_table} (
     {ints_id_col},
-    source_vert,
+    {edges_source_col},
     source_road_id,
-    target_vert,
+    {edges_target_col},
     target_road_id,
     int_crossing,
     {edges_geom_col}
@@ -216,12 +216,12 @@ WHERE
 -- assigning stress and costs;
 UPDATE {edges_schema}.{edges_table} AS edges
 SET
-    link_stress = GREATEST(
+    {edges_stress_col} = GREATEST(
         e.source_seg_stress,
         e.target_seg_stress,
         CASE WHEN int_crossing THEN e.source_int_stress ELSE 0 END
     ),
-    link_cost = ROUND((ST_Length(source_road.{roads_geom_col}) + ST_Length(target_road.{roads_geom_col})) / 2)
+    {edges_cost_col} = ROUND((ST_Length(source_road.{roads_geom_col}) + ST_Length(target_road.{roads_geom_col})) / 2)
 FROM
     pg_temp.e,
     {roads_schema}.{roads_table} source_road,
