@@ -425,7 +425,7 @@ class Zones(DBUtils):
         conn.close()
 
 
-    def _associate_nodes_with_zones(self,conn,subs,dry=False):
+    def _associate_nodes_with_zones(self,conn=None,subs=None,dry=False):
         """
         Runs queries to associate network nodes with zones
 
@@ -438,6 +438,14 @@ class Zones(DBUtils):
         query_04 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes","04_unnest.sql"))
         query_05 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes","05_set_nodes_closest_to_center.sql"))
         query_06 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes","06_set_nodes_furthest_apart.sql"))
+        query_07 = self.read_sql_from_file(os.path.join(self.module_dir,"sql","zones","associate_nodes","07_uniqueify.sql"))
+
+        newconn = False
+        if conn is None:
+            newconn = True
+            conn = self.get_db_connection()
+        if subs is None:
+            subs = dict(self.sql_subs)
 
         cur = conn.cursor()
 
@@ -471,7 +479,17 @@ class Zones(DBUtils):
             else:
                 cur.execute(q)
 
+        q = sql.SQL(query_07).format(**subs)
+        if dry:
+            print(q.as_string(conn))
+        else:
+            cur.execute(q)
+
         cur.close()
+
+        if newconn:
+            conn.commit()
+            conn.close()
 
 
     def associate_blocks_with_zones(self,table=None,schema=None,uid=None,geom=None,dry=False):

@@ -17,6 +17,7 @@ FROM
     {zones_schema}.{zones_table} zones,
     tmp_tile
 WHERE
-    ST_Intersects(tmp_tile.geom,zones.{zones_geom_col})
+    zones.node_ids IS NOT NULL
+    AND ST_Intersects(tmp_tile.geom,zones.{zones_geom_col})
     AND ST_Intersects(tmp_tile.geom,ST_Centroid(zones.{zones_geom_col}))
 ;

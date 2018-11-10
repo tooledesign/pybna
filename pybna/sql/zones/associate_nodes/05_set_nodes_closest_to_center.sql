@@ -15,5 +15,7 @@ ORDER BY
 UPDATE {zones_schema}.{zones_table} zones
 SET node_ids = ARRAY[tmp_zone_node.node_id]
 FROM tmp_zone_node
-WHERE zones.{zones_id_col} = tmp_zone_node.zone_id
+WHERE
+    array_length(zones.block_ids,1) > 1
+    AND zones.{zones_id_col} = tmp_zone_node.zone_id
 ;
