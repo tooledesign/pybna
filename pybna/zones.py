@@ -280,13 +280,13 @@ class Zones(DBUtils):
         in_geom = "geom" # future: add get_geom to dbutils
 
         if out_table is None:
-            table = self.config.bna.connectivity.zones.table
+            out_table = self.config.bna.connectivity.zones.table
 
         if out_schema is None:
             if "schema" in self.config.bna.connectivity.zones:
-                schema = self.config.bna.connectivity.zones.schema
+                out_schema = self.config.bna.connectivity.zones.schema
             else:
-                schema = self.default_schema
+                out_schema = self.default_schema
 
         if uid is None:
             if "uid" in self.config.bna.connectivity.zones:

@@ -2,14 +2,15 @@
 
 SELECT
     array_agg(blocks.{blocks_id_col}) AS block_ids,
-    ST_Multi(ST_Union(blocks.{blocks_geom_col}))::geometry(multipolygon,{srid}) AS {zones_geom_col},
+    src_table.{in_geom} AS {zones_geom_col},
     array_agg(nodes.{nodes_id_col}) AS node_ids
 INTO {zones_schema}.{zones_table}
 FROM
-    tmp_prelim_zones z,
+    {in_schema}.{in_table} src_table,
     {blocks_schema}.{blocks_table} blocks,
     {nodes_schema}.{nodes_table} nodes
 WHERE FALSE
+GROUP BY src_table.{in_geom}
 ;
 
 DELETE FROM {zones_schema}.{zones_table};
@@ -20,6 +21,7 @@ SELECT DISTINCT ON (block_id)
     src_table.{in_uid} AS src_id,
     blocks.{blocks_id_col} AS block_id,
     blocks.{blocks_geom_col} AS geom
+INTO TEMP TABLE tmp_zones_blocks
 FROM
     {in_schema}.{in_table} src_table,
     {blocks_schema}.{blocks_table} blocks
@@ -33,7 +35,7 @@ ORDER BY
 INSERT INTO {zones_schema}.{zones_table}
 SELECT
     array_agg(tmp_zones_blocks.block_id) AS block_ids,
-    ST_Union(tmp_zones_blocks.geom) AS {zones_geom_col},
+    ST_Multi(ST_Union(tmp_zones_blocks.geom)) AS {zones_geom_col},
     NULL
 FROM tmp_zones_blocks
 GROUP BY tmp_zones_blocks.src_id

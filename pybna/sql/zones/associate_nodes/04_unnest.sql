@@ -1,14 +1,58 @@
-DROP TABLE IF EXISTS tmp_blockzones;
+DROP TABLE IF EXISTS tmp_centroids;
 SELECT
     {zones_id_col} AS zone_id,
     unnest(block_ids) AS block_id,
-    ST_Centroid({zones_geom_col}) AS centroid,
-    ST_Buffer({zones_geom_col},(-1 * {blocks_roads_tolerance})) AS inner_1, --roads_tolerance
-    ST_Buffer({zones_geom_col},(-3 * {blocks_roads_tolerance})) AS inner_2,
-    ST_Buffer({zones_geom_col},(-6 * {blocks_roads_tolerance})) AS inner_3
-INTO TEMP TABLE tmp_blockzones
+    ST_Centroid({zones_geom_col}) AS centroid
+INTO TEMP TABLE tmp_centroids
 FROM {zones_schema}.{zones_table}
 WHERE array_length(block_ids,1) > 1
+;
+
+DROP TABLE IF EXISTS tmp_inner_1;
+SELECT
+    {zones_id_col} AS zone_id,
+    ST_Buffer({zones_geom_col},(-1 * {blocks_roads_tolerance})) AS inner_1  --roads_tolerance
+INTO TEMP TABLE tmp_inner_1
+FROM {zones_schema}.{zones_table}
+WHERE array_length(block_ids,1) > 1
+;
+
+DROP TABLE IF EXISTS tmp_inner_2;
+SELECT
+    {zones_id_col} AS zone_id,
+    ST_Buffer({zones_geom_col},(-3 * {blocks_roads_tolerance})) AS inner_2
+INTO TEMP TABLE tmp_inner_2
+FROM {zones_schema}.{zones_table}
+WHERE array_length(block_ids,1) > 1
+;
+
+DROP TABLE IF EXISTS tmp_inner_3;
+SELECT
+    {zones_id_col} AS zone_id,
+    ST_Buffer({zones_geom_col},(-6 * {blocks_roads_tolerance})) AS inner_3
+INTO TEMP TABLE tmp_inner_3
+FROM {zones_schema}.{zones_table}
+WHERE array_length(block_ids,1) > 1
+;
+
+DROP TABLE IF EXISTS tmp_blockzones;
+SELECT
+    c.zone_id,
+    c.block_id,
+    c.centroid,
+    i1.inner_1,
+    i2.inner_2,
+    i3.inner_3
+INTO TEMP TABLE tmp_blockzones
+FROM
+    tmp_centroids c,
+    tmp_inner_1 i1,
+    tmp_inner_2 i2,
+    tmp_inner_3 i3
+WHERE
+    c.zone_id = i1.zone_id
+    AND c.zone_id = i2.zone_id
+    AND c.zone_id = i3.zone_id
 ;
 CREATE INDEX tidx_tmp_blockzones_block_id ON tmp_blockzones (block_id);
 CREATE INDEX tsidx_tmp_blockzones_centroid ON tmp_blockzones USING GIST (centroid);
