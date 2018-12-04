@@ -13,7 +13,7 @@ WHERE
 
 -- polygonize to create preliminary zones
 DROP TABLE IF EXISTS tmp_prelim_zones;
-SELECT (ST_Dump(ST_Polygonize(geom))).geom AS geom
+SELECT ST_MakeValid((ST_Dump(ST_Polygonize(geom))).geom) AS geom
 INTO TEMP TABLE tmp_prelim_zones
 FROM tmp_roads_filtered
 ;
