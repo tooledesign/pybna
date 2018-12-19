@@ -6,35 +6,20 @@ SELECT
     ls.agg_cost AS ls_cost
 INTO TEMP TABLE tmp_combined
 FROM
-    tmp_hs_cost_to_zones hs
+    tmp_hs_cost_to_units hs
     FULL OUTER JOIN
-    tmp_ls_cost_to_zones ls
+    tmp_ls_cost_to_units ls
         ON hs.id = ls.id
 ;
 
-DROP TABLE tmp_hs_cost_to_zones;
-DROP TABLE tmp_ls_cost_to_zones;
-
--- flatten blocks
-DROP TABLE IF EXISTS tmp_zone_blocks;
-SELECT
-    zones.{zones_id_col} AS id,
-    unnest(zones.block_ids) AS block_id
-INTO TEMP TABLE tmp_zone_blocks
-FROM
-    {zones_schema}.{zones_table} zones,
-    tmp_tile
-WHERE ST_DWithin(zones.{zones_geom_col},tmp_tile.geom,{connectivity_max_distance})
-;
-
-CREATE INDEX idx_tmp_zone_blocks_node_id ON tmp_zone_blocks (block_id);
-ANALYZE tmp_zone_blocks;
+DROP TABLE tmp_hs_cost_to_units;
+DROP TABLE tmp_ls_cost_to_units;
 
 -- build connectivity table
 DROP TABLE IF EXISTS tmp_connectivity;
 SELECT
-    ozones.block_id AS source,
-    dzones.block_id AS target,
+    ounits.block_id AS source,
+    dunits.block_id AS target,
     (hs_cost IS NOT NULL)::BOOLEAN AS hs,
     (
         hs_cost IS NULL
@@ -43,15 +28,15 @@ SELECT
     )::BOOLEAN AS ls
 INTO TEMP TABLE tmp_connectivity
 FROM
-    tmp_zone_blocks ozones,
-    tmp_zone_blocks dzones,
+    tmp_unit_blocks ounits,
+    tmp_unit_blocks dunits,
     tmp_combined
 WHERE
-    ozones.id = {zone_id}
-    AND tmp_combined.id = dzones.id
+    ounits.id = {unit_id}
+    AND tmp_combined.id = dunits.id
 ;
 
-DROP TABLE tmp_zone_blocks;
+DROP TABLE tmp_unit_blocks;
 DROP TABLE tmp_combined;
 
 INSERT INTO {connectivity_schema}.{connectivity_table}

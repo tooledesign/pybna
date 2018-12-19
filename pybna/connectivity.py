@@ -143,6 +143,21 @@ class Connectivity(DBUtils):
         return True
 
 
+    def _get_tile_ids(self):
+        """
+        Returns a list of all tile IDs from the database
+        """
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            sql.SQL("select {tiles_id_col} from {tiles_schema}.{tiles_table}").format(**subs)
+        )
+        tiles = []
+        for row in cur:
+            tiles.append(row[0])
+        return tiles
+
+
     def _connectivity_table_create(self,overwrite=False):
         """
         Creates the connectivity table in the database
@@ -228,8 +243,8 @@ class Connectivity(DBUtils):
 
     def calculate_connectivity(self,tiles=None,network_filter=None,append=False,dry=False):
         """
-        Prepares and executes queries to do connectivity analysis within the
-        database. Operates on tiles and adds results as each tile completes.
+        Prepares inputs and calls _calculate_connectivity for operating on
+        blocks
 
         args
         tiles -- list of tile IDs to operate on. if empty use all tiles
@@ -237,23 +252,61 @@ class Connectivity(DBUtils):
         append -- append to existing db table instead of creating a new one
         dry -- only prepare the query language but don't execute in the database
         """
-        if network_filter is None:
-            network_filter = "TRUE"
-
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
+
+        # set up references to units
+        subs["units_table"] = subs["blocks_table"]
+        subs["units_schema"] = subs["blocks_schema"]
+        subs["units_id_col"] = subs["blocks_id_col"]
+        subs["units_geom_col"] = subs["blocks_geom_col"]
+
+        self._calculate_connectivity(subs,zone=False,tiles=tiles,network_filter=network_filter,append=append,dry=dry)
+
+
+    def calculate_connectivity_with_zones(self,tiles=None,network_filter=None,append=False,dry=False):
+        """
+        Prepares inputs and calls _calculate_connectivity for operating on
+        zones
+
+        args
+        tiles -- list of tile IDs to operate on. if empty use all tiles
+        network_filter -- filter to be applied to the road network when routing
+        append -- append to existing db table instead of creating a new one
+        dry -- only prepare the query language but don't execute in the database
+        """
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
+
+        # set up references to units
+        subs["units_table"] = subs["zones_table"]
+        subs["units_schema"] = subs["zones_schema"]
+        subs["units_id_col"] = subs["zones_id_col"]
+        subs["units_geom_col"] = subs["zones_geom_col"]
+
+        self._calculate_connectivity(subs,zone=True,tiles=tiles,network_filter=network_filter,append=append,dry=dry)
+
+
+    def _calculate_connectivity(self,subs,zone=False,tiles=None,network_filter=None,append=False,dry=False):
+        """
+        Organizes and calls SQL scripts for calculating connectivity based on
+        blocks or zones.
+
+        args
+        subs -- dictionary of SQL substitutions (usually comes from self.sql_subs)
+        zone -- whether to use blocks (false) or zones (true)
+        tiles -- list of tile IDs to operate on. if empty use all tiles
+        network_filter -- filter to be applied to the road network when routing
+        append -- append to existing db table instead of creating a new one
+        dry -- only prepare the query language but don't execute in the database
+        """
+        if network_filter is None:
+            network_filter = "TRUE"
         subs["network_filter"] = sql.SQL(network_filter)
 
         # check tiles
         if tiles is None:
-            conn = self.get_db_connection()
-            cur = conn.cursor()
-            cur.execute(
-                sql.SQL("select {tiles_id_col} from {tiles_schema}.{tiles_table}").format(**subs)
-            )
-            tiles = []
-            for row in cur:
-                tiles.append(row[0])
+            tiles = _get_tile_ids()
         elif not type(tiles) == list and not type(tiles) == tuple:
             raise ValueError("Tile IDs must be given as an iterable")
 
@@ -265,12 +318,20 @@ class Connectivity(DBUtils):
                 raise ValueError("table %s not found" % self.db_connectivity_table)
 
         # get raw queries
-        q_filter_zones_to_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","filter_zones_to_tile.sql"))
-        q_zone_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","zone_nodes.sql"))
-        q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","network_subset.sql"))
-        q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","distance_table.sql"))
-        q_cost_to_zones = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","cost_to_zones.sql"))
-        q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","combine_cost_matrices.sql"))
+        q_filter_to_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","filter_to_tile.sql"))
+        if zones:
+            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","unit_nodes_zones.sql"))
+        else:
+            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","unit_nodes_blocks.sql"))
+        q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","network_subset.sql"))
+        q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","distance_table.sql"))
+        if zones:
+            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","flatten_zones.sql"))
+        else:
+            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","flatten_blocks.sql"))
+        q_cost_to_units = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","cost_to_units.sql"))
+
+        q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","combine_cost_matrices.sql"))
 
         tile_progress = tqdm(tiles)
         failed_zones = list()
@@ -283,14 +344,14 @@ class Connectivity(DBUtils):
             cur = conn.cursor()
 
             # filter zones to tile
-            q = sql.SQL(q_filter_zones_to_tile).format(**subs)
+            q = sql.SQL(q_filter_to_tile).format(**subs)
             if dry:
                 print(q.as_string(conn))
             else:
                 cur.execute(q)
 
-            # flatten zones and nodes
-            q = sql.SQL(q_zone_nodes).format(**subs)
+            # associate units and nodes
+            q = sql.SQL(q_unit_nodes).format(**subs)
             if dry:
                 print(q.as_string(conn))
             else:
@@ -318,7 +379,7 @@ class Connectivity(DBUtils):
             if dry:
                 zones = [(-100,[-200])]
             else:
-                cur.execute("select id, node_ids from pg_temp.tmp_tilezones")
+                cur.execute("select id, node_ids from pg_temp.tmp_tileunits")
                 zones = cur.fetchall()
 
             zone_progress = tqdm(zones)
@@ -326,13 +387,13 @@ class Connectivity(DBUtils):
                 failure = False
                 zone_id = zone[0]
                 node_ids = zone[1]
-                subs["zone_id"] = sql.Literal(zone_id)
+                subs["unit_id"] = sql.Literal(zone_id)
                 subs["node_ids"] = sql.Literal(node_ids)
 
                 # get hs zone costs
                 subs["net_table"] = sql.Identifier("tmp_hs_net")
                 subs["distance_table"] = sql.Identifier("tmp_hs_distance")
-                subs["cost_to_zones"] = sql.Identifier("tmp_hs_cost_to_zones")
+                subs["cost_to_units"] = sql.Identifier("tmp_hs_cost_to_units")
 
                 q = sql.SQL(q_distance_table).format(**subs)
                 if dry:
@@ -348,7 +409,21 @@ class Connectivity(DBUtils):
                         time.sleep(5)
                         continue
 
-                q = sql.SQL(q_cost_to_zones).format(**subs)
+                q = sql.SQL(q_flatten).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_zones.append(zone_id)
+                        time.sleep(5)
+                        continue
+
+                q = sql.SQL(q_cost_to_units).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
@@ -365,7 +440,7 @@ class Connectivity(DBUtils):
                 # get ls zone costs
                 subs["net_table"] = sql.Identifier("tmp_ls_net")
                 subs["distance_table"] = sql.Identifier("tmp_ls_distance")
-                subs["cost_to_zones"] = sql.Identifier("tmp_ls_cost_to_zones")
+                subs["cost_to_units"] = sql.Identifier("tmp_ls_cost_to_units")
                 q = sql.SQL(q_distance_table).format(**subs)
                 if dry:
                     print(q.as_string(conn))
@@ -379,7 +454,7 @@ class Connectivity(DBUtils):
                         failed_zones.append(zone_id)
                         time.sleep(5)
                         continue
-                q = sql.SQL(q_cost_to_zones).format(**subs)
+                q = sql.SQL(q_cost_to_units).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:

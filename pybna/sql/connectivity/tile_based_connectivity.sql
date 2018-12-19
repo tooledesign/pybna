@@ -8,13 +8,13 @@ WHERE {tiles_id_col} = {tile_id}
 ;
 
 -- filtering zones to tile;
-DROP TABLE IF EXISTS tmp_tilezones;
+DROP TABLE IF EXISTS tmp_tileunits;
 SELECT
     ozones.{zones_id_col} AS o_id,
     dzones.{zones_id_col} AS d_id,
     ozones.node_ids AS o_nodes,
     dzones.node_ids AS d_nodes
-INTO TEMP TABLE tmp_tilezones
+INTO TEMP TABLE tmp_tileunits
 FROM
     {zones_schema}.{zones_table} ozones,
     {zones_schema}.{zones_table} dzones,
@@ -32,10 +32,10 @@ SELECT
     route.agg_cost
 INTO TEMP TABLE tmp_allverts
 FROM
-    tmp_tilezones
+    tmp_tileunits
     pgr_drivingdistance(
         {hs_link_query},
-        tmp_tilezones.o_nodes,
+        tmp_tileunits.o_nodes,
         {connectivity_max_distance},
         equicost:=TRUE,
         directed:=TRUE
