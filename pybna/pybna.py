@@ -42,6 +42,7 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
 
         return: pyBNA object
         """
+        Zones.__init__(self)
         Destinations.__init__(self)
         Connectivity.__init__(self)
         Core.__init__(self)
