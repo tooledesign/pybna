@@ -80,10 +80,6 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
             print("DB connection: %s" % db_connection_string)
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
 
-        # blocks
-        if not self.debug:
-            self.set_blocks()
-
         # srid
         if "srid" in self.config:
             self.srid = self.config["srid"]
@@ -160,10 +156,21 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
         returns:
         dictionary of SQL substitutions
         """
+        boundary = config.bna.boundary
         blocks = config.bna.blocks
         tiles = config.bna.tiles
         network = config.bna.network
         connectivity = config.bna.connectivity
+
+        # boundary
+        if "schema" in boundary:
+            boundary_schema = boundary.schema
+        else:
+            boundary_schema = self.get_schema(boundary.table)
+        if "geom" in boundary:
+            boundary_geom = boundary.geom
+        else:
+            boundary_geom = "geom"
 
         # blocks
         if "schema" in blocks:
@@ -316,6 +323,9 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
 
         subs = {
             "srid": sql.Literal(srid),
+            "boundary_table": sql.Identifier(config.boundary.table),
+            "boundary_schema": sql.Identifier(boundary_schema),
+            "boundary_geom_col": sql.Identifier(boundary_geom),
             "blocks_table": sql.Identifier(blocks.table),
             "blocks_schema": sql.Identifier(blocks_schema),
             "blocks_id_col": sql.Identifier(blocks_id_col),

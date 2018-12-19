@@ -23,14 +23,13 @@ class Core(DBUtils):
         self.verbose = None
         self.debug = None
         self.srid = None
-        self.blocks = None  # reference to Blocks class
         self.tiles = None
         self.tiles_pkid = None
         self.sql_subs = None
         self.default_schema = None
 
 
-    def make_tiles(self,table=None,max_blocks=5000,schema=None,geom=None,overwrite=False):
+    def make_tiles(self,table=None,max_blocks=5000,schema=None,id=None,geom=None,overwrite=False):
         """
         Creates a new tile table using the config parameters. Automatically adjusts
         tile size so no tile contains more than max_blocks number of blocks. This
@@ -38,63 +37,57 @@ class Core(DBUtils):
         recursively splitting prospective tiles into four equal parts until
         max_blocks is satisfied.
 
+        Where applicable, defaults to whatever is given in the config file unless
+        another value is explicitly passed in.
+
         args
         table -- the table name to use
         max_blocks -- maximum allowable number of blocks for a tile
         schema -- schema for the tiles table. if none looks for a schema in the
                     config. if none in config uses schema of the blocks.
+        id -- the name to use for the identifier column (primary key)
+        geom -- the name to use for the geom column
         overwrite -- whether to overwrite an existing table
         """
-        if table is None:
-            table = self.config["bna"]["tiles"]["table"]
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
 
-        if schema is None:
-            if "schema" in self.config["bna"]["tiles"]:
-                schema = self.config["bna"]["tiles"]["schema"]
-            else:
-                schema = self.get_schema(self.config["bna"]["blocks"]["table"])
-
-        if geom is None:
-            geom = self.config["bna"]["tiles"]["geom"]
+        if not table is None:
+            subs["tiles_table"] = sql.Identifier(table)
+        if not schema is None:
+            subs["tiles_schema"] = sql.Identifier(schema)
+        if not id is None:
+            subs["tiles_id_col"] = sql.Identifier(id)
+        if not geom is None:
+            subs["tiles_geom_col"] = sql.Identifier(geom)
 
         conn = self.get_db_connection()
         cur = conn.cursor()
 
         if overwrite:
-            cur.execute(sql.SQL("drop table if exists {}.{}").format(
-                sql.Identifier(schema),
-                sql.Identifier(table)
-            ))
+            self.drop_table(
+                table=subs["tiles_table"],
+                schema=subs["tiles_schema"],
+                conn=conn
+            )
 
         # create table
         cur.execute(sql.SQL(" \
-            create table {}.{} ( \
-                id serial primary key, \
-                {} geometry(polygon,{}) \
+            create table {tiles_schema}.{tiles_table} ( \
+                {tiles_id_col} serial primary key, \
+                {tiles_geom_col} geometry(polygon,{srid}) \
             ) \
-        ").format(
-            sql.Identifier(schema),
-            sql.Identifier(table),
-            sql.Identifier(geom),
-            sql.Literal(self.srid)
-        ))
+        ").format(**subs))
 
         # get dimensions
         cur.execute(sql.SQL(" \
             SELECT \
-                MIN(ST_XMin({})) AS xmin, \
-                MIN(ST_YMin({})) AS ymin, \
-                MAX(ST_XMax({})) AS xmax, \
-                MAX(ST_YMax({})) AS ymax \
-            FROM {}.{} \
-        ").format(
-            sql.Identifier(self.blocks.geom),
-            sql.Identifier(self.blocks.geom),
-            sql.Identifier(self.blocks.geom),
-            sql.Identifier(self.blocks.geom),
-            sql.Identifier(self.blocks.schema),
-            sql.Identifier(self.blocks.table)
-        ))
+                MIN(ST_XMin({blocks_geom_col})) AS xmin, \
+                MIN(ST_YMin({blocks_geom_col})) AS ymin, \
+                MAX(ST_XMax({blocks_geom_col})) AS xmax, \
+                MAX(ST_YMax({blocks_geom_col})) AS ymax \
+            FROM {blocks_schema}.{blocks_table} \
+        ").format(**subs))
 
         row = cur.fetchone()
         xmin = row[0]
@@ -102,13 +95,13 @@ class Core(DBUtils):
         xmax = row[2]
         ymax = row[3]
 
-        self._split_tiles(conn,table,schema,geom,max_blocks,xmin,ymin,xmax,ymax)
+        self._split_tiles(conn,subs,max_blocks,xmin,ymin,xmax,ymax)
         conn.commit()
         cur.close()
         conn.close()
 
 
-    def _split_tiles(self,conn,table,schema,geom,max_blocks,xmin,ymin,xmax,ymax):
+    def _split_tiles(self,conn,subs,max_blocks,xmin,ymin,xmax,ymax):
         """
         Recursive method that tests the input bounds for how many blocks are contained.
         If less than max, write the bounds to the DB as a tile. If not, split
@@ -117,9 +110,7 @@ class Core(DBUtils):
 
         args
         conn -- database connection object from parent method
-        table -- table name for the tiles table
-        schema -- schema for the tiles table
-        geom -- the geometry column name
+        subs -- dictionary of substitions (usually a copy of self.sql_subs)
         max_blocks -- maximum allowable number of blocks for a tile
         xmin -- minimum x bound
         ymin -- minimum y bound
@@ -131,25 +122,21 @@ class Core(DBUtils):
             sql.Literal(ymin),
             sql.Literal(xmax),
             sql.Literal(ymax),
-            sql.Literal(self.srid)
+            subs["srid"]
         )
+
+        subs["envelope"] = sql_envelope
 
         # test for contained blocks
         cur = conn.cursor()
         cur.execute(sql.SQL(" \
-            select count({}) from {}.{} blocks \
+            select count({blocks_id_col}) from {blocks_schema}.{blocks_table} blocks \
             where \
                 st_intersects( \
-                    blocks.{}, \
-                    {} \
+                    blocks.{blocks_geom_col}, \
+                    {envelope} \
                 ) \
-        ").format(
-            sql.Identifier(self.blocks.id_column),
-            sql.Identifier(self.blocks.schema),
-            sql.Identifier(self.blocks.table),
-            sql.Identifier(self.blocks.geom),
-            sql_envelope
-        ))
+        ").format(**subs))
         block_count = cur.fetchone()[0]
         if max_blocks < block_count:
             cur.close()
@@ -163,41 +150,9 @@ class Core(DBUtils):
             cur.close()
         else:
             cur.execute(sql.SQL(" \
-                insert into {}.{} ({}) \
-                select {} \
-            ").format(
-                sql.Identifier(schema),
-                sql.Identifier(table),
-                sql.Identifier(geom),
-                sql_envelope
-            ))
-
-
-    def set_blocks(self):
-        """
-        Set pybna's blocks from database
-        """
-        blocks_table = self.config["bna"]["blocks"]["table"]
-        boundary_table = self.config["bna"]["boundary"]["table"]
-        boundary_geom = self.config["bna"]["boundary"]["geom"]
-        pop = self.config["bna"]["blocks"]["population"]
-        geom = self.config["bna"]["blocks"]["geom"]
-        if "schema" in self.config["bna"]["blocks"]:
-            blocks_schema = self.config["bna"]["blocks"]["schema"]
-        else:
-            blocks_schema = self.get_schema(blocks_table)
-        if "uid" in self.config["bna"]["blocks"]:
-            block_id_col = self.config["bna"]["blocks"]["uid"]
-        else:
-            block_id_col = get_pkid_col(blocks_table,schema=blocks_schema)
-
-        self.blocks = Blocks()
-        self.blocks.table = blocks_table
-        self.blocks.schema = blocks_schema
-        self.blocks.id_column = block_id_col
-        self.blocks.id_type = self.get_column_type(blocks_table,block_id_col,schema=blocks_schema)
-        self.blocks.geom = geom
-        self.blocks.pop_column = pop
+                insert into {tiles_schema}.{tiles_table} ({tiles_geom_col}) \
+                select {envelope} \
+            ").format(**subs))
 
 
     def set_destinations(self):

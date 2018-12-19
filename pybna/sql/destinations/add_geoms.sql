@@ -1,12 +1,12 @@
 --
 -- adds geometries to the block scoring output table
 --
-ALTER TABLE {schema}.{table}
-ADD COLUMN {block_geom} {type};
+ALTER TABLE {scores_schema}.{scores_table}
+ADD COLUMN {blocks_geom_col} {type};
 
-UPDATE {schema}.{table} AS t
-SET {block_geom} = b.{block_geom}
+UPDATE {scores_schema}.{scores_table} AS t
+SET {blocks_geom_col} = b.{blocks_geom_col}
 FROM {blocks_schema}.{blocks_table} AS b
-WHERE t.{block_id_col} = b.{block_id_col};
+WHERE t.{blocks_id_col} = b.{blocks_id_col};
 
-CREATE INDEX {sidx_name} ON {schema}.{table} USING GIST({block_geom});
+CREATE INDEX {sidx_name} ON {scores_schema}.{scores_table} USING GIST({blocks_geom_col});
