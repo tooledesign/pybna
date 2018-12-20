@@ -2,6 +2,7 @@ import yaml
 from urllib import urlretrieve
 import tempfile
 import os
+from shutil import copy
 from zipfile import ZipFile
 import fnmatch
 import geopandas as gpd
@@ -65,34 +66,45 @@ class Importer(DBUtils):
         pass
 
 
-    def import_census_blocks(self,fips=None,url=None,table=None,schema=None,
+    def import_census_blocks(self,fips=None,url=None,fpath=None,
+                             table=None,schema=None,
                              id=None,geom=None,pop="pop10",srid=None,
-                             boundary_shp=None,overwrite=False):
+                             boundary_file=None,overwrite=False):
         """
         Retrieves census block features and saves them to the
         designated blocks table in the DB. Can take a FIPS code to download
-        directly from the US Census, or can take a URL to a zipped shapefile.
+        directly from the US Census, or can take a URL or file path to any
+        file that can be automatically opened by geopandas' read_file method
+        (zipped shapefile, shapefile, geojson, etc.)
 
         args
         fips -- the two digit fips code that identifies the state
-        url -- url to download a zipped shapefile from
+        url -- url to download a file from
+        fpath -- path to a file
         table -- the table name to save blocks to (if none use config)
         schema -- the schema to save blocks to (if none use config)
         id -- name for the id/primary key column (if none use config)
         geom -- name for the geometry column (if none use config)
         pop -- name for the population column
         srid -- projection to use (if not given uses srid defined in config)
-        boundary_shp -- path to the boundary shapefile (if not given reads it from the DB as defined in config)
+        boundary_file -- path to the boundary file (if not given reads it from the DB as defined in config)
         overwrite -- deletes an existing table
         """
         # check inputs
-        if fips is None and url is None:
-            raise ValueError("Either FIPS code or URL must be given")
+        if fips is None and url is None and fpath is None:
+            raise ValueError("Either FIPS code, URL, or file path must be given")
         if fips is not None and url is not None:
             raise ValueError("Can't accept a FIPS code _and_ a URL")
+        if fips is not None and fpath is not None:
+            raise ValueError("Can't accept a FIPS code _and_ a file name")
+        if fpath is not None and url is not None:
+            raise ValueError("Can't accept a file name _and_ a URL")
         if fips is not None:
             if isinstance(fips, (int, long)):
                 fips = '{0:02d}'.format(fips)
+        if fpath is not None:
+            if not os.path.isfile(fpath):
+                raise ValueError("File not found at %s" % fpath)
         if table is None:
             if "table" in self.config["bna"]["blocks"]:
                 table = self.config["bna"]["blocks"]["table"]
@@ -121,28 +133,21 @@ class Importer(DBUtils):
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
 
-        # download shapefile to temporary directory and load into geopandas
-        if url is None:
-            url = "http://www2.census.gov/geo/tiger/TIGER2010BLKPOPHU/tabblock2010_" + fips + "_pophu.zip"
-        temp_dir = tempfile.mkdtemp()
-        fpath = os.path.join(temp_dir,"blocks.zip")
-        print("Downloading to %s from %s" % (fpath,url))
-        urlretrieve(url,fpath)
-        with ZipFile(fpath, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
-        shp = ""
-        for root, dirs, files in os.walk(temp_dir):
-            for _file in files:
-                if fnmatch.fnmatch(_file, '*.shp'):
-                    shp = os.path.join(root, _file)
-        blocks = gpd.read_file(shp)
+        # copy the shapefile to temporary directory and load into geopandas
+        if not fpath is None:
+            src = fpath
+        if not url is None:
+            src = url
+        if not fips is None:
+            src = "http://www2.census.gov/geo/tiger/TIGER2010BLKPOPHU/tabblock2010_" + fips + "_pophu.zip"
+        blocks = gpd.read_file(src)
         epsg = "epsg:%i" % srid
         blocks = blocks.to_crs({'init': epsg})
         blocks.columns = [c.lower() for c in blocks.columns]
 
         # load the boundary into geopandas
         print("Loading boundary")
-        if boundary_shp is None:
+        if boundary_file is None:
             if "geom" in self.config["bna"]["boundary"]:
                 boundary_geom = self.config["bna"]["boundary"]["geom"]
             else:
@@ -163,7 +168,7 @@ class Importer(DBUtils):
             )
             conn.close()
         else:
-            boundary = gpd.read_file(boundary_shp)
+            boundary = gpd.read_file(boundary_file)
         boundary = boundary.to_crs({'init': epsg})
 
         # buffer the boundary by the maximum travel distance
