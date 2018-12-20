@@ -3,8 +3,6 @@ from urllib import urlretrieve
 import tempfile
 import os
 from shutil import copy
-from zipfile import ZipFile
-import fnmatch
 import geopandas as gpd
 import numpy as np
 from binascii import hexlify
