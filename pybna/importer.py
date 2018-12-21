@@ -4,11 +4,7 @@ import tempfile
 import os
 from shutil import copy
 import geopandas as gpd
-import numpy as np
-from binascii import hexlify
-from string import upper
 from psycopg2 import sql
-from psycopg2.extras import execute_values
 
 from dbutils import DBUtils
 
@@ -64,10 +60,9 @@ class Importer(DBUtils):
         pass
 
 
-    def import_census_blocks(self,fips=None,url=None,fpath=None,
-                             table=None,schema=None,
-                             id=None,geom=None,pop="pop10",srid=None,
-                             boundary_file=None,overwrite=False):
+    def import_census_blocks(self,fips=None,url=None,fpath=None,table=None,
+                             schema=None,keep_case=False,columns=None,id=None,
+                             geom=None,srid=None,boundary_file=None,overwrite=False):
         """
         Retrieves census block features and saves them to the
         designated blocks table in the DB. Can take a FIPS code to download
@@ -81,9 +76,10 @@ class Importer(DBUtils):
         fpath -- path to a file
         table -- the table name to save blocks to (if none use config)
         schema -- the schema to save blocks to (if none use config)
+        keep_case -- whether to prevent column names from being converted to lower case
+        columns -- list of columns in the dataset to keep (if none keeps all)
         id -- name for the id/primary key column (if none use config)
         geom -- name for the geometry column (if none use config)
-        pop -- name for the population column
         srid -- projection to use (if not given uses srid defined in config)
         boundary_file -- path to the boundary file (if not given reads it from the DB as defined in config)
         overwrite -- deletes an existing table
@@ -130,6 +126,9 @@ class Importer(DBUtils):
                 srid = self.config["srid"]
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
+        if boundary_file is not None:
+            if not os.path.isfile(boundary_file):
+                raise ValueError("File not found at %s" % boundary_file)
 
         # copy the shapefile to temporary directory and load into geopandas
         if not fpath is None:
@@ -138,6 +137,7 @@ class Importer(DBUtils):
             src = url
         if not fips is None:
             src = "http://www2.census.gov/geo/tiger/TIGER2010BLKPOPHU/tabblock2010_" + fips + "_pophu.zip"
+        print("Loading data from %s" % src)
         blocks = gpd.read_file(src)
         epsg = "epsg:%i" % srid
         blocks = blocks.to_crs({'init': epsg})
@@ -176,78 +176,14 @@ class Importer(DBUtils):
         print("Filtering blocks to boundary")
         blocks = blocks[blocks.intersects(boundary.unary_union)]
 
-        #
-        # write the dataframe to the db
-        #
-        conn = self.get_db_connection()
-        cur = conn.cursor()
-
-        # drop old table
-        if overwrite:
-            self.drop_table(table,schema,conn)
-
-        # build table creation statement
-        if self.verbose:
-            print("Creating table")
-        columns = list()
-        types = list()
-        columns.append(geom)
-        types.append("text")
-        for c in blocks.columns:
-            if c == blocks.geometry.name:
-                continue
-            dtype = "text"
-            if blocks[c].dtype in (np.int8,np.int16,np.int32,np.int64,np.uint8,np.uint16,np.uint32,np.uint64):
-                dtype = "integer"
-            if blocks[c].dtype in (np.float16,np.float32,np.float64):
-                dtype = "float"
-            if c.lower() == id.lower():
-                dtype += " primary key"
-            columns.append(c)
-            types.append(dtype)
-        columns_with_types = [sql.SQL(" ").join([sql.Identifier(k),sql.SQL(v)]) for k, v in zip(columns,types)]
-        if not id in columns:
-            columns_with_types.insert(0,sql.SQL(" ").join([sql.Identifier(id),sql.SQL("serial primary key")]))
-        columns_sql = sql.SQL(",").join(columns_with_types)
-        q = sql.SQL("CREATE TABLE {}.{} ({})").format(
-            sql.Identifier(schema),
-            sql.Identifier(table),
-            columns_sql
-        )
-        cur.execute(q)
-
-        #
-        # copy data over
-        #
+        # copy data to db
         print("Copying blocks to database")
-        insert_sql = sql.SQL("INSERT INTO {}.{} ({})").format(
-            sql.Identifier(schema),
-            sql.Identifier(table),
-            sql.SQL(",").join([sql.Identifier(c) for c in columns])
+        self.gdf_to_postgis(
+            blocks,table,schema,
+            geom=geom,
+            id=id,
+            keep_case=keep_case,
+            srid=srid,
+            columns=columns,
+            overwrite=overwrite
         )
-        insert = insert_sql.as_string(conn)
-        insert += " VALUES %s"
-
-        # convert geoms to wkt
-        blocks["wkbs"] = blocks.geometry.apply(lambda x: x.wkb).apply(hexlify).apply(upper)
-        blocks = blocks.drop(blocks.geometry.name,axis=1)
-        blocks = blocks.rename(columns={"wkbs": geom})
-
-        execute_values(cur,insert,blocks[columns].values)
-        subs = {
-            "schema": sql.Identifier(schema),
-            "table": sql.Identifier(table),
-            "geom": sql.Identifier(geom),
-            "srid": sql.Literal(srid),
-            "index": sql.Identifier("sidx_"+table)
-        }
-        q = sql.SQL(" \
-            ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry(multipolygon,{srid}) \
-            USING ST_Multi(ST_SetSRID({geom}::geometry,{srid})); \
-            CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
-            ANALYZE {schema}.{table};"
-        ).format(**subs)
-        cur.execute(q)
-        cur.close()
-        conn.commit()
-        conn.close()
