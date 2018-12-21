@@ -187,3 +187,7 @@ class Importer(DBUtils):
             columns=columns,
             overwrite=overwrite
         )
+
+
+        def import_osm(self):
+            pass
