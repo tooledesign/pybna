@@ -189,5 +189,11 @@ class Importer(DBUtils):
         )
 
 
-        def import_osm(self):
-            pass
+    def import_osm(self):
+        """
+        Processes OSM roads data and copies it into the database with attributes
+        needed for LTS.
+
+        args
+
+        """
