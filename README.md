@@ -15,10 +15,11 @@ pyBNA is tested with Python 2.7. The following libraries are required:
 - pyyaml
 - geopandas
 - munch
+- overpass
 
 You can install these via pip:
 ```
-pip install psycopg2 tqdm pyyaml geopandas munch
+pip install psycopg2 tqdm pyyaml geopandas munch overpass
 ```
 
 The imposm library requires some additional packages to be installed. Consult the imposm documentation for details, but as of this writing you can handle the dependencies by running the following on a recent Ubuntu install

@@ -5,6 +5,7 @@ import os
 from shutil import copy
 import geopandas as gpd
 from psycopg2 import sql
+import overpass
 
 from dbutils import DBUtils
 
@@ -189,11 +190,42 @@ class Importer(DBUtils):
         )
 
 
-    def import_osm(self):
+    def import_osm(self,boundary_file=None):
         """
-        Processes OSM roads data and copies it into the database with attributes
-        needed for LTS.
+        Processes OSM data and copies it into the database with attributes
+        needed for LTS and destination scoring.
 
         args
 
         """
+        pass
+
+
+    def _osm_ways_from_overpass(self,xmax,ymax,xmin,ymin):
+        """
+        Submits an Overpass API query and returns a dictionary of results
+
+        args
+        xmax -- Maximum bound of the data on the X axis
+        ymax -- Maximum bound of the data on the Y axis
+        xmin -- Minimum bound of the data on the X axis
+        ymin -- Minimum bound of the data on the Y axis
+        """
+        # https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL
+        # https://github.com/mvexel/overpass-api-python-wrapper
+        # https://gis.stackexchange.com/questions/246303/can-you-restrict-which-osm-tags-are-returned-by-overpass-api
+        pass
+
+
+    def _osm_destination_from_overpass(self,xmax,ymax,xmin,ymin,tags):
+        """
+        Submits an Overpass API query and returns a dictionary of results
+
+        args
+        xmax -- Maximum bound of the data on the X axis
+        ymax -- Maximum bound of the data on the Y axis
+        xmin -- Minimum bound of the data on the X axis
+        ymin -- Minimum bound of the data on the Y axis
+        tags -- list of osm tags to use for filtering this destination type
+        """
+        pass
