@@ -146,6 +146,159 @@ class Importer(DBUtils):
 
         # load the boundary into geopandas
         print("Loading boundary")
+        self._load_boundary_as_dataframe(boundary_file,srid)
+
+        # buffer the boundary by the maximum travel distance
+        boundary.geometry = boundary.buffer(self.config["bna"]["connectivity"]["max_distance"])
+
+        # filter to blocks within the boundary
+        print("Filtering blocks to boundary")
+        blocks = blocks[blocks.intersects(boundary.unary_union)]
+
+        # copy data to db
+        print("Copying blocks to database")
+        self.gdf_to_postgis(
+            blocks,table,schema,
+            geom=geom,
+            id=id,
+            keep_case=keep_case,
+            srid=srid,
+            columns=columns,
+            overwrite=overwrite
+        )
+
+
+    def import_osm_ways(self,table=None,schema=None,boundary_file=None,srid=None,overwrite=False):
+        """
+        Processes OSM ways and copies the data into the database with attributes
+        needed for LTS scoring.
+
+        args
+        table -- name of the table to save the OSM ways to (if none use config)
+        schema -- the schema to create the table in (if none use config)
+        boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
+        srid -- projection to use
+        overwrite -- whether to overwrite any existing tables
+        """
+        if table is None:
+            if "table" in self.config["bna"]["blocks"]:
+                table = self.config["bna"]["blocks"]["table"]
+            else:
+                raise ValueError("No table given. Must be specified as an arg or in config file.")
+        if schema is None:
+            if "schema" in self.config["bna"]["blocks"]:
+                schema = self.config["bna"]["blocks"]["schema"]
+            else:
+                raise ValueError("No schema given. Must be specified as an arg or in config file.")
+        if not overwrite and self.table_exists(table,schema):
+            raise ValueError("Table %s.%s already exists" % (schema,table))
+        if srid is None:
+            if "srid" in self.config:
+                srid = self.config["srid"]
+            else:
+                raise ValueError("SRID must be specified as an arg or in the config file")
+        epsg = "epsg:%i" % srid
+
+        boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
+        boundary = boundary.to_crs({"init": "epsg:4326"})
+        min_lon,min_lat,max_lon,max_lat = boundary.total_bounds
+
+        ways = self._osm_ways_from_overpass(min_lon,min_lat,max_lon,max_lat)
+        ways = ways.to_crs({"init": epsg})
+
+        # copy data to db
+        print("Copying OSM ways to database")
+        self.gdf_to_postgis(
+            ways,table,schema,
+            srid=srid,
+            overwrite=overwrite
+        )
+
+
+    def _osm_ways_from_overpass(self,min_lon,min_lat,max_lon,max_lat):
+        """
+        Submits an Overpass API query and returns a geodataframe of results
+
+        args
+        min_lon -- Minimum longitude
+        min_lat -- Minimum latitude
+        max_lon -- Maximum longitude
+        max_lat -- Maximum latitude
+        """
+        # https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL
+        # https://github.com/mvexel/overpass-api-python-wrapper
+        # https://gis.stackexchange.com/questions/246303/can-you-restrict-which-osm-tags-are-returned-by-overpass-api
+        pass
+
+
+    def import_osm_destinations(self,schema,boundary_file=None,srid=None,overwrite=False):
+        """
+        Processes OSM destinations and copies the data into the database.
+
+        args
+        schema -- the schema to create the tables in
+        boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
+        srid -- projection to use
+        overwrite -- whether to overwrite any existing tables
+        """
+        if srid is None:
+            if "srid" in self.config:
+                srid = self.config["srid"]
+            else:
+                raise ValueError("SRID must be specified as an arg or in the config file")
+        epsg = "epsg:%i" % srid
+
+        boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
+        boundary = boundary.to_crs({"init": "epsg:4326"})
+        min_lon,min_lat,max_lon,max_lat = boundary.total_bounds
+
+        # set up a list of dictionaries with info about each destination
+        destinations = [
+            {"table":"schools","tags_query":""},
+            {"table":"parks","tags_query":""}
+        ]
+
+        for d in destinations:
+            table = d["table"]
+            tags = d["tags_query"]
+            gdf = self._osm_destination_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
+            print("Copying %s to database" % table)
+            self.gdf_to_postgis(
+                gdf,table,schema,
+                srid=srid,
+                overwrite=overwrite
+            )
+
+
+    def _osm_destination_from_overpass(self,min_lon,min_lat,max_lon,max_lat,tags):
+        """
+        Submits an Overpass API query and returns a geodataframe of results
+
+        args
+        min_lon -- Minimum longitude
+        min_lat -- Minimum latitude
+        max_lon -- Maximum longitude
+        max_lat -- Maximum latitude
+        tags -- list of osm tags to use for filtering this destination type
+        """
+        pass
+
+
+    def _load_boundary_as_dataframe(self,boundary_file=None,srid=None):
+        """
+        Loads the boundary file as a geodataframe. If a file is given, uses
+        the file. If not, reads the config and loads the boundary from the
+        table indicated in the config.
+
+        args
+        boundary_file -- path to a file
+        srid -- projection to use for the geodataframe (if none use the projection of the source data)
+
+        returns
+        geodataframe object
+        """
+        if not srid is None:
+            epsg = "epsg:%i" % srid
         if boundary_file is None:
             if "geom" in self.config["bna"]["boundary"]:
                 boundary_geom = self.config["bna"]["boundary"]["geom"]
@@ -168,64 +321,6 @@ class Importer(DBUtils):
             conn.close()
         else:
             boundary = gpd.read_file(boundary_file)
-        boundary = boundary.to_crs({'init': epsg})
-
-        # buffer the boundary by the maximum travel distance
-        boundary.geometry = boundary.buffer(self.config["bna"]["connectivity"]["max_distance"])
-
-        # filter to blocks within the boundary
-        print("Filtering blocks to boundary")
-        blocks = blocks[blocks.intersects(boundary.unary_union)]
-
-        # copy data to db
-        print("Copying blocks to database")
-        self.gdf_to_postgis(
-            blocks,table,schema,
-            geom=geom,
-            id=id,
-            keep_case=keep_case,
-            srid=srid,
-            columns=columns,
-            overwrite=overwrite
-        )
-
-
-    def import_osm(self,boundary_file=None):
-        """
-        Processes OSM data and copies it into the database with attributes
-        needed for LTS and destination scoring.
-
-        args
-
-        """
-        pass
-
-
-    def _osm_ways_from_overpass(self,xmax,ymax,xmin,ymin):
-        """
-        Submits an Overpass API query and returns a dictionary of results
-
-        args
-        xmax -- Maximum bound of the data on the X axis
-        ymax -- Maximum bound of the data on the Y axis
-        xmin -- Minimum bound of the data on the X axis
-        ymin -- Minimum bound of the data on the Y axis
-        """
-        # https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL
-        # https://github.com/mvexel/overpass-api-python-wrapper
-        # https://gis.stackexchange.com/questions/246303/can-you-restrict-which-osm-tags-are-returned-by-overpass-api
-        pass
-
-
-    def _osm_destination_from_overpass(self,xmax,ymax,xmin,ymin,tags):
-        """
-        Submits an Overpass API query and returns a dictionary of results
-
-        args
-        xmax -- Maximum bound of the data on the X axis
-        ymax -- Maximum bound of the data on the Y axis
-        xmin -- Minimum bound of the data on the X axis
-        ymin -- Minimum bound of the data on the Y axis
-        tags -- list of osm tags to use for filtering this destination type
-        """
-        pass
+        if not srid is None:
+            boundary = boundary.to_crs({'init': epsg})
+        return boundary
