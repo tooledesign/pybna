@@ -305,7 +305,7 @@ class Connectivity(DBUtils):
 
         # check tiles
         if tiles is None:
-            tiles = _get_tile_ids()
+            tiles = self._get_tile_ids()
         elif not type(tiles) == list and not type(tiles) == tuple:
             raise ValueError("Tile IDs must be given as an iterable")
 
