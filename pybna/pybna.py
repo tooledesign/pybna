@@ -324,7 +324,7 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
 
         subs = {
             "srid": sql.Literal(srid),
-            "boundary_table": sql.Identifier(config.boundary.table),
+            "boundary_table": sql.Identifier(boundary.table),
             "boundary_schema": sql.Identifier(boundary_schema),
             "boundary_geom_col": sql.Identifier(boundary_geom),
             "blocks_table": sql.Identifier(blocks.table),
