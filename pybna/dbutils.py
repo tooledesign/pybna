@@ -243,13 +243,16 @@ class DBUtils:
             conn = self.get_db_connection()
         cur = conn.cursor()
 
+        if isinstance(table, str):
+            table = sql.Identifier(table)
+        if schema is not None and isinstance(schema, str):
+            schema = sql.Identifier(schema)
+
         if schema is None:
-            cur.execute(sql.SQL("drop table if exists {}").format(sql.Identifier(table)))
+            cur.execute(sql.SQL("drop table if exists {}").format(table))
         else:
             cur.execute(sql.SQL("drop table if exists {}.{}").format(
-                sql.Identifier(schema),
-                sql.Identifier(table)
-            ))
+                schema, table))
 
         if not transaction:
             conn.commit()

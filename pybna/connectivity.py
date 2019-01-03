@@ -149,7 +149,7 @@ class Connectivity(DBUtils):
         conn = self.get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            sql.SQL("select {tiles_id_col} from {tiles_schema}.{tiles_table}").format(**subs)
+            sql.SQL("select {tiles_id_col} from {tiles_schema}.{tiles_table}").format(**self.sql_subs)
         )
         tiles = []
         for row in cur:

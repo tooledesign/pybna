@@ -142,10 +142,10 @@ class Core(DBUtils):
             cur.close()
             xmid = (xmin + xmax)/2
             ymid = (ymin + ymax)/2
-            self._split_tiles(conn,table,schema,geom,max_blocks,xmin,ymin,xmid,ymid) # bottom left
-            self._split_tiles(conn,table,schema,geom,max_blocks,xmid,ymin,xmax,ymid) # bottom right
-            self._split_tiles(conn,table,schema,geom,max_blocks,xmin,ymid,xmid,ymax) # upper left
-            self._split_tiles(conn,table,schema,geom,max_blocks,xmid,ymid,xmax,ymax) # upper right
+            self._split_tiles(conn,subs,max_blocks,xmin,ymin,xmid,ymid) # bottom left
+            self._split_tiles(conn,subs,max_blocks,xmid,ymin,xmax,ymid) # bottom right
+            self._split_tiles(conn,subs,max_blocks,xmin,ymid,xmid,ymax) # upper left
+            self._split_tiles(conn,subs,max_blocks,xmid,ymid,xmax,ymax) # upper right
         elif block_count == 0:
             cur.close()
         else:
