@@ -365,6 +365,10 @@ class Connectivity(DBUtils):
             else:
                 cur.execute(q)
 
+            # get hs nodes
+            cur.execute("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net")
+            hs_nodes = set(n[0] for n in cur.fetchall())
+
             # subset ls network
             subs["max_stress"] = sql.Literal(self.config.bna.connectivity.max_stress)
             subs["net_table"] = sql.Identifier("tmp_ls_net")
@@ -373,6 +377,10 @@ class Connectivity(DBUtils):
                 print(q.as_string(conn))
             else:
                 cur.execute(q)
+
+            # get ls nodes
+            cur.execute("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net")
+            ls_nodes = set(n[0] for n in cur.fetchall())
 
             # retrieve units and loop through
             if dry:
@@ -385,11 +393,13 @@ class Connectivity(DBUtils):
             for unit in unit_progress:
                 failure = False
                 unit_id = unit[0]
-                node_ids = unit[1]
+                node_ids = set(unit[1])
+                hs_node_ids = list(node_ids & hs_nodes)
+                ls_node_ids = list(node_ids & ls_nodes)
                 subs["unit_id"] = sql.Literal(unit_id)
-                subs["node_ids"] = sql.Literal(node_ids)
 
                 # get hs unit costs
+                subs["node_ids"] = sql.Literal(hs_node_ids)
                 subs["net_table"] = sql.Identifier("tmp_hs_net")
                 subs["distance_table"] = sql.Identifier("tmp_hs_distance")
                 subs["cost_to_units"] = sql.Identifier("tmp_hs_cost_to_units")
@@ -405,7 +415,7 @@ class Connectivity(DBUtils):
                     except:
                         failure = True
                         failed_units.append(unit_id)
-                        time.sleep(5)
+                        time.sleep(2)
                         continue
 
                 q = sql.SQL(q_flatten).format(**subs)
@@ -419,7 +429,7 @@ class Connectivity(DBUtils):
                     except:
                         failure = True
                         failed_units.append(unit_id)
-                        time.sleep(5)
+                        time.sleep(2)
                         continue
 
                 q = sql.SQL(q_cost_to_units).format(**subs)
@@ -433,39 +443,42 @@ class Connectivity(DBUtils):
                     except:
                         failure = True
                         failed_units.append(unit_id)
-                        time.sleep(5)
+                        time.sleep(2)
                         continue
 
                 # get ls unit costs
+                subs["node_ids"] = sql.Literal(ls_node_ids)
                 subs["net_table"] = sql.Identifier("tmp_ls_net")
                 subs["distance_table"] = sql.Identifier("tmp_ls_distance")
                 subs["cost_to_units"] = sql.Identifier("tmp_ls_cost_to_units")
-                q = sql.SQL(q_distance_table).format(**subs)
-                if dry:
-                    print(q.as_string(conn))
-                else:
-                    try:
-                        cur2 = conn.cursor()
-                        cur2.execute(q)
-                        cur2.close()
-                    except:
-                        failure = True
-                        failed_units.append(unit_id)
-                        time.sleep(5)
-                        continue
-                q = sql.SQL(q_cost_to_units).format(**subs)
-                if dry:
-                    print(q.as_string(conn))
-                else:
-                    try:
-                        cur2 = conn.cursor()
-                        cur2.execute(q)
-                        cur2.close()
-                    except:
-                        failure = True
-                        failed_units.append(unit_id)
-                        time.sleep(5)
-                        continue
+
+                if len(ls_node_ids) > 0:
+                    q = sql.SQL(q_distance_table).format(**subs)
+                    if dry:
+                        print(q.as_string(conn))
+                    else:
+                        try:
+                            cur2 = conn.cursor()
+                            cur2.execute(q)
+                            cur2.close()
+                        except:
+                            failure = True
+                            failed_units.append(unit_id)
+                            time.sleep(2)
+                            continue
+                    q = sql.SQL(q_cost_to_units).format(**subs)
+                    if dry:
+                        print(q.as_string(conn))
+                    else:
+                        try:
+                            cur2 = conn.cursor()
+                            cur2.execute(q)
+                            cur2.close()
+                        except:
+                            failure = True
+                            failed_units.append(unit_id)
+                            time.sleep(2)
+                            continue
 
                 # build combined cost table and write to connectivity table
                 q = sql.SQL(q_combine).format(**subs)
@@ -479,7 +492,7 @@ class Connectivity(DBUtils):
                     except:
                         failure = True
                         failed_units.append(unit_id)
-                        time.sleep(5)
+                        time.sleep(2)
                         continue
 
                 # if dry, break after one go-round so we don't overload the output
