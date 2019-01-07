@@ -36,6 +36,13 @@ WHERE
     AND tmp_combined.id = dunits.id
 ;
 
+UPDATE tmp_connectivity
+SET
+    hs = TRUE,
+    ls = TRUE
+WHERE source = target
+;
+
 DROP TABLE tmp_unit_blocks;
 DROP TABLE tmp_combined;
 

@@ -452,7 +452,11 @@ class Connectivity(DBUtils):
                 subs["distance_table"] = sql.Identifier("tmp_ls_distance")
                 subs["cost_to_units"] = sql.Identifier("tmp_ls_cost_to_units")
 
-                if len(ls_node_ids) > 0:
+                if len(ls_node_ids) == 0:
+                    cur2 = conn.cursor()
+                    cur2.execute("create temp table tmp_ls_cost_to_units (id int, agg_cost float)")
+                    cur2.close()
+                else:
                     q = sql.SQL(q_distance_table).format(**subs)
                     if dry:
                         print(q.as_string(conn))
