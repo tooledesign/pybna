@@ -60,7 +60,7 @@ class DBUtils:
         cur.execute(q)
 
         if cur.rowcount == 0:
-            raise Error("No primary key defined on table %s" % table)
+            raise ValueError("No primary key defined on table %s" % table)
 
         row = cur.fetchone()
         if self.verbose:
@@ -140,7 +140,7 @@ class DBUtils:
         cur.execute(q)
 
         if cur.rowcount == 0:
-            raise Error("Column %s not found in table %s" % (column,table))
+            raise ValueError("Column %s not found in table %s" % (column,table))
 
         row = cur.fetchone()
         cur.close()

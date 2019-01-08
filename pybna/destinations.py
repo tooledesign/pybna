@@ -415,7 +415,7 @@ class Destinations(DBUtils):
         subs["type"] = sql.SQL(
             self.get_column_type(
                 subs["blocks_table"].as_string(conn),
-                subs["blocks_geom_col"].as_string(conn),
+                subs["blocks_geom_col"].string,
                 subs["blocks_schema"].as_string(conn)
             )
         )
