@@ -6,6 +6,7 @@ from shutil import copy
 import geopandas as gpd
 from psycopg2 import sql
 import overpass
+import osmnx as ox
 
 from dbutils import DBUtils
 
@@ -168,30 +169,50 @@ class Importer(DBUtils):
         )
 
 
-    def import_osm_ways(self,table=None,schema=None,boundary_file=None,srid=None,overwrite=False):
+    def import_osm_network(self,ways_table=None,ways_schema=None,ints_table=None,
+                           ints_schema=None,boundary_file=None,boundary_buffer=None,
+                           srid=None,overwrite=False):
         """
         Processes OSM ways and copies the data into the database with attributes
         needed for LTS scoring.
 
         args
-        table -- name of the table to save the OSM ways to (if none use config)
-        schema -- the schema to create the table in (if none use config)
+        ways_table -- name of the table to save the OSM ways to (if none use config)
+        ways_schema -- the schema to create the ways table in (if none use config)
+        ints_table -- name of the table to save the OSM intersections to (if none use config)
+        ints_schema -- the schema to create the intersections table in (if none use config)
         boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
+        boundary_buffer -- distance (in units of the boundary) outside of the
+            boundary to pull network features (if none use max_distance from config)
         srid -- projection to use
         overwrite -- whether to overwrite any existing tables
         """
-        if table is None:
-            if "table" in self.config["bna"]["blocks"]:
-                table = self.config["bna"]["blocks"]["table"]
+        if ways_table is None:
+            if "table" in self.config["bna"]["network"]["roads"]:
+                ways_table = self.config["bna"]["network"]["roads"]["table"]
             else:
-                raise ValueError("No table given. Must be specified as an arg or in config file.")
-        if schema is None:
-            if "schema" in self.config["bna"]["blocks"]:
-                schema = self.config["bna"]["blocks"]["schema"]
+                raise ValueError("No ways table given. Must be specified as an arg or in config file.")
+        if ways_schema is None:
+            if "schema" in self.config["bna"]["network"]["roads"]:
+                ways_schema = self.config["bna"]["network"]["roads"]["schema"]
             else:
-                raise ValueError("No schema given. Must be specified as an arg or in config file.")
-        if not overwrite and self.table_exists(table,schema):
-            raise ValueError("Table %s.%s already exists" % (schema,table))
+                raise ValueError("No ways schema given. Must be specified as an arg or in config file.")
+        if ints_table is None:
+            if "table" in self.config["bna"]["network"]["intersections"]:
+                ints_table = self.config["bna"]["network"]["intersections"]["table"]
+            else:
+                raise ValueError("No intersections table given. Must be specified as an arg or in config file.")
+        if ints_schema is None:
+            if "schema" in self.config["bna"]["network"]["intersections"]:
+                ints_schema = self.config["bna"]["network"]["intersections"]["schema"]
+            else:
+                raise ValueError("No ways schema given. Must be specified as an arg or in config file.")
+        if not overwrite and self.table_exists(ways_table,ways_schema):
+            raise ValueError("Table %s.%s already exists" % (ways_table,ways_schema))
+        if not overwrite and self.table_exists(ints_table,ints_schema):
+            raise ValueError("Table %s.%s already exists" % (ints_table,ints_schema))
+        if boundary_buffer is None:
+            boundary_buffer = self.config["bna"]["connectivity"]["max_distance"]
         if srid is None:
             if "srid" in self.config:
                 srid = self.config["srid"]
@@ -200,35 +221,148 @@ class Importer(DBUtils):
         epsg = "epsg:%i" % srid
 
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
+        boundary = boundary.buffer(boundary_buffer)
         boundary = boundary.to_crs({"init": "epsg:4326"})
-        min_lon,min_lat,max_lon,max_lat = boundary.total_bounds
+        boundary = boundary.unary_union
 
-        ways = self._osm_ways_from_overpass(min_lon,min_lat,max_lon,max_lat)
+        ways, ints = self._osm_net_from_osmnx(boundary,epsg)
         ways = ways.to_crs({"init": epsg})
+        ints = ints.to_crs({"init": epsg})
+
+        # rename source and target columns
+        source = self.config["bna"]["network"]["roads"]["source_column"]
+        target = self.config["bna"]["network"]["roads"]["target_column"]
+        ways = ways.rename(columns={"u": source,"v": target})
 
         # copy data to db
         print("Copying OSM ways to database")
         self.gdf_to_postgis(
-            ways,table,schema,
+            ways,
+            ways_table,
+            ways_schema,
+            srid=srid,
+            overwrite=overwrite
+        )
+
+        print("Copying OSM intersections to database")
+        self.gdf_to_postgis(
+            ints,
+            ints_table,
+            ints_schema,
             srid=srid,
             overwrite=overwrite
         )
 
 
-    def _osm_ways_from_overpass(self,min_lon,min_lat,max_lon,max_lat):
+    def _osm_net_from_osmnx(self,boundary,epsg):
         """
         Submits an Overpass API query and returns a geodataframe of results
 
         args
-        min_lon -- Minimum longitude
-        min_lat -- Minimum latitude
-        max_lon -- Maximum longitude
-        max_lat -- Maximum latitude
+        boundary -- shapely geometry representing the boundary for pulling the network
         """
-        # https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL
-        # https://github.com/mvexel/overpass-api-python-wrapper
-        # https://gis.stackexchange.com/questions/246303/can-you-restrict-which-osm-tags-are-returned-by-overpass-api
-        pass
+        # https://osmnx.readthedocs.io/en/stable/osmnx.html#osmnx.save_load.graph_to_gdfs
+        node_tags = [
+            "access",
+            "amenity",
+            "bicycle",
+            "bridge",
+            "button_operated",
+            "crossing",
+            "flashing_lights",
+            "foot",
+            "highway",
+            "junction",
+            "leisure",
+            "motorcar",
+            "name",
+            "oneway",
+            "oneway:bicycle",
+            "operator",
+            "public_transport",
+            "railway",
+            "segregated",
+            "shop",
+            "stop",
+            "surface",
+            "traffic_sign",
+            "traffic_signals",
+            "tunnel",
+            "width"
+        ]
+        way_tags = [
+            "access",
+            "bridge",
+            "bicycle",
+            "button_operated",
+            "crossing",
+            "cycleway",
+            "cycleway:left",
+            "cycleway:right",
+            "cycleway:both",
+            "cycleway:buffer",
+            "cycleway:left:buffer",
+            "cycleway:right:buffer",
+            "cycleway:both:buffer",
+            "cycleway:width",
+            "cycleway:left:width",
+            "cycleway:right:width",
+            "cycleway:both:width",
+            "flashing_lights",
+            "foot",
+            "footway",
+            "highway",
+            "junction",
+            "landuse",
+            "lanes",
+            "lanes:forward",
+            "lanes:backward",
+            "lanes:both_ways",
+            "leisure",
+            "maxspeed",
+            "motorcar",
+            "name",
+            "oneway",
+            "oneway:bicycle",
+            "operator",
+            "parking",
+            "parking:lane",
+            "parking:lane:right",
+            "parking:lane:left",
+            "parking:lane:both",
+            "parking:lane:width",
+            "parking:lane:right:width",
+            "parking:lane:left:width",
+            "parking:lane:both:width",
+            "public_transport",
+            "railway",
+            "segregated",
+            "service",
+            "shop",
+            "stop",
+            "surface",
+            "tracktype",
+            "traffic_sign",
+            "traffic_signals:direction",
+            "tunnel",
+            "turn:lanes",
+            "turn:lanes:both_ways",
+            "turn:lanes:backward",
+            "turn:lanes:forward",
+            "width",
+            "width:lanes",
+            "width:lanes:forward",
+            "width:lanes:backward"
+        ]
+
+        ox.config(default_crs=epsg,useful_tags_node=node_tags,useful_tags_path=way_tags)
+        G = ox.graph_from_polygon(
+            boundary,network_type='all',simplify=True,retain_all=False,
+            truncate_by_edge=False,timeout=180,clean_periphery=True,
+            custom_filter=None
+        )
+        gdfs = ox.graph_to_gdfs(G)
+        return gdfs[1], gdfs[0]
 
 
     def import_osm_destinations(self,schema,boundary_file=None,srid=None,overwrite=False):
