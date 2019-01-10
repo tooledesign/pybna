@@ -85,7 +85,7 @@ class pyBNA(DBUtils,Zones,Destinations,Connectivity,Core):
         if "srid" in self.config:
             self.srid = self.config["srid"]
         elif not self.debug:
-            self.srid = self.get_srid(self.blocks.table)
+            self.srid = self.get_srid(self.config.bna.blocks.table)
 
         # destinations
         self.destinations = dict()
