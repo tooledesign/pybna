@@ -51,6 +51,10 @@ class Importer(DBUtils):
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
 
 
+    def __repr__(self):
+        return "pyBNA Importer connected with {%s}" % self.db_connection_string
+
+
     def import_boundary(self,fpath,srid=None):
         """
         Takes a shapefile input and saves it to the DB (reprojecting if srid is given)
