@@ -280,12 +280,15 @@ class Importer(DBUtils):
         roads_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","roads.sql"))
         ints_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","intersections.sql"))
 
-        # cur = conn.cursor()
-        # q = sql.SQL(roads_query).format(**subs)
-        # cur.execute(q)
-        # q = sql.SQL(ints_query).format(**subs)
-        # cur.execute(q)
-        # cur.close()
+        if overwrite:
+            self.drop_table(roads_table,schema=roads_schema,conn=conn)
+            self.drop_table(ints_table,schema=ints_schema,conn=conn)
+        cur = conn.cursor()
+        q = sql.SQL(roads_query).format(**subs)
+        cur.execute(q)
+        q = sql.SQL(ints_query).format(**subs)
+        cur.execute(q)
+        cur.close()
         conn.commit()
         conn.close()
 
