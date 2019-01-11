@@ -10,6 +10,7 @@ from psycopg2.extras import execute_values
 import pandas as pd
 import geopandas as gpd
 import numpy as np
+from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
 from binascii import hexlify
 from string import upper
 from tqdm import tqdm
@@ -294,6 +295,26 @@ class DBUtils:
         if overwrite:
             self.drop_table(table,schema,conn)
 
+        # get geom column type
+        shapely_type = gdf.geometry.apply(lambda x: type(x)).unique()
+        if len(shapely_type) > 1:
+            raise ValueError("Can't process more than one geometry type")
+        shapely_type = shapely_type[0]
+        if shapely_type is Point:
+            geom_type = "point"
+        elif shapely_type is MultiPoint:
+            geom_type = "multipoint"
+        elif shapely_type is LineString:
+            geom_type = "linestring"
+        elif shapely_type is MultiLineString:
+            geom_type = "multilinestring"
+        elif shapely_type is Polygon:
+            geom_type = "polygon"
+        elif shapely_type is MultiPolygon:
+            geom_type = "multipolygon"
+        else:
+            raise ValueError("Incompatible geometry type %s" % shapely_type)
+
         # remove geom column and any columns that aren't in the gdf
         tmp_cols = list()
         for c in columns:
@@ -310,7 +331,9 @@ class DBUtils:
             if c == gdf.geometry.name:
                 continue
             dtype = "text"
-            if gdf[c].dtype in (np.int8,np.int16,np.int32,np.int64,np.uint8,np.uint16,np.uint32,np.uint64):
+            if gdf[c].dtype in (np.int64,np.uint64):
+                dtype = "bigint"
+            if gdf[c].dtype in (np.int8,np.int16,np.int32,np.uint8,np.uint16,np.uint32):
                 dtype = "integer"
             if gdf[c].dtype in (np.float16,np.float32,np.float64):
                 dtype = "float"
@@ -351,12 +374,13 @@ class DBUtils:
             "schema": sql.Identifier(schema),
             "table": sql.Identifier(table),
             "geom": sql.Identifier(geom),
+            "geom_type": sql.SQL(geom_type),
             "srid": sql.Literal(srid),
             "index": sql.Identifier("sidx_"+table)
         }
         q = sql.SQL(" \
-            ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry(multipolygon,{srid}) \
-            USING ST_Multi(ST_SetSRID({geom}::geometry,{srid})); \
+            ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
+            USING ST_SetSRID({geom}::geometry,{srid}); \
             CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
             ANALYZE {schema}.{table};"
         ).format(**subs)
