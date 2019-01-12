@@ -10,10 +10,11 @@ import osmnx as ox
 import random
 import string
 
+from conf import Conf
 from dbutils import DBUtils
 
 
-class Importer(DBUtils):
+class Importer(DBUtils,Conf):
     """Standalone class to import pyBNA datasets"""
 
     def __init__(self, config="config.yaml", verbose=False, debug=False,
@@ -30,19 +31,20 @@ class Importer(DBUtils):
         user -- username to connect to database (overrides the config file if given)
         password -- password to connect to database (overrides the config file if given)
         """
+        Conf.__init__(self)
         self.verbose = verbose
         self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
-        self.config = yaml.safe_load(open(config))
+        self.config = self.parse_config(yaml.safe_load(open(config)))
         print("Connecting to database")
         if host is None:
-            host = self.config["db"]["host"]
+            host = self.config.db.host
         if db_name is None:
-            db_name = self.config["db"]["dbname"]
+            db_name = self.config.db.dbname
         if user is None:
-            user = self.config["db"]["user"]
+            user = self.config.db.user
         if password is None:
-            password = self.config["db"]["password"]
+            password = self.config.db.password
         db_connection_string = " ".join([
             "dbname=" + db_name,
             "user=" + user,
@@ -52,6 +54,7 @@ class Importer(DBUtils):
         if self.debug:
             print("DB connection: %s" % db_connection_string)
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
+        self.sql_subs = self.make_sql_substitutions(self.config)
 
 
     def __repr__(self):
@@ -109,30 +112,30 @@ class Importer(DBUtils):
             if not os.path.isfile(fpath):
                 raise ValueError("File not found at %s" % fpath)
         if table is None:
-            if "table" in self.config["bna"]["blocks"]:
-                table = self.config["bna"]["blocks"]["table"]
+            if "table" in self.config.bna.blocks:
+                table = self.config.bna.blocks.table
             else:
                 raise ValueError("No table given. Must be specified as an arg or in config file.")
         if schema is None:
-            if "schema" in self.config["bna"]["blocks"]:
-                schema = self.config["bna"]["blocks"]["schema"]
+            if "schema" in self.config.bna.blocks:
+                schema = self.config.bna.blocks.schema
             else:
                 raise ValueError("No schema given. Must be specified as an arg or in config file.")
         if not overwrite and self.table_exists(table,schema):
             raise ValueError("Table %s.%s already exists" % (schema,table))
         if id is None:
-            if "uid" in self.config["bna"]["blocks"]:
-                id = self.config["bna"]["blocks"]["uid"]
+            if "uid" in self.config.bna.blocks:
+                id = self.config.bna.blocks.uid
             else:
                 raise ValueError("No ID column name given. Must be specified as an arg or in config file.")
         if geom is None:
-            if "geom" in self.config["bna"]["blocks"]:
-                geom = self.config["bna"]["blocks"]["geom"]
+            if "geom" in self.config.bna.blocks:
+                geom = self.config.bna.blocks.geom
             else:
                 raise ValueError("No geom column name given. Must be specified as an arg or in config file.")
         if srid is None:
             if "srid" in self.config:
-                srid = self.config["srid"]
+                srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
         if boundary_file is not None:
@@ -144,7 +147,7 @@ class Importer(DBUtils):
         boundary = self._load_boundary_as_dataframe(boundary_file,srid)
 
         # buffer the boundary by the maximum travel distance
-        boundary.geometry = boundary.buffer(self.config["bna"]["connectivity"]["max_distance"])
+        boundary.geometry = boundary.buffer(self.config.bna.connectivity.max_distance)
 
         # copy the shapefile to temporary directory and load into geopandas
         if not fpath is None:
@@ -196,23 +199,23 @@ class Importer(DBUtils):
         overwrite -- whether to overwrite any existing tables
         """
         if roads_table is None:
-            if "table" in self.config["bna"]["network"]["roads"]:
-                roads_table = self.config["bna"]["network"]["roads"]["table"]
+            if "table" in self.config.bna.network.roads:
+                roads_table = self.config.bna.network.roads.table
             else:
                 raise ValueError("No ways table given. Must be specified as an arg or in config file.")
         if roads_schema is None:
-            if "schema" in self.config["bna"]["network"]["roads"]:
-                roads_schema = self.config["bna"]["network"]["roads"]["schema"]
+            if "schema" in self.config.bna.network.roads:
+                roads_schema = self.config.bna.network.roads.schema
             else:
                 raise ValueError("No ways schema given. Must be specified as an arg or in config file.")
         if ints_table is None:
-            if "table" in self.config["bna"]["network"]["intersections"]:
-                ints_table = self.config["bna"]["network"]["intersections"]["table"]
+            if "table" in self.self.config.bna.network.intersections:
+                ints_table = self.self.config.bna.network.intersections.table
             else:
                 raise ValueError("No intersections table given. Must be specified as an arg or in config file.")
         if ints_schema is None:
-            if "schema" in self.config["bna"]["network"]["intersections"]:
-                ints_schema = self.config["bna"]["network"]["intersections"]["schema"]
+            if "schema" in self.self.config.bna.network.intersections:
+                ints_schema = self.self.config.bna.network.intersections.schema
             else:
                 raise ValueError("No ways schema given. Must be specified as an arg or in config file.")
         if not overwrite and self.table_exists(roads_table,roads_schema):
@@ -220,25 +223,25 @@ class Importer(DBUtils):
         if not overwrite and self.table_exists(ints_table,ints_schema):
             raise ValueError("Table %s.%s already exists" % (ints_table,ints_schema))
         if boundary_buffer is None:
-            boundary_buffer = self.config["bna"]["connectivity"]["max_distance"]
+            boundary_buffer = self.config.bna.connectivity.max_distance
         if srid is None:
             if "srid" in self.config:
-                srid = self.config["srid"]
+                srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
         crs = {"init": "epsg:%i" % srid}
 
         # generate table names for holding tables
-        ways_table = "osm_ways_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
+        osm_ways_table = "osm_ways_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
         if keep_holding_tables:
-            ways_schema = roads_schema
+            osm_ways_schema = roads_schema
         else:
-            ways_schema = "pg_temp"
-        nodes_table = "osm_nodes_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
+            osm_ways_schema = "pg_temp"
+        osm_nodes_table = "osm_nodes_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
         if keep_holding_tables:
-            nodes_schema = ints_schema
+            osm_nodes_schema = ints_schema
         else:
-            nodes_schema = "pg_temp"
+            osm_nodes_schema = "pg_temp"
 
         # load the boundary and process
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
@@ -252,16 +255,19 @@ class Importer(DBUtils):
         nodes = nodes.to_crs(crs)
 
         # copy to db
-        subs = self._prepare_osm_subs(
-            roads_table,roads_schema,ways_table,ways_schema,
-            ints_table,ints_schema,nodes_table,nodes_schema
-        )
         print("Copying OSM ways to database")
+
+        subs = dict(self.sql_subs)
+        subs["osm_ways_table"] = sql.Identifier(osm_ways_table)
+        subs["osm_ways_schema"] = sql.Identifier(osm_ways_schema)
+        subs["osm_nodes_table"] = sql.Identifier(osm_nodes_table)
+        subs["osm_nodes_schema"] = sql.Identifier(osm_nodes_schema)
+
         conn = self.get_db_connection()
         self.gdf_to_postgis(
             ways,
-            ways_table,
-            ways_schema,
+            osm_ways_table,
+            osm_ways_schema,
             srid=srid,
             overwrite=overwrite,
             conn=conn
@@ -270,25 +276,28 @@ class Importer(DBUtils):
         print("Copying OSM intersections to database")
         self.gdf_to_postgis(
             nodes,
-            nodes_table,
-            nodes_schema,
+            osm_nodes_table,
+            osm_nodes_schema,
             srid=srid,
             overwrite=overwrite,
             conn=conn
         )
 
-        roads_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","roads.sql"))
-        ints_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","intersections.sql"))
+        queries = list()
+        queries.append(self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","roads","01_standardize_osm.sql")))
+        queries.append(self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","roads","02_create_table.sql")))
+        queries.append(self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","intersections.sql")))
 
         if overwrite:
             self.drop_table(roads_table,schema=roads_schema,conn=conn)
             self.drop_table(ints_table,schema=ints_schema,conn=conn)
-        cur = conn.cursor()
-        q = sql.SQL(roads_query).format(**subs)
-        cur.execute(q)
-        q = sql.SQL(ints_query).format(**subs)
-        cur.execute(q)
-        cur.close()
+
+        for query in queries:
+            cur = conn.cursor()
+            q = sql.SQL(query).format(**subs)
+            cur.execute(q)
+            cur.close()
+
         conn.commit()
         conn.close()
 
@@ -404,18 +413,6 @@ class Importer(DBUtils):
         return gdfs[1], gdfs[0]
 
 
-    def _prepare_osm_subs(self,roads_table,roads_schema,ways_table,ways_schema,
-                          ints_table,ints_schema,nodes_table,nodes_schema):
-        """
-        Creates uniform SQL substitutes to be plugged into the queries that transform
-        raw OSM data into BNA-ready tables
-
-        returns:
-        dictionary of SQL substitutes
-        """
-        pass
-
-
     def import_osm_destinations(self,schema,boundary_file=None,srid=None,overwrite=False):
         """
         Processes OSM destinations and copies the data into the database.
@@ -428,7 +425,7 @@ class Importer(DBUtils):
         """
         if srid is None:
             if "srid" in self.config:
-                srid = self.config["srid"]
+                srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
         epsg = "epsg:%i" % srid
@@ -485,18 +482,18 @@ class Importer(DBUtils):
         if not srid is None:
             epsg = "epsg:%i" % srid
         if boundary_file is None:
-            if "geom" in self.config["bna"]["boundary"]:
-                boundary_geom = self.config["bna"]["boundary"]["geom"]
+            if "geom" in self.config.bna.boundary:
+                boundary_geom = self.config.bna.boundary.geom
             else:
                 boundary_geom = "geom"
-            if "schema" in self.config["bna"]["boundary"]:
-                boundary_schema = self.config["bna"]["boundary"]["schema"]
+            if "schema" in self.config.bna.boundary:
+                boundary_schema = self.config.bna.boundary.schema
             else:
-                boundary_schema = self.get_schema(self.config["bna"]["boundary"]["table"])
+                boundary_schema = self.get_schema(self.config.bna.boundary.table)
             conn = self.get_db_connection()
             q = sql.SQL("select * from {}.{}").format(
                 sql.Identifier(boundary_schema),
-                sql.Identifier(self.config["bna"]["boundary"]["table"])
+                sql.Identifier(self.config.bna.boundary.table)
             ).as_string(conn)
             boundary = gpd.GeoDataFrame.from_postgis(
                 sql=q,
