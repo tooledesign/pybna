@@ -61,3 +61,15 @@ ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "width" 
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "width:lanes" TEXT;
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "width:lanes:forward" TEXT;
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "width:lanes:backward" TEXT;
+ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "one_way_car" TEXT;
+
+-- set one_way_car
+UPDATE {osm_ways_schema}.{osm_ways_table}
+SET one_way_car = 'ft'
+WHERE trim(oneway) IN ('1','yes')
+;
+
+UPDATE {osm_ways_schema}.{osm_ways_table}
+SET one_way_car = 'tf'
+WHERE trim(oneway) = '-1'
+;

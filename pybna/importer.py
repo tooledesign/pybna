@@ -283,10 +283,12 @@ class Importer(DBUtils,Conf):
             conn=conn
         )
 
-        queries = list()
-        queries.append(self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","roads","01_standardize_osm.sql")))
-        queries.append(self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","roads","02_create_table.sql")))
-        queries.append(self.read_sql_from_file(os.path.join(self.module_dir,"sql","importer","intersections.sql")))
+        road_queries = [os.path.join(self.module_dir,"sql","importer","roads",f) for f in os.listdir(os.path.join(self.module_dir,"sql","importer","roads"))]
+        road_queries = sorted(road_queries)
+        int_queries = [os.path.join(self.module_dir,"sql","importer","intersections",f) for f in os.listdir(os.path.join(self.module_dir,"sql","importer","intersections"))]
+        int_queries = sorted(int_queries)
+        queries = list(road_queries)
+        queries.extend(int_queries)
 
         if overwrite:
             self.drop_table(roads_table,schema=roads_schema,conn=conn)
