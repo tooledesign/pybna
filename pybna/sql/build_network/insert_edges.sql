@@ -20,175 +20,175 @@ CREATE TEMP TABLE e (
 INSERT INTO pg_temp.e
 -- backward to forward
 SELECT
-    i.int_id,
-    source.road_id,
-    source.{one_way},
+    i.{ints_id_col},
+    source.{roads_id_col},
+    source.{roads_oneway_col},
     ST_Azimuth(
-        ST_LineInterpolatePoint(source.geom,0.1),
-        ST_Startpoint(source.geom)
+        ST_LineInterpolatePoint(source.{roads_geom_col},0.1),
+        ST_Startpoint(source.{roads_geom_col})
     ),
-    source.intersection_from,
-    source.intersection_to,
-    source.{tf_seg_stress},
-    source.{tf_int_stress},
-    target.road_id,
-    target.{one_way},
+    source.{roads_source_col},
+    source.{roads_target_col},
+    source.{roads_stress_seg_bwd},
+    source.{roads_stress_cross_bwd},
+    target.{roads_id_col},
+    target.{roads_oneway_col},
     ST_Azimuth(
-        ST_Startpoint(target.geom),
-        ST_LineInterpolatePoint(target.geom,0.1)
+        ST_Startpoint(target.{roads_geom_col}),
+        ST_LineInterpolatePoint(target.{roads_geom_col},0.1)
     ),
-    target.intersection_from,
-    target.intersection_to,
-    target.{ft_seg_stress}
+    target.{roads_source_col},
+    target.{roads_target_col},
+    target.{roads_stress_seg_fwd}
 FROM
-    {schema}.{intersections} i,
-    {schema}.{roads} source,
-    {schema}.{roads} target
+    {ints_schema}.{ints_table} i,
+    {roads_schema}.{roads_table} source,
+    {roads_schema}.{roads_table} target
 WHERE
-    source.road_id != target.road_id
-    AND i.int_id = source.intersection_from
-    AND i.int_id = target.intersection_from;
+    source.{roads_id_col} != target.{roads_id_col}
+    AND i.{ints_id_col} = source.{roads_source_col}
+    AND i.{ints_id_col} = target.{roads_source_col};
 
 INSERT INTO pg_temp.e
 -- backward to backward
 SELECT
-    i.int_id,
-    source.road_id,
-    source.{one_way},
+    i.{ints_id_col},
+    source.{roads_id_col},
+    source.{roads_oneway_col},
     ST_Azimuth(
-        ST_LineInterpolatePoint(source.geom,0.1),
-        ST_Startpoint(source.geom)
+        ST_LineInterpolatePoint(source.{roads_geom_col},0.1),
+        ST_Startpoint(source.{roads_geom_col})
     ),
-    source.intersection_from,
-    source.intersection_to,
-    source.{tf_seg_stress},
-    source.{tf_int_stress},
-    target.road_id,
-    target.{one_way},
+    source.{roads_source_col},
+    source.{roads_target_col},
+    source.{roads_stress_seg_bwd},
+    source.{roads_stress_cross_bwd},
+    target.{roads_id_col},
+    target.{roads_oneway_col},
     ST_Azimuth(
-        ST_Endpoint(target.geom),
-        ST_LineInterpolatePoint(target.geom,0.9)
+        ST_Endpoint(target.{roads_geom_col}),
+        ST_LineInterpolatePoint(target.{roads_geom_col},0.9)
     ),
-    target.intersection_from,
-    target.intersection_to,
-    target.{tf_seg_stress}
+    target.{roads_source_col},
+    target.{roads_target_col},
+    target.{roads_stress_seg_bwd}
 FROM
-    {schema}.{intersections} i,
-    {schema}.{roads} source,
-    {schema}.{roads} target
+    {ints_schema}.{ints_table} i,
+    {roads_schema}.{roads_table} source,
+    {roads_schema}.{roads_table} target
 WHERE
-    source.road_id != target.road_id
-    AND i.int_id = source.intersection_from
-    AND i.int_id = target.intersection_to;
+    source.{roads_id_col} != target.{roads_id_col}
+    AND i.{ints_id_col} = source.{roads_source_col}
+    AND i.{ints_id_col} = target.{roads_target_col};
 
 INSERT INTO pg_temp.e
 -- forward to forward
 SELECT
-    i.int_id,
-    source.road_id,
-    source.{one_way},
+    i.{ints_id_col},
+    source.{roads_id_col},
+    source.{roads_oneway_col},
     ST_Azimuth(
-        ST_LineInterpolatePoint(source.geom,0.9),
-        ST_Endpoint(source.geom)
+        ST_LineInterpolatePoint(source.{roads_geom_col},0.9),
+        ST_Endpoint(source.{roads_geom_col})
     ),
-    source.intersection_from,
-    source.intersection_to,
-    source.{ft_seg_stress},
-    source.{ft_int_stress},
-    target.road_id,
-    target.{one_way},
+    source.{roads_source_col},
+    source.{roads_target_col},
+    source.{roads_stress_seg_fwd},
+    source.{roads_stress_cross_fwd},
+    target.{roads_id_col},
+    target.{roads_oneway_col},
     ST_Azimuth(
-        ST_Startpoint(target.geom),
-        ST_LineInterpolatePoint(target.geom,0.1)
+        ST_Startpoint(target.{roads_geom_col}),
+        ST_LineInterpolatePoint(target.{roads_geom_col},0.1)
     ),
-    target.intersection_from,
-    target.intersection_to,
-    target.{ft_seg_stress}
+    target.{roads_source_col},
+    target.{roads_target_col},
+    target.{roads_stress_seg_fwd}
 FROM
-    {schema}.{intersections} i,
-    {schema}.{roads} source,
-    {schema}.{roads} target
+    {ints_schema}.{ints_table} i,
+    {roads_schema}.{roads_table} source,
+    {roads_schema}.{roads_table} target
 WHERE
-    source.road_id != target.road_id
-    AND i.int_id = source.intersection_to
-    AND i.int_id = target.intersection_from;
+    source.{roads_id_col} != target.{roads_id_col}
+    AND i.{ints_id_col} = source.{roads_target_col}
+    AND i.{ints_id_col} = target.{roads_source_col};
 
 INSERT INTO pg_temp.e
 -- forward to backward
 SELECT
-    i.int_id,
-    source.road_id,
-    source.{one_way},
+    i.{ints_id_col},
+    source.{roads_id_col},
+    source.{roads_oneway_col},
     ST_Azimuth(
-        ST_LineInterpolatePoint(source.geom,0.9),
-        ST_Endpoint(source.geom)
+        ST_LineInterpolatePoint(source.{roads_geom_col},0.9),
+        ST_Endpoint(source.{roads_geom_col})
     ),
-    source.intersection_from,
-    source.intersection_to,
-    source.{ft_seg_stress},
-    source.{ft_int_stress},
-    target.road_id,
-    target.{one_way},
+    source.{roads_source_col},
+    source.{roads_target_col},
+    source.{roads_stress_seg_fwd},
+    source.{roads_stress_cross_fwd},
+    target.{roads_id_col},
+    target.{roads_oneway_col},
     ST_Azimuth(
-        ST_Endpoint(target.geom),
-        ST_LineInterpolatePoint(target.geom,0.9)
+        ST_Endpoint(target.{roads_geom_col}),
+        ST_LineInterpolatePoint(target.{roads_geom_col},0.9)
     ),
-    target.intersection_from,
-    target.intersection_to,
-    target.{tf_seg_stress}
+    target.{roads_source_col},
+    target.{roads_target_col},
+    target.{roads_stress_seg_bwd}
 FROM
-    {schema}.{intersections} i,
-    {schema}.{roads} source,
-    {schema}.{roads} target
+    {ints_schema}.{ints_table} i,
+    {roads_schema}.{roads_table} source,
+    {roads_schema}.{roads_table} target
 WHERE
-    source.road_id != target.road_id
-    AND i.int_id = source.intersection_to
-    AND i.int_id = target.intersection_to;
+    source.{roads_id_col} != target.{roads_id_col}
+    AND i.{ints_id_col} = source.{roads_target_col}
+    AND i.{ints_id_col} = target.{roads_target_col};
 
 
 -- building network from valid connections;
-INSERT INTO {schema}.{edges} (
-    int_id,
-    source_vert,
+INSERT INTO {edges_schema}.{edges_table} (
+    {ints_id_col},
+    {edges_source_col},
     source_road_id,
-    target_vert,
+    {edges_target_col},
     target_road_id,
     int_crossing,
-    geom
+    {edges_geom_col}
 )
 SELECT
     e.int_id,
-    source_node.{node_id},
+    source_node.{nodes_id_col},
     e.source_road_id,
-    target_node.{node_id},
+    target_node.{nodes_id_col},
     e.target_road_id,
     TRUE,   -- assume this movement crosses traffic until we prove otherwise
-    ST_Makeline(source_node.geom,target_node.geom)
+    ST_Makeline(source_node.{nodes_geom_col},target_node.{nodes_geom_col})
 FROM
     pg_temp.e,
-    {schema}.{nodes} source_node,
-    {schema}.{nodes} target_node
+    {nodes_schema}.{nodes_table} source_node,
+    {nodes_schema}.{nodes_table} target_node
 WHERE
     e.source_road_id = source_node.road_id
     AND e.target_road_id = target_node.road_id
     AND (
         e.source_road_dir IS NULL
-        OR (e.source_road_dir = {forward} AND e.int_id = e.source_int_to)
-        OR (e.source_road_dir = {backward} AND e.int_id = e.source_int_from)
+        OR (e.source_road_dir = {roads_oneway_fwd} AND e.int_id = e.source_int_to)
+        OR (e.source_road_dir = {roads_oneway_bwd} AND e.int_id = e.source_int_from)
     )
     AND (
         e.target_road_dir IS NULL
-        OR (e.target_road_dir = {forward} AND e.int_id = e.target_int_from)
-        OR (e.target_road_dir = {backward} AND e.int_id = e.target_int_to)
+        OR (e.target_road_dir = {roads_oneway_fwd} AND e.int_id = e.target_int_from)
+        OR (e.target_road_dir = {roads_oneway_bwd} AND e.int_id = e.target_int_to)
     );
 
 
 -- creating indexes;
-CREATE INDEX tidx_net_build_int_id ON {schema}.{edges} (int_id);
-CREATE INDEX tidx_net_build_source_road_id ON {schema}.{edges} (source_road_id);
-CREATE INDEX tidx_net_build_target_road_id ON {schema}.{edges} (target_road_id);
-CREATE INDEX {edge_index} ON {schema}.{edges} USING GIST (geom);
-ANALYZE {schema}.{edges};
+CREATE INDEX tidx_net_build_int_id ON {edges_schema}.{edges_table} ({ints_id_col});
+CREATE INDEX tidx_net_build_source_road_id ON {edges_schema}.{edges_table} (source_road_id);
+CREATE INDEX tidx_net_build_target_road_id ON {edges_schema}.{edges_table} (target_road_id);
+CREATE INDEX {edges_index} ON {edges_schema}.{edges_table} USING GIST ({edges_geom_col});
+ANALYZE {edges_schema}.{edges_table};
 
 
 -- reading turns and crossings;
@@ -204,33 +204,33 @@ ORDER BY
     source_road_id,
     degrees(5*pi() + source_road_azi - target_road_azi)::INT%360 ASC;
 
-UPDATE {schema}.{edges} AS edges
+UPDATE {edges_schema}.{edges_table} AS edges
 SET int_crossing = FALSE
 FROM t
 WHERE
-    edges.int_id = t.int_id
+    edges.{ints_id_col} = t.int_id
     AND edges.source_road_id = t.source_road_id
     AND edges.target_road_id = t.target_road_id;
 
 
 -- assigning stress and costs;
-UPDATE {schema}.{edges} AS edges
+UPDATE {edges_schema}.{edges_table} AS edges
 SET
-    link_stress = GREATEST(
+    {edges_stress_col} = GREATEST(
         e.source_seg_stress,
         e.target_seg_stress,
         CASE WHEN int_crossing THEN e.source_int_stress ELSE 0 END
     ),
-    link_cost = ROUND((ST_Length(source_road.geom) + ST_Length(target_road.geom)) / 2)
+    {edges_cost_col} = ROUND((ST_Length(source_road.{roads_geom_col}) + ST_Length(target_road.{roads_geom_col})) / 2)
 FROM
     pg_temp.e,
-    {schema}.{roads} source_road,
-    {schema}.{roads} target_road
+    {roads_schema}.{roads_table} source_road,
+    {roads_schema}.{roads_table} target_road
 WHERE
-    edges.int_id = e.int_id
+    edges.{ints_id_col} = e.int_id
     AND edges.source_road_id = e.source_road_id
     AND edges.target_road_id = e.target_road_id
-    AND edges.source_road_id = source_road.{road_id}
-    AND edges.target_road_id = target_road.{road_id};
+    AND edges.source_road_id = source_road.{roads_id_col}
+    AND edges.target_road_id = target_road.{roads_id_col};
 
 -- Network edges added;

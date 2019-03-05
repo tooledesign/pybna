@@ -7,62 +7,61 @@
 # want to specify these if you have an
 # unusual circumstance
 #############################################
-# srid: 4326
+srid: 7599
 
 db:
+    host: "192.168.40.225"
+    dbname: "madison_mpo_bna"
     user: "gis"
     password: "gis"
-    host: "localhost"
-    dbname: "bna"
 
 bna:
     boundary:
-        table: "neighborhood_boundary"
+        table: "boundary"
         geom: "geom"
 
     blocks:
-        table: "neighborhood_census_blocks"
+        table: "bna_test_blocks"
         # schema: "generated"
-        uid: "blockid10"
-        population: "pop10"
+        id_column: "BLOCKID10"
+        uid: "BLOCKID10"
+        population: "POP10"
         geom: "geom"
-        roads_tolerance: 15     # determines whether a road is considered "connected" to a block
-        min_road_length: 30     # determines whether a road is considered "connected" to a block
+        roads_tolerance: 45     # determines whether a road is considered "connected" to a block
+        min_road_length: 90     # determines whether a road is considered "connected" to a block
 
     tiles:
-        # file: "/path/to/shapefile.shp"
-        table: "grid_bna"
+        table: "grid"
         geom: "geom"
-        # columns: ["column1","column2"] # note: pybna already grabs the id column
 
     network:
         roads:
-            table: "neighborhood_ways"
+            table: "bna_test_streets"
             geom: "geom"
-            uid: "road_id"
-            source_column: "intersection_from"
-            target_column: "intersection_to"
-            oneway: {name: "one_way", forward: "ft", backward: "tf"}
+            uid: "id"
+            source_column: "source_int"
+            target_column: "target_int"
+            oneway: {name: "oneway", forward: "ft", backward: "tf"}
             stress:
                 segment:
-                    forward: ft_seg_stress
-                    backward: tf_seg_stress
+                    forward: stress
+                    backward: stress
                 crossing:
-                    forward: ft_int_stress
-                    backward: tf_int_stress
+                    forward: stress
+                    backward: stress
         intersections:
-            table: "neighborhood_ways_intersections"
+            table: "bna_test_streets_intersections"
             geom: "geom"
-            uid: "int_id"
+            uid: "id"
         edges:
-            table: "neighborhood_ways_net_link"
+            table: "bna_test_net_link"
             source_column: "source_vert"
             target_column: "target_vert"
             stress_column: "link_stress"
             cost_column: "link_cost"
             id_column: link_id
         nodes:
-            table: "neighborhood_ways_net_vert"
+            table: "bna_test_net_vert"
             id_column: vert_id
 
     connectivity:
@@ -70,13 +69,12 @@ bna:
             table: "zones"
             # schema: "automated"
             # uid: id
-        table: "neighborhood_connected_census_blocks"
+        table: "test_conn"
         source_column: "source_blockid10"
         target_column: "target_blockid10"
-        max_distance: 2680
+        max_distance: 8800
         max_detour: 25      # given as a whole number percentage (i.e. 25 == 25%)
-        detour_agnostic_threshold: 400  # under this distance, detour is ignored
-        max_stress: 1
+        max_stress: 2
 
     destinations:
       - name: people

@@ -15,63 +15,28 @@ from psycopg2 import sql
 from tqdm import tqdm
 import time
 
+from dbutils import DBUtils
 
-class Connectivity:
+
+class Connectivity(DBUtils):
     """pyBNA Connectivity class"""
 
-    config = None
-    net_config = None
-    verbose = None
-    debug = None
-    db = None  # reference to DBUtils class
-    srid = None
-    blocks = None  # reference to Blocks class
-    tiles = None
-    net_blocks = None
-    hs_graph = None
-    ls_graph = None
-    module_dir = None
-    db_connectivity_table = None
-    tiles_pkid = None
+    def __init__(self):
+        DBUtils.__init__(self,"")
+        self.config = None
+        self.net_config = None
+        self.verbose = None
+        self.debug = None
+        self.srid = None
+        self.tiles = None
+        self.net_blocks = None
+        self.module_dir = None
+        self.db_connectivity_table = None
+        self.tiles_pkid = None
+        self.db_connection_string = None
 
-    # register pandas apply with tqdm for progress bar
-    tqdm.pandas(desc="Evaluating connectivity")
-
-
-    def _get_block_nodes(self):
-        # set up substitutions
-        subs = {
-            "blocks_schema": sql.Identifier(self.blocks.schema),
-            "blocks": sql.Identifier(self.blocks.table),
-            "block_id": sql.Identifier(self.blocks.id_column),
-            "block_geom": sql.Identifier(self.blocks.geom),
-            "roads_schema": sql.Identifier(self.db.get_schema(self.net_config["roads"]["table"])),
-            "roads": sql.Identifier(self.net_config["roads"]["table"]),
-            "road_id": sql.Identifier(self.net_config["roads"]["uid"]),
-            "road_geom": sql.Identifier(self.net_config["roads"]["geom"]),
-            "nodes": sql.Identifier(self.net_config["nodes"]["table"]),
-            "node_id": sql.Identifier(self.net_config["nodes"]["id_column"]),
-            "distance": sql.Literal(self.config["bna"]["blocks"]["roads_tolerance"]),
-            "min_length": sql.Literal(self.config["bna"]["blocks"]["min_road_length"])
-        }
-
-        # read in the raw query language
-        f = open(os.path.join(self.module_dir,"sql","block_nodes.sql"))
-        raw = f.read()
-        f.close()
-
-        conn = self.db.get_db_connection()
-        q = sql.SQL(raw).format(**subs).as_string(conn)
-
-        if self.debug:
-            print(q)
-
-        return pd.read_sql_query(
-            q,
-            conn
-        )
-
-        conn.close()
+        # register pandas apply with tqdm for progress bar
+        # tqdm.pandas(desc="Evaluating connectivity")
 
 
     def build_network(self,dry=False):
@@ -85,51 +50,23 @@ class Connectivity:
             print("Building network in database")
 
         # set up substitutions
-        net_subs = {
-            "srid": sql.Literal(self.srid),
-            "schema": sql.Identifier(self.db.get_schema(self.net_config["roads"]["table"])),
-            "roads": sql.Identifier(self.net_config["roads"]["table"]),
-            "road_id": sql.Identifier(self.net_config["roads"]["uid"]),
-            "roads_geom": sql.Identifier(self.net_config["roads"]["geom"]),
-            "road_source": sql.Identifier(self.net_config["roads"]["source_column"]),
-            "road_target": sql.Identifier(self.net_config["roads"]["target_column"]),
-            "one_way": sql.Identifier(self.net_config["roads"]["oneway"]["name"]),
-            "forward": sql.Literal(self.net_config["roads"]["oneway"]["forward"]),
-            "backward": sql.Literal(self.net_config["roads"]["oneway"]["backward"]),
-            "intersections": sql.Identifier(self.net_config["intersections"]["table"]),
-            "int_id": sql.Identifier(self.net_config["intersections"]["uid"]),
-            "nodes": sql.Identifier(self.net_config["nodes"]["table"]),
-            "node_id": sql.Identifier(self.net_config["nodes"]["id_column"]),
-            "node_index": sql.Identifier("sidx_"+self.net_config["nodes"]["table"]),
-            "edges": sql.Identifier(self.net_config["edges"]["table"]),
-            "edge_id": sql.Identifier(self.net_config["edges"]["id_column"]),
-            "edge_index": sql.Identifier("sidx_"+self.net_config["edges"]["table"]),
-            "ft_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["forward"]),
-            "tf_seg_stress": sql.Identifier(self.net_config["roads"]["stress"]["segment"]["backward"]),
-            "ft_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["forward"]),
-            "tf_int_stress": sql.Identifier(self.net_config["roads"]["stress"]["crossing"]["backward"])
-        }
+        subs = dict(self.sql_subs)
+        subs["nodes_index"] = sql.Identifier("sidx_"+self.config.bna.network.nodes.table)
+        subs["edges_index"] = sql.Identifier("sidx_"+self.config.bna.network.edges.table)
 
         # read in the raw query language
-        f = open(os.path.join(self.module_dir,"sql","build_network","create_tables.sql"))
-        create_query = f.read()
-        f.close()
-        f = open(os.path.join(self.module_dir,"sql","build_network","insert_nodes.sql"))
-        nodes_query = f.read()
-        f.close()
-        f = open(os.path.join(self.module_dir,"sql","build_network","insert_edges.sql"))
-        edges_query = f.read()
-        f.close()
-        f = open(os.path.join(self.module_dir,"sql","build_network","cleanup.sql"))
-        cleanup_query = f.read()
-        f.close()
+        create_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","create_tables.sql"))
+        nodes_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","insert_nodes.sql"))
+        edges_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","insert_edges.sql"))
+        cleanup_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","cleanup.sql"))
+        associate_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","associate_roads_with_blocks.sql"))
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
 
         # create
         print("Creating network tables")
-        q = sql.SQL(create_query).format(**net_subs)
+        q = sql.SQL(create_query).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
@@ -137,7 +74,7 @@ class Connectivity:
 
         # nodes
         print("Adding network nodes")
-        q = sql.SQL(nodes_query).format(**net_subs)
+        q = sql.SQL(nodes_query).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
@@ -153,7 +90,7 @@ class Connectivity:
                 prog_statements.set_description(statement.strip()[2:])
             else:
                 # compose the query
-                q = sql.SQL(statement).format(**net_subs)
+                q = sql.SQL(statement).format(**subs)
 
                 if dry:
                     print(q.as_string(conn))
@@ -162,11 +99,28 @@ class Connectivity:
 
         # cleanup
         print("Finishing up network")
-        q = sql.SQL(cleanup_query).format(**net_subs)
+        q = sql.SQL(cleanup_query).format(**subs)
         if dry:
             print(q.as_string(conn))
         else:
             cur.execute(q)
+
+        # associate_roads_with_blocks
+        print("Associating roads with blocks")
+        statements = [s for s in associate_query.split(";") if len(s.strip()) > 1]
+        prog_statements = tqdm(statements)
+        for statement in prog_statements:
+            # handle progress updates
+            if statement.strip()[:2] == '--':
+                prog_statements.set_description(statement.strip()[2:])
+            else:
+                # compose the query
+                q = sql.SQL(statement).format(**subs)
+
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    cur.execute(q)
 
         conn.commit()
         cur.close()
@@ -179,60 +133,50 @@ class Connectivity:
 
         returns True if they exist, False if they don't
         """
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         for table in [self.net_config["edges"]["table"],self.net_config["nodes"]["table"]]:
             if self.verbose:
                 print("Checking for %s in database" % table)
-            if not self.db.table_exists(table):
+            if not self.table_exists(table):
                 return False
-        #
-        #     try:
-        #         cur = conn.cursor()
-        #         cur.execute(
-        #             sql.SQL(
-        #                 "select * from {} limit 1"
-        #             ).format(
-        #                 sql.Identifier(table)
-        #             )
-        #         )
-        #         cur.fetchone()
-        #         cur.close()
-        #     except psycopg2.ProgrammingError:
-        #         conn.close()
-        #         return False
-        #
-        # # no errors = tables found
-        # conn.close
         return True
+
+
+    def _get_tile_ids(self):
+        """
+        Returns a list of all tile IDs from the database
+        """
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            sql.SQL("select {tiles_id_col} from {tiles_schema}.{tiles_table}").format(**self.sql_subs)
+        )
+        tiles = []
+        for row in cur:
+            tiles.append(row[0])
+        return tiles
 
 
     def _connectivity_table_create(self,overwrite=False):
         """
         Creates the connectivity table in the database
         """
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
         if overwrite:
-            cur.execute(sql.SQL('drop table if exists {}').format(sql.Identifier(self.db_connectivity_table)))
+            cur.execute(
+                sql.SQL(
+                    'DROP TABLE IF EXISTS {connectivity_schema}.{connectivity_table}'
+                ).format(**self.sql_subs)
+            )
         try:
-            cur.execute(sql.SQL(
-                'create table {}.{} ( \
-                    id serial primary key, \
-                    {} varchar(15), \
-                    {} varchar(15), \
-                    high_stress BOOLEAN, \
-                    low_stress BOOLEAN \
-                )'
-            ).format(
-                sql.Identifier(self.blocks.schema),
-                sql.Identifier(self.db_connectivity_table),
-                sql.Identifier(self.config["bna"]["connectivity"]["source_column"]),
-                sql.Identifier(self.config["bna"]["connectivity"]["target_column"])
-            ))
+            raw = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","create_table.sql"))
+            q = sql.SQL(raw).format(**self.sql_subs)
+            cur.execute(q)
         except psycopg2.ProgrammingError:
             conn.rollback()
             conn.close()
-            raise ValueError("Table %s already exists" % self.db_connectivity_table)
+            raise ValueError("Table %s already exists" % self.config.bna.connectivity.table)
         cur.close()
         conn.commit()
         conn.close()
@@ -243,7 +187,7 @@ class Connectivity:
         """
         Drops indexes on the connectivity table
         """
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
         cur.execute("\
             SELECT indexrelid::regclass::text \
@@ -252,7 +196,15 @@ class Connectivity:
                 AND d.deptype = 'i' \
             WHERE  i.indrelid = {}::regclass \
             AND    d.objid IS NULL \
-        ").format(sql.Literal(self.db_connectivity_table))
+        ").format(
+            sql.Literal(
+                "'" +
+                self.config.bna.connectivity.schema +
+                "'.'" +
+                self.config.bna.connectivity.table +
+                "'"
+            )
+        )
         for row in cur:
             if row[0] is None:
                 pass
@@ -270,30 +222,28 @@ class Connectivity:
         """
         Creates index on the connectivity table
         """
-        source = self.config["bna"]["connectivity"]["source_column"]
-        target = self.config["bna"]["connectivity"]["target_column"]
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
+        subs["connectivity_index"] = sql.Identifier("idx_" + self.config.bna.connectivity.table + "_low_stress")
 
-        conn = self.db.get_db_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
         if overwrite:
             self._connectivity_table_drop_index()
 
         cur.execute(sql.SQL(" \
-            CREATE INDEX {} ON {} ({},{}) WHERE low_stress \
-        ").format(
-            sql.Identifier("idx_" + self.db_connectivity_table + "_low_stress"),
-            sql.Identifier(self.db_connectivity_table),
-            sql.Identifier(source),
-            sql.Identifier(target)
-        ))
+            CREATE INDEX {connectivity_index} \
+            ON {connectivity_schema}.{connectivity_table} ({connectivity_source_col},{connectivity_target_col}) \
+            WHERE low_stress \
+        ").format(**subs))
         conn.commit()
-        cur.execute(sql.SQL("analyze {}").format(sql.Identifier(self.db_connectivity_table)));
+        cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
     def calculate_connectivity(self,tiles=None,network_filter=None,append=False,dry=False):
         """
-        Prepares and executes queries to do connectivity analysis within the
-        database. Operates on tiles and adds results as each tile completes.
+        Prepares inputs and calls _calculate_connectivity for operating on
+        blocks
 
         args
         tiles -- list of tile IDs to operate on. if empty use all tiles
@@ -301,126 +251,268 @@ class Connectivity:
         append -- append to existing db table instead of creating a new one
         dry -- only prepare the query language but don't execute in the database
         """
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
+
+        # set up references to units
+        subs["units_table"] = subs["blocks_table"]
+        subs["units_schema"] = subs["blocks_schema"]
+        subs["units_id_col"] = subs["blocks_id_col"]
+        subs["units_geom_col"] = subs["blocks_geom_col"]
+
+        self._calculate_connectivity(subs,zone_unit=False,tiles=tiles,network_filter=network_filter,append=append,dry=dry)
+
+
+    def calculate_connectivity_with_zones(self,tiles=None,network_filter=None,append=False,dry=False):
+        """
+        Prepares inputs and calls _calculate_connectivity for operating on
+        zones
+
+        args
+        tiles -- list of tile IDs to operate on. if empty use all tiles
+        network_filter -- filter to be applied to the road network when routing
+        append -- append to existing db table instead of creating a new one
+        dry -- only prepare the query language but don't execute in the database
+        """
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
+
+        # set up references to units
+        subs["units_table"] = subs["zones_table"]
+        subs["units_schema"] = subs["zones_schema"]
+        subs["units_id_col"] = subs["zones_id_col"]
+        subs["units_geom_col"] = subs["zones_geom_col"]
+
+        self._calculate_connectivity(subs,zone_unit=True,tiles=tiles,network_filter=network_filter,append=append,dry=dry)
+
+
+    def _calculate_connectivity(self,subs,zone_unit=False,tiles=None,network_filter=None,append=False,dry=False):
+        """
+        Organizes and calls SQL scripts for calculating connectivity based on
+        blocks or zones.
+
+        args
+        subs -- dictionary of SQL substitutions (usually comes from self.sql_subs)
+        zone_unit -- whether to use blocks (false) or zones (true)
+        tiles -- list of tile IDs to operate on. if empty use all tiles
+        network_filter -- filter to be applied to the road network when routing
+        append -- append to existing db table instead of creating a new one
+        dry -- only prepare the query language but don't execute in the database
+        """
+        if network_filter is None:
+            network_filter = "TRUE"
+        subs["network_filter"] = sql.SQL(network_filter)
+
         # check tiles
         if tiles is None:
-            conn = self.db.get_db_connection()
-            cur = conn.cursor()
-            cur.execute(sql.SQL("select {} from {}").format(
-                sql.Identifier(self.tiles_pkid),
-                sql.Identifier(self.config["bna"]["tiles"]["table"])
-            ))
-            tiles = []
-            for row in cur:
-                tiles.append(row[0])
+            tiles = self._get_tile_ids()
         elif not type(tiles) == list and not type(tiles) == tuple:
             raise ValueError("Tile IDs must be given as an iterable")
 
-        # drop db table or check existence if append mode set
+        # create db table or check existence if append mode set
         if not append and not dry:
             self._connectivity_table_create(overwrite=False)
-        elif not self.db.table_exists(self.db_connectivity_table) and not dry:
-            raise ValueError("table %s not found" % self.db_connectivity_table)
+        if append and not dry:
+            if not self.table_exists(self.db_connectivity_table):
+                raise ValueError("table %s not found" % self.db_connectivity_table)
+
+        # get raw queries
+        q_filter_to_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","filter_to_tile.sql"))
+        if zone_unit:
+            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","unit_nodes_zones.sql"))
+        else:
+            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","unit_nodes_blocks.sql"))
+        q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","network_subset.sql"))
+        q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","distance_table.sql"))
+        if zone_unit:
+            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","flatten_zones.sql"))
+        else:
+            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","flatten_blocks.sql"))
+        q_cost_to_units = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","cost_to_units.sql"))
+
+        q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","combine_cost_matrices.sql"))
 
         tile_progress = tqdm(tiles)
-        failed_tiles = list()
+        failed_units = list()
 
         for tile_id in tile_progress:
-            failure = False
             tile_progress.set_description("Tile id: "+str(tile_id))
-            hs_link_query = self._build_link_query(tile_id,filter=network_filter)
-            ls_link_query = self._build_link_query(tile_id,max_stress=self.config["bna"]["connectivity"]["max_stress"],filter=network_filter)
+            subs["tile_id"] = sql.Literal(tile_id)
 
-            subs = {
-                "blocks_table": sql.Identifier(self.config["bna"]["blocks"]["table"]),
-                "block_id_col": sql.Identifier(self.config["bna"]["blocks"]["id_column"]),
-                "block_geom_col": sql.Identifier(self.config["bna"]["blocks"]["geom"]),
-                "tiles_table": sql.Identifier(self.config["bna"]["tiles"]["table"]),
-                "tile_id_col": sql.Identifier(self.tiles_pkid),
-                "tile_geom_col": sql.Identifier(self.config["bna"]["tiles"]["geom"]),
-                "tile_id": sql.Literal(tile_id),
-                "vert_table": sql.Identifier(self.net_config["nodes"]["table"]),
-                "vert_id_col": sql.Identifier(self.net_config["nodes"]["id_column"]),
-                "road_id": sql.Identifier("road_id"),
-                "connectivity_table": sql.Identifier(self.db_connectivity_table),
-                "conn_source_col": sql.Identifier(self.config["bna"]["connectivity"]["source_column"]),
-                "conn_target_col": sql.Identifier(self.config["bna"]["connectivity"]["target_column"]),
-                "max_trip_distance": sql.Literal(self.config["bna"]["connectivity"]["max_distance"]),
-                "max_detour": sql.Literal(self.config["bna"]["connectivity"]["max_detour"]),
-                "hs_link_query": sql.Literal(hs_link_query),
-                "ls_link_query": sql.Literal(ls_link_query)
-            }
+            conn = self.get_db_connection()
+            cur = conn.cursor()
 
-            f = open(os.path.join(self.module_dir,"sql","connectivity","tile_based_connectivity.sql"))
-            raw = f.read()
-            f.close()
+            # filter units to tile
+            q = sql.SQL(q_filter_to_tile).format(**subs)
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur.execute(q)
 
-            conn = self.db.get_db_connection()
+            # associate units and nodes
+            q = sql.SQL(q_unit_nodes).format(**subs)
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur.execute(q)
 
-            statements = self.db.split_sql_for_tqdm(raw)
+            # subset hs network
+            subs["max_stress"] = sql.Literal(99)
+            subs["net_table"] = sql.Identifier("tmp_hs_net")
+            q = sql.SQL(q_network_subset).format(**subs)
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur.execute(q)
 
-            for statement in statements:
-                statements.set_description(statement["update"])
-                q = sql.SQL(statement["query"]).format(**subs)
+            # get hs nodes
+            cur.execute("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net")
+            hs_nodes = set(n[0] for n in cur.fetchall())
 
+            # subset ls network
+            subs["max_stress"] = sql.Literal(self.config.bna.connectivity.max_stress)
+            subs["net_table"] = sql.Identifier("tmp_ls_net")
+            q = sql.SQL(q_network_subset).format(**subs)
+            if dry:
+                print(q.as_string(conn))
+            else:
+                cur.execute(q)
+
+            # get ls nodes
+            cur.execute("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net")
+            ls_nodes = set(n[0] for n in cur.fetchall())
+
+            # retrieve units and loop through
+            if dry:
+                units = [(-100,[-200])]
+            else:
+                cur.execute("select id, node_ids from pg_temp.tmp_tileunits")
+                units = cur.fetchall()
+
+            unit_progress = tqdm(units)
+            for unit in unit_progress:
+                failure = False
+                unit_id = unit[0]
+                node_ids = set(unit[1])
+                hs_node_ids = list(node_ids & hs_nodes)
+                ls_node_ids = list(node_ids & ls_nodes)
+                subs["unit_id"] = sql.Literal(unit_id)
+
+                # get hs unit costs
+                subs["node_ids"] = sql.Literal(hs_node_ids)
+                subs["net_table"] = sql.Identifier("tmp_hs_net")
+                subs["distance_table"] = sql.Identifier("tmp_hs_distance")
+                subs["cost_to_units"] = sql.Identifier("tmp_hs_cost_to_units")
+
+                q = sql.SQL(q_distance_table).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
                     try:
-                        cur = conn.cursor()
-                        cur.execute(q)
-                        cur.close()
-                    except psycopg2.OperationalError:
-                        print("Tile %s failed" % str(tile_id))
-                        failed_tiles.append(tile_id)
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
                         failure = True
-                        time.sleep(60)
-                        break
+                        failed_units.append(unit_id)
+                        time.sleep(2)
+                        continue
 
-            if not failure:
+                q = sql.SQL(q_flatten).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_units.append(unit_id)
+                        time.sleep(2)
+                        continue
+
+                q = sql.SQL(q_cost_to_units).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_units.append(unit_id)
+                        time.sleep(2)
+                        continue
+
+                # get ls unit costs
+                subs["node_ids"] = sql.Literal(ls_node_ids)
+                subs["net_table"] = sql.Identifier("tmp_ls_net")
+                subs["distance_table"] = sql.Identifier("tmp_ls_distance")
+                subs["cost_to_units"] = sql.Identifier("tmp_ls_cost_to_units")
+
+                if len(ls_node_ids) == 0:
+                    cur2 = conn.cursor()
+                    cur2.execute("create temp table tmp_ls_cost_to_units (id int, agg_cost float)")
+                    cur2.close()
+                else:
+                    q = sql.SQL(q_distance_table).format(**subs)
+                    if dry:
+                        print(q.as_string(conn))
+                    else:
+                        try:
+                            cur2 = conn.cursor()
+                            cur2.execute(q)
+                            cur2.close()
+                        except:
+                            failure = True
+                            failed_units.append(unit_id)
+                            time.sleep(2)
+                            continue
+                    q = sql.SQL(q_cost_to_units).format(**subs)
+                    if dry:
+                        print(q.as_string(conn))
+                    else:
+                        try:
+                            cur2 = conn.cursor()
+                            cur2.execute(q)
+                            cur2.close()
+                        except:
+                            failure = True
+                            failed_units.append(unit_id)
+                            time.sleep(2)
+                            continue
+
+                # build combined cost table and write to connectivity table
+                q = sql.SQL(q_combine).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_units.append(unit_id)
+                        time.sleep(2)
+                        continue
+
+                # if dry, break after one go-round so we don't overload the output
+                if dry:
+                    unit_progress.close()
+                    break
+
+            if not dry:
                 conn.commit()
             conn.close()
 
         print("\n\n------------------------------------")
-        print("Process completed with %i failed tiles" % len(failed_tiles))
-        if len(failed_tiles) > 0:
-            print(failed_tiles)
+        print("Process completed with %i failed units" % len(failed_units))
+        if len(failed_units) > 0:
+            print(failed_units)
         print("------------------------------------\n")
 
         if not dry and not append:
             self._connectivity_table_create_index();
-
-
-    def _build_link_query(self,tile_id,max_stress=99,filter=None):
-        """
-        Prepares the query of road network features passed to pgrouting for the
-        routing analysis.
-        """
-
-        if filter is None:
-            filter = "TRUE"
-
-        conn = self.db.get_db_connection()
-        cur = conn.cursor()
-
-        subs = {
-            "link_table": sql.Identifier(self.net_config["edges"]["table"]),
-            "link_id_col": sql.Identifier(self.net_config["edges"]["id_column"]),
-            "link_cost_col": sql.Identifier(self.net_config["edges"]["cost_column"]),
-            "link_stress_col": sql.Identifier(self.net_config["edges"]["stress_column"]),
-            "tiles_table": sql.Identifier(self.config["bna"]["tiles"]["table"]),
-            "tile_id_col": sql.Identifier(self.tiles_pkid),
-            "tile_geom_col": sql.Identifier(self.config["bna"]["tiles"]["geom"]),
-            "tile_id": sql.Literal(tile_id),
-            "max_trip_distance": sql.Literal(self.config["bna"]["connectivity"]["max_distance"]),
-            "max_stress": sql.Literal(max_stress),
-            "filter": sql.SQL(filter)
-        }
-
-        f = open(os.path.join(self.module_dir,"sql","connectivity","link_query.sql"))
-        raw = f.read()
-        f.close()
-
-        q = sql.SQL(raw).format(**subs).as_string(conn)
-        conn.close()
-
-        return q

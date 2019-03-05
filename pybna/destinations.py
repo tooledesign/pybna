@@ -9,17 +9,19 @@ import numpy as np
 from tqdm import tqdm
 import random, string
 
+from dbutils import DBUtils
 from destinationcategory import DestinationCategory
 
 
-class Destinations():
+class Destinations(DBUtils):
     """pyBNA Destinations class"""
-    config = None
-    verbose = None
-    debug = None
-    db = None              # reference to DBUtils class
-    srid = None
-    blocks = None
+
+    def __init__(self):
+        DBUtils.__init__(self,"")
+        self.config = None
+        self.verbose = None
+        self.debug = None
+        self.srid = None
 
 
     def score_destinations(self,output_table,schema=None,with_geoms=False,overwrite=False,dry=False):
@@ -32,20 +34,27 @@ class Destinations():
         overwrite -- overwrite a pre-existing table
         dry -- print the assembled query instead of executing in the database
         """
-        if schema is None:
-            schema = self.blocks.schema
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
 
-        conn = self.db.get_db_connection()
+        subs["scores_table"] = sql.Identifier(output_table)
+        if schema is not None:
+            subs["scores_schema"] = sql.Identifier(schema)
+        else:
+            subs["scores_schema"] = subs["blocks_schema"]
+
+        conn = self.get_db_connection()
         cur = conn.cursor()
 
         if not dry:
             if overwrite:
-                cur.execute(sql.SQL("drop table if exists {}.{}").format(
-                    sql.Identifier(schema),
-                    sql.Identifier(output_table)
-                ))
-            elif self.db.table_exists(output_table,schema):
-                raise psycopg2.ProgrammingError("Table %s.%s already exists" % (schema,output_table))
+                self.drop_table(
+                    table=subs["scores_table"],
+                    schema=subs["scores_schema"],
+                    conn=conn
+                )
+            elif self.table_exists(output_table,subs["scores_schema"].as_string(conn)):
+                raise psycopg2.ProgrammingError("Table %s.%s already exists" % (subs["scores_schema"].as_string(conn),output_table))
 
         # combine all the temporary tables into the final output
         columns = sql.SQL("")
@@ -56,40 +65,24 @@ class Destinations():
             columns += cat_cols
             tables += tab_cols
 
-        if "schema" in self.config["bna"]["boundary"]:
-            boundary_schema = self.config["bna"]["boundary"]["schema"]
-        else:
-            boundary_schema = self.db.get_schema(self.config["bna"]["boundary"]["table"])
-
-        subs = {
-            "blocks_schema": sql.Identifier(self.blocks.schema),
-            "blocks_table": sql.Identifier(self.blocks.table),
-            "block_id_col": sql.Identifier(self.blocks.id_column),
-            "block_geom": sql.Identifier(self.blocks.geom),
-            "boundary_schema": sql.Identifier(boundary_schema),
-            "boundary_table": sql.Identifier(self.config["bna"]["boundary"]["table"]),
-            "boundary_geom": sql.Identifier(self.config["bna"]["boundary"]["geom"]),
-            "schema": sql.Identifier(schema),
-            "table": sql.Identifier(output_table),
-            "columns": columns,
-            "tables": tables
-        }
+        subs["columns"] = columns
+        subs["tables"] = tables
 
         q = sql.SQL(" \
             SELECT \
-                blocks.{block_id_col} \
+                blocks.{blocks_id_col} \
                 {columns}, \
                 NULL::FLOAT AS overall_score \
-            INTO {schema}.{table} \
+            INTO {scores_schema}.{scores_table} \
             FROM \
                 {blocks_schema}.{blocks_table} blocks \
                 {tables} \
             WHERE EXISTS ( \
                 select 1 \
                 from {boundary_schema}.{boundary_table} bound \
-                where st_intersects(blocks.{block_geom},bound.{boundary_geom}) \
+                where st_intersects(blocks.{blocks_geom_col},bound.{boundary_geom_col}) \
             ); \
-            ALTER TABLE {schema}.{table} ADD PRIMARY KEY ({block_id_col}); \
+            ALTER TABLE {scores_schema}.{scores_table} ADD PRIMARY KEY ({blocks_id_col}); \
         ").format(**subs)
 
         if dry:
@@ -109,7 +102,7 @@ class Destinations():
         cases = sql.SQL(cases.as_string(conn)[1:])
         subs["cases"] = cases
         q = sql.SQL(" \
-            UPDATE {schema}.{table} \
+            UPDATE {scores_schema}.{scores_table} \
             SET {cases} \
         ").format(**subs)
 
@@ -208,12 +201,12 @@ class Destinations():
 
             tables += sql.SQL(" LEFT JOIN pg_temp.{} ON blocks.{} = {}.block_id ").format(
                 hs_tmptable,
-                sql.Identifier(self.blocks.id_column),
+                self.sql_subs["blocks_id_col"],
                 hs_tmptable
             )
             tables += sql.SQL(" LEFT JOIN pg_temp.{} ON blocks.{} = {}.block_id ").format(
                 ls_tmptable,
-                sql.Identifier(self.blocks.id_column),
+                self.sql_subs["blocks_id_col"],
                 ls_tmptable
             )
 
@@ -374,7 +367,7 @@ class Destinations():
             subs["denominator"] = sql.SQL(" + ").join(den)
             subs["maxpoints"] = sql.Literal(node["maxpoints"])
             q = sql.SQL(" \
-                update {schema}.{table} \
+                update {scores_schema}.{scores_table} \
                 set \
                     {this_column} = \
                         case \
@@ -420,13 +413,13 @@ class Destinations():
         """
         # get geometry type from block table
         subs["type"] = sql.SQL(
-            self.db.get_column_type(
-                self.blocks.table,
-                self.blocks.geom,
-                self.blocks.schema
+            self.get_column_type(
+                subs["blocks_table"].as_string(conn),
+                subs["blocks_geom_col"].string,
+                subs["blocks_schema"].as_string(conn)
             )
         )
-        subs["sidx_name"] = sql.Identifier("sidx_")+subs["table"]
+        subs["sidx_name"] = sql.Identifier("sidx_")+subs["scores_table"]
 
         f = open(os.path.join(self.module_dir,"sql","destinations","add_geoms.sql"))
         raw = f.read()

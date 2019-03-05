@@ -60,11 +60,11 @@ class DBUtils:
         cur.execute(q)
 
         if cur.rowcount == 0:
-            raise Error("No primary key defined on table %s" % table)
+            raise ValueError("No primary key defined on table %s" % table)
 
         row = cur.fetchone()
         if self.verbose:
-            print("   ID: %s" % row[0])
+            print("   Table %s  ID: %s" % (table,row[0]))
         cur.close()
         conn.close()
         return row[0]
@@ -82,8 +82,9 @@ class DBUtils:
         return cur.next()[0]
 
 
-    def get_srid(self,table,geom="geom"):
-        schema = self.get_schema(table)
+    def get_srid(self,table,geom="geom",schema=None):
+        if schema is None:
+            schema = self.get_schema(table)
         conn = self.get_db_connection()
         cur = conn.cursor()
 
@@ -139,7 +140,7 @@ class DBUtils:
         cur.execute(q)
 
         if cur.rowcount == 0:
-            raise Error("Column %s not found in table %s" % (column,table))
+            raise ValueError("Column %s not found in table %s" % (column,table))
 
         row = cur.fetchone()
         cur.close()
@@ -209,3 +210,49 @@ class DBUtils:
                 # }
 
         return tqdm(parsed)
+
+
+    def read_sql_from_file(self,path):
+        """
+        Reads the SQL file at the path and returns it as plain text
+
+        args:
+        path -- file path
+
+        returns:
+        string
+        """
+        f = open(path)
+        query = f.read()
+        f.close()
+        return query
+
+
+    def drop_table(self,table,schema=None,conn=None):
+        """
+        Drops the given table from the database
+
+        args:
+        table -- table name
+        schema -- schema name (default: inferred)
+        conn -- a psycopg2 connection object (default: create new connection)
+        """
+        transaction = True
+        if conn is None:
+            transaction = False
+            conn = self.get_db_connection()
+        cur = conn.cursor()
+
+        if isinstance(table, str):
+            table = sql.Identifier(table)
+        if schema is not None and isinstance(schema, str):
+            schema = sql.Identifier(schema)
+
+        if schema is None:
+            cur.execute(sql.SQL("drop table if exists {}").format(table))
+        else:
+            cur.execute(sql.SQL("drop table if exists {}.{}").format(
+                schema, table))
+
+        if not transaction:
+            conn.commit()
