@@ -7,6 +7,26 @@ file for customizability. The current implementation requires a user to run the
 old-style BNA on the command line to import datasets. This library can build the
 routeable network, process the connectivity routing, and calculate scores.
 
+## Requirements
+
+pyBNA is tested with Python 2.7. The following libraries are required:
+- psycopg2
+- tqdm
+- pyyaml
+- geopandas
+- munch
+- overpass
+
+You can install these via pip:
+```
+pip install psycopg2 tqdm pyyaml geopandas munch overpass
+```
+
+The imposm library requires some additional packages to be installed. Consult the imposm documentation for details, but as of this writing you can handle the dependencies by running the following on a recent Ubuntu install
+```
+sudo apt install build-essential python-devel protobuf-compiler libprotobuf-dev
+```
+
 ## Getting started
 
 First, import pybna and create a pyBNA object by pointing it to the config file.

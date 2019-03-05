@@ -6,9 +6,13 @@ import os
 import yaml
 import psycopg2
 from psycopg2 import sql
+from psycopg2.extras import execute_values
 import pandas as pd
 import geopandas as gpd
-import pickle
+import numpy as np
+from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
+from binascii import hexlify
+from string import upper
 from tqdm import tqdm
 
 
@@ -256,3 +260,132 @@ class DBUtils:
 
         if not transaction:
             conn.commit()
+
+
+    def gdf_to_postgis(self,gdf,table,schema,columns=None,geom="geom",id="id",
+                       keep_case=False,srid=None,conn=None,overwrite=False):
+        """
+        Saves a geopandas geodataframe to Postgis.
+
+        args:
+        gdf -- the GeoDataFrame to save
+        table -- the table name
+        schema -- the schema name
+        columns -- a list of columns to save (if empty, save all columns)
+        geom -- name to use for the geom column
+        id -- name to use for the id/primary key column (created if it doesn't match anything in columns)
+        keep_case -- prevents conversion of column names to lower case
+        srid -- the projection to use (if none inferred from data)
+        conn -- an open psycopg2 connection
+        overwrite -- drops an existing table
+        """
+        # process inputs
+        transaction = True
+        if conn is None:
+            transaction = False
+            conn = self.get_db_connection()
+        if not keep_case:
+            gdf.columns = [c.lower() for c in gdf.columns]
+        if columns is None:
+            columns = gdf.columns
+        elif not keep_case:
+            columns = [c.lower() for c in columns]
+        if srid is None:
+            srid = int(gdf.geometry.crs["init"].split(":")[1])
+        if overwrite:
+            self.drop_table(table,schema,conn)
+
+        # get geom column type
+        shapely_type = gdf.geometry.apply(lambda x: type(x)).unique()
+        if len(shapely_type) > 1:
+            raise ValueError("Can't process more than one geometry type")
+        shapely_type = shapely_type[0]
+        if shapely_type is Point:
+            geom_type = "point"
+        elif shapely_type is MultiPoint:
+            geom_type = "multipoint"
+        elif shapely_type is LineString:
+            geom_type = "linestring"
+        elif shapely_type is MultiLineString:
+            geom_type = "multilinestring"
+        elif shapely_type is Polygon:
+            geom_type = "polygon"
+        elif shapely_type is MultiPolygon:
+            geom_type = "multipolygon"
+        else:
+            raise ValueError("Incompatible geometry type %s" % shapely_type)
+
+        # remove geom column and any columns that aren't in the gdf
+        tmp_cols = list()
+        for c in columns:
+            if c in gdf.columns and c != geom:
+                tmp_cols.append(c)
+        columns = list(tmp_cols)
+        del tmp_cols
+
+        db_columns = list()
+        types = list()
+        db_columns.append(geom)
+        types.append("text")
+        for c in columns:
+            if c == gdf.geometry.name:
+                continue
+            dtype = "text"
+            if gdf[c].dtype in (np.int64,np.uint64):
+                dtype = "bigint"
+            if gdf[c].dtype in (np.int8,np.int16,np.int32,np.uint8,np.uint16,np.uint32):
+                dtype = "integer"
+            if gdf[c].dtype in (np.float16,np.float32,np.float64):
+                dtype = "float"
+            if c.lower() == id.lower():
+                dtype += " primary key"
+            db_columns.append(c)
+            types.append(dtype)
+        columns_with_types = [sql.SQL(" ").join([sql.Identifier(k),sql.SQL(v)]) for k, v in zip(db_columns,types)]
+        if not id in db_columns:
+            columns_with_types.insert(0,sql.SQL(" ").join([sql.Identifier(id),sql.SQL("serial primary key")]))
+        columns_sql = sql.SQL(",").join(columns_with_types)
+        q = sql.SQL("CREATE TABLE {}.{} ({})").format(
+            sql.Identifier(schema),
+            sql.Identifier(table),
+            columns_sql
+        )
+        cur = conn.cursor()
+        cur.execute(q)
+
+        #
+        # copy data over
+        #
+        insert_sql = sql.SQL("INSERT INTO {}.{} ({})").format(
+            sql.Identifier(schema),
+            sql.Identifier(table),
+            sql.SQL(",").join([sql.Identifier(c) for c in db_columns])
+        )
+        insert_sql = insert_sql.as_string(conn)
+        insert_sql += " VALUES %s"
+
+        # convert geoms to wkt
+        gdf["wkbs"] = gdf.geometry.apply(lambda x: x.wkb).apply(hexlify).apply(upper)
+        gdf = gdf.drop(gdf.geometry.name,axis=1)
+        gdf = gdf.rename(columns={"wkbs": geom})
+
+        execute_values(cur,insert_sql,gdf[db_columns].values)
+        subs = {
+            "schema": sql.Identifier(schema),
+            "table": sql.Identifier(table),
+            "geom": sql.Identifier(geom),
+            "geom_type": sql.SQL(geom_type),
+            "srid": sql.Literal(srid),
+            "index": sql.Identifier("sidx_"+table)
+        }
+        q = sql.SQL(" \
+            ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
+            USING ST_SetSRID({geom}::geometry,{srid}); \
+            CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
+            ANALYZE {schema}.{table};"
+        ).format(**subs)
+        cur.execute(q)
+        cur.close()
+        if not transaction:
+            conn.commit()
+            conn.close()
