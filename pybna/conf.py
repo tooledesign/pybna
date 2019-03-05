@@ -1,6 +1,7 @@
 ###################################################################
 # The Config class houses methods for dealing with the config file
 ###################################################################
+import collections
 from psycopg2 import sql
 from munch import Munch
 from dbutils import DBUtils
@@ -76,7 +77,7 @@ class Conf(DBUtils):
         tiles_schema = " "
         tiles_id_col = " "
         tiles_geom_col = " "
-        if tiles in config.bna:
+        if "tiles" in config.bna:
             tiles = config.bna.tiles
             if "table" in tiles:
                 tiles_table = tiles.table

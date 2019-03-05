@@ -9,7 +9,6 @@
 ###################################################################
 import os
 import yaml
-import collections
 from munch import Munch
 from psycopg2 import sql
 from tqdm import tqdm

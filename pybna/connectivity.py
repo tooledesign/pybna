@@ -59,7 +59,7 @@ class Connectivity(DBUtils):
         nodes_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","insert_nodes.sql"))
         edges_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","insert_edges.sql"))
         cleanup_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","cleanup.sql"))
-        associate_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","associate_roads_with_blocks.sql"))
+        # associate_query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","build_network","associate_roads_with_blocks.sql"))
 
         conn = self.get_db_connection()
         cur = conn.cursor()
@@ -106,21 +106,21 @@ class Connectivity(DBUtils):
             cur.execute(q)
 
         # associate_roads_with_blocks
-        print("Associating roads with blocks")
-        statements = [s for s in associate_query.split(";") if len(s.strip()) > 1]
-        prog_statements = tqdm(statements)
-        for statement in prog_statements:
-            # handle progress updates
-            if statement.strip()[:2] == '--':
-                prog_statements.set_description(statement.strip()[2:])
-            else:
-                # compose the query
-                q = sql.SQL(statement).format(**subs)
-
-                if dry:
-                    print(q.as_string(conn))
-                else:
-                    cur.execute(q)
+        # print("Associating roads with blocks")
+        # statements = [s for s in associate_query.split(";") if len(s.strip()) > 1]
+        # prog_statements = tqdm(statements)
+        # for statement in prog_statements:
+        #     # handle progress updates
+        #     if statement.strip()[:2] == '--':
+        #         prog_statements.set_description(statement.strip()[2:])
+        #     else:
+        #         # compose the query
+        #         q = sql.SQL(statement).format(**subs)
+        #
+        #         if dry:
+        #             print(q.as_string(conn))
+        #         else:
+        #             cur.execute(q)
 
         conn.commit()
         cur.close()
@@ -317,20 +317,21 @@ class Connectivity(DBUtils):
                 raise ValueError("table %s not found" % self.db_connectivity_table)
 
         # get raw queries
-        q_filter_to_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","filter_to_tile.sql"))
+        q_filter_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","10_filter_tile.sql"))
         if zone_unit:
-            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","unit_nodes_zones.sql"))
+            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","20_unit_nodes_zones.sql"))
         else:
-            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","unit_nodes_blocks.sql"))
-        q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","network_subset.sql"))
-        q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","distance_table.sql"))
+            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","20_unit_nodes_blocks.sql"))
+        q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","30_network_subset.sql"))
+        q_units_in_this_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","35_units_in_this_tile.sql"))
+        q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","40_distance_table.sql"))
         if zone_unit:
-            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","flatten_zones.sql"))
+            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","50_flatten_zones.sql"))
         else:
-            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","flatten_blocks.sql"))
-        q_cost_to_units = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","cost_to_units.sql"))
+            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","50_flatten_blocks.sql"))
+        q_cost_to_units = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","60_cost_to_units.sql"))
 
-        q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","combine_cost_matrices.sql"))
+        q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","70_combine_cost_matrices.sql"))
 
         tile_progress = tqdm(tiles)
         failed_units = list()
@@ -343,7 +344,7 @@ class Connectivity(DBUtils):
             cur = conn.cursor()
 
             # filter units to tile
-            q = sql.SQL(q_filter_to_tile).format(**subs)
+            q = sql.SQL(q_filter_tile).format(**subs)
             if dry:
                 print(q.as_string(conn))
             else:
@@ -386,7 +387,8 @@ class Connectivity(DBUtils):
             if dry:
                 units = [(-100,[-200])]
             else:
-                cur.execute("select id, node_ids from pg_temp.tmp_tileunits")
+                q = sql.SQL(q_units_in_this_tile).format(**subs)
+                cur.execute(q)
                 units = cur.fetchall()
 
             unit_progress = tqdm(units)
