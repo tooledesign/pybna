@@ -186,6 +186,7 @@ class Destinations(DBUtils):
                     cur.close()
                 except psycopg2.Error as error:
                     conn.rollback()
+                    conn.close()
                     raise error
 
 
