@@ -5,9 +5,9 @@ SELECT
     link.{edges_cost_col} AS cost
 FROM
     {edges_schema}.{edges_table} link,
-    {tiles_schema}.{tiles_table} tile
+    {blocks_schema}.{blocks_table} block
 WHERE
-    tile.{tiles_id_col}={tile_id}
-    AND ST_DWithin(tile.{tiles_geom_col},link.{edges_geom_col},{connectivity_max_distance})
+    block.{blocks_id_col}={block_id}
+    AND ST_DWithin(block.{blocks_geom_col},link.{edges_geom_col},{connectivity_max_distance})
     AND {edges_stress_col} <= {max_stress}
     AND {filter}

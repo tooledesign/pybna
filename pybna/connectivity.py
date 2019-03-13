@@ -28,11 +28,9 @@ class Connectivity(DBUtils):
         self.verbose = None
         self.debug = None
         self.srid = None
-        self.tiles = None
         self.net_blocks = None
         self.module_dir = None
         self.db_connectivity_table = None
-        self.tiles_pkid = None
         self.db_connection_string = None
 
         # register pandas apply with tqdm for progress bar
@@ -142,19 +140,19 @@ class Connectivity(DBUtils):
         return True
 
 
-    def _get_tile_ids(self):
+    def _get_block_ids(self):
         """
-        Returns a list of all tile IDs from the database
+        Returns a list of all block IDs from the database
         """
         conn = self.get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            sql.SQL("select {tiles_id_col} from {tiles_schema}.{tiles_table}").format(**self.sql_subs)
+            sql.SQL("select {blocks_id_col} from {blocks_schema}.{blocks_table}").format(**self.sql_subs)
         )
-        tiles = []
+        blocks = []
         for row in cur:
-            tiles.append(row[0])
-        return tiles
+            blocks.append(row[0])
+        return blocks
 
 
     def _connectivity_table_create(self,overwrite=False):
@@ -240,12 +238,12 @@ class Connectivity(DBUtils):
         cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
-    def calculate_connectivity(self,tiles=None,network_filter=None,append=False,dry=False):
+    def calculate_connectivity(self,blocks=None,network_filter=None,append=False,dry=False):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
         args
-        tiles -- list of tile IDs to operate on. if empty use all tiles
+        blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
         append -- append to existing db table instead of creating a new one
         dry -- only prepare the query language but don't execute in the database
@@ -256,11 +254,11 @@ class Connectivity(DBUtils):
             network_filter = "TRUE"
         subs["network_filter"] = sql.SQL(network_filter)
 
-        # check tiles
-        if tiles is None:
-            tiles = self._get_tile_ids()
-        elif not type(tiles) == list and not type(tiles) == tuple:
-            raise ValueError("Tile IDs must be given as an iterable")
+        # check blocks
+        if blocks is None:
+            blocks = self._get_block_ids()
+        elif not type(blocks) == list and not type(blocks) == tuple:
+            raise ValueError("Block IDs must be given as an iterable")
 
         # create db table or check existence if append mode set
         if not append and not dry:
@@ -280,17 +278,17 @@ class Connectivity(DBUtils):
 
         q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","70_combine_cost_matrices.sql"))
 
-        tile_progress = tqdm(tiles)
+        block_progress = tqdm(blocks)
         failed_units = list()
 
-        for tile_id in tile_progress:
-            tile_progress.set_description("Tile id: "+str(tile_id))
-            subs["tile_id"] = sql.Literal(tile_id)
+        for block_id in block_progress:
+            block_progress.set_description("Block id: "+str(block_id))
+            subs["block_id"] = sql.Literal(block_id)
 
             conn = self.get_db_connection()
             cur = conn.cursor()
 
-            # filter units to tile
+            # filter blocks
             q = sql.SQL(q_filter_tile).format(**subs)
             if dry:
                 print(q.as_string(conn))

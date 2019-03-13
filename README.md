@@ -35,16 +35,6 @@ import pybna
 bna = pybna.pyBNA(config="/home/spencer/dev/napa/bna/bna_vine_config.yaml")
 ```
 
-If you don't already have tiles in your database you can create them with
-```
-bna.make_tiles()
-```
-It isn't necessary to create tiles, but it can be helpful for monitoring progress
-on a larger area. In addition, larger areas can sometimes overwhelm the
-computer, resulting in an out-of-memory error. Tiling reduces the amount of
-memory needed to process the connectivity calculations and can alleviate that
-problem.
-
 Next, you can calculate the connectivity with
 ```
 bna.calculate_connectivity()

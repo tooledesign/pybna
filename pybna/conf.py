@@ -12,7 +12,6 @@ class Conf(DBUtils):
 
     def __init__(self):
         DBUtils.__init__(self,"")
-        self.tiles_exist = None
 
 
     def parse_config(self,config):
@@ -43,7 +42,6 @@ class Conf(DBUtils):
         """
         boundary = config.bna.boundary
         blocks = config.bna.blocks
-        tiles = config.bna.tiles
         network = config.bna.network
         connectivity = config.bna.connectivity
 
@@ -70,34 +68,6 @@ class Conf(DBUtils):
             blocks_geom_col = blocks.geom
         else:
             blocks_geom_col = "geom"
-
-        # tiles
-        tiles_table = " "
-        tiles_schema = " "
-        tiles_id_col = " "
-        tiles_geom_col = " "
-        if "tiles" in config.bna:
-            tiles = config.bna.tiles
-            if "table" in tiles:
-                tiles_table = tiles.table
-                if "schema" in tiles:
-                    tiles_schema = tiles.schema
-                elif self.table_exists(tiles_table):
-                    tiles_schema = self.get_schema(tiles_table)
-                else:
-                    tiles_schema = blocks_schema
-                if "uid" in tiles:
-                    tiles_id_col = tiles.uid
-                elif self.table_exists(tiles_table,tiles_schema):
-                    tiles_id_col = self.get_pkid_col(tiles_table,tiles_schema)
-                else:
-                    tiles_id_col = "id"
-                if "geom" in tiles:
-                    tiles_geom_col = tiles.geom
-                elif self.table_exists(tiles_table,tiles_schema):
-                    tiles_geom_col = "geom"
-                else:
-                    tiles_geom_col = "geom"
 
         # roads
         if "schema" in network.roads:
@@ -191,10 +161,6 @@ class Conf(DBUtils):
             "blocks_population_col": sql.Identifier(blocks.population),
             "blocks_roads_tolerance": sql.Literal(blocks.roads_tolerance),
             "blocks_min_road_length": sql.Literal(blocks.min_road_length),
-            "tiles_table": sql.Identifier(tiles_table),
-            "tiles_schema": sql.Identifier(tiles_schema),
-            "tiles_id_col": sql.Identifier(tiles_id_col),
-            "tiles_geom_col": sql.Identifier(tiles_geom_col),
             "roads_table": sql.Identifier(network.roads.table),
             "roads_schema": sql.Identifier(roads_schema),
             "roads_id_col": sql.Identifier(roads_id_col),
