@@ -242,8 +242,7 @@ class Connectivity(DBUtils):
 
     def calculate_connectivity(self,tiles=None,network_filter=None,append=False,dry=False):
         """
-        Prepares inputs and calls _calculate_connectivity for operating on
-        blocks
+        Organizes and calls SQL scripts for calculating connectivity.
 
         args
         tiles -- list of tile IDs to operate on. if empty use all tiles
@@ -251,54 +250,8 @@ class Connectivity(DBUtils):
         append -- append to existing db table instead of creating a new one
         dry -- only prepare the query language but don't execute in the database
         """
-        # make a copy of sql substitutes
         subs = dict(self.sql_subs)
 
-        # set up references to units
-        subs["units_table"] = subs["blocks_table"]
-        subs["units_schema"] = subs["blocks_schema"]
-        subs["units_id_col"] = subs["blocks_id_col"]
-        subs["units_geom_col"] = subs["blocks_geom_col"]
-
-        self._calculate_connectivity(subs,zone_unit=False,tiles=tiles,network_filter=network_filter,append=append,dry=dry)
-
-
-    def calculate_connectivity_with_zones(self,tiles=None,network_filter=None,append=False,dry=False):
-        """
-        Prepares inputs and calls _calculate_connectivity for operating on
-        zones
-
-        args
-        tiles -- list of tile IDs to operate on. if empty use all tiles
-        network_filter -- filter to be applied to the road network when routing
-        append -- append to existing db table instead of creating a new one
-        dry -- only prepare the query language but don't execute in the database
-        """
-        # make a copy of sql substitutes
-        subs = dict(self.sql_subs)
-
-        # set up references to units
-        subs["units_table"] = subs["zones_table"]
-        subs["units_schema"] = subs["zones_schema"]
-        subs["units_id_col"] = subs["zones_id_col"]
-        subs["units_geom_col"] = subs["zones_geom_col"]
-
-        self._calculate_connectivity(subs,zone_unit=True,tiles=tiles,network_filter=network_filter,append=append,dry=dry)
-
-
-    def _calculate_connectivity(self,subs,zone_unit=False,tiles=None,network_filter=None,append=False,dry=False):
-        """
-        Organizes and calls SQL scripts for calculating connectivity based on
-        blocks or zones.
-
-        args
-        subs -- dictionary of SQL substitutions (usually comes from self.sql_subs)
-        zone_unit -- whether to use blocks (false) or zones (true)
-        tiles -- list of tile IDs to operate on. if empty use all tiles
-        network_filter -- filter to be applied to the road network when routing
-        append -- append to existing db table instead of creating a new one
-        dry -- only prepare the query language but don't execute in the database
-        """
         if network_filter is None:
             network_filter = "TRUE"
         subs["network_filter"] = sql.SQL(network_filter)
@@ -318,17 +271,11 @@ class Connectivity(DBUtils):
 
         # get raw queries
         q_filter_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","10_filter_tile.sql"))
-        if zone_unit:
-            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","20_unit_nodes_zones.sql"))
-        else:
-            q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","20_unit_nodes_blocks.sql"))
+        q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","20_unit_nodes_blocks.sql"))
         q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","30_network_subset.sql"))
         q_units_in_this_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","35_units_in_this_tile.sql"))
         q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","40_distance_table.sql"))
-        if zone_unit:
-            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","50_flatten_zones.sql"))
-        else:
-            q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","50_flatten_blocks.sql"))
+        q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","50_flatten_blocks.sql"))
         q_cost_to_units = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","60_cost_to_units.sql"))
 
         q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","70_combine_cost_matrices.sql"))

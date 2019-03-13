@@ -13,7 +13,6 @@ class Conf(DBUtils):
     def __init__(self):
         DBUtils.__init__(self,"")
         self.tiles_exist = None
-        self.zones_exist = None
 
 
     def parse_config(self,config):
@@ -168,33 +167,6 @@ class Conf(DBUtils):
         else:
             nodes_geom_col = "geom"
 
-        # zones
-        zones_table = " "
-        zones_schema = " "
-        zones_id_col = " "
-        zones_geom_col = " "
-        if "zones" in connectivity:
-            if "table" in connectivity.zones:
-                zones_table = connectivity.zones.table
-                if "schema" in connectivity.zones:
-                    zones_schema = connectivity.zones.schema
-                elif self.table_exists(zones_table):
-                    zones_schema = self.get_schema(zones_table)
-                else:
-                    zones_schema = blocks_schema
-                if "uid" in connectivity.zones:
-                    zones_id_col = connectivity.zones.uid
-                elif self.table_exists(zones_table,zones_schema):
-                    zones_id_col = self.get_pkid_col(zones_table,zones_schema)
-                else:
-                    zones_id_col = "id"
-                if "geom" in connectivity.zones:
-                    zones_geom_col = connectivity.zones.geom
-                elif self.table_exists(zones_table,zones_schema):
-                    zones_geom_col = "geom"
-                else:
-                    zones_geom_col = "geom"
-
         # connectivity
         if "schema" in connectivity:
             connectivity_schema = connectivity.schema
@@ -252,10 +224,6 @@ class Conf(DBUtils):
             "nodes_schema": sql.Identifier(nodes_schema),
             "nodes_id_col": sql.Identifier(nodes_id_col),
             "nodes_geom_col": sql.Identifier(nodes_geom_col),
-            "zones_table": sql.Identifier(zones_table),
-            "zones_schema": sql.Identifier(zones_schema),
-            "zones_id_col": sql.Identifier(zones_id_col),
-            "zones_geom_col": sql.Identifier(zones_geom_col),
             "connectivity_table": sql.Identifier(connectivity.table),
             "connectivity_schema": sql.Identifier(connectivity_schema),
             "connectivity_source_col": sql.Identifier(connectivity.source_column),
