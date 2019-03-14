@@ -248,7 +248,14 @@ class DBUtils:
         cur = conn.cursor()
 
         if isinstance(table, str):
-            table = sql.Identifier(table)
+            if schema is None:
+                try:
+                    schema, table = table.split(".")
+                    table = sql.Identifier(table)
+                except:
+                    pass
+            else:
+                table = sql.Identifier(table)
         if schema is not None and isinstance(schema, str):
             schema = sql.Identifier(schema)
 
