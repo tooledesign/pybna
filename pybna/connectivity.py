@@ -312,8 +312,11 @@ class Connectivity(DBUtils):
                 cur.execute(q)
 
             # get hs nodes
-            cur.execute("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net")
-            hs_nodes = set(n[0] for n in cur.fetchall())
+            if dry:
+                hs_nodes = {-1}
+            else:
+                cur.execute("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net")
+                hs_nodes = set(n[0] for n in cur.fetchall())
 
             # subset ls network
             subs["max_stress"] = sql.Literal(self.config.bna.connectivity.max_stress)
@@ -325,13 +328,19 @@ class Connectivity(DBUtils):
                 cur.execute(q)
 
             # get ls nodes
-            cur.execute("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net")
-            ls_nodes = set(n[0] for n in cur.fetchall())
+            if dry:
+                ls_nodes = {-1}
+            else:
+                cur.execute("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net")
+                ls_nodes = set(n[0] for n in cur.fetchall())
 
             # retrieve nodes for this block and loop through
-            q = sql.SQL(q_this_block_nodes).format(**subs)
-            cur.execute(q)
-            node_ids = set(cur.fetchone()[0])
+            if dry:
+                node_ids = {-1}
+            else:
+                q = sql.SQL(q_this_block_nodes).format(**subs)
+                cur.execute(q)
+                node_ids = set(cur.fetchone()[0])
             hs_node_ids = list(node_ids & hs_nodes)
             ls_node_ids = list(node_ids & ls_nodes)
 

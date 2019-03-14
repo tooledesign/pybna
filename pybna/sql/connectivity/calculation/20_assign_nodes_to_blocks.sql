@@ -45,5 +45,4 @@ CREATE INDEX idx_tmp_blocks_nodes_node_id ON tmp_blocks_nodes (node_id);
 ANALYZE tmp_blocks_nodes;
 
 -- drop tables that don't need to be carried through
-DROP TABLE IF EXISTS tmp_blocks;
 DROP TABLE IF EXISTS tmp_blocks_roads;
