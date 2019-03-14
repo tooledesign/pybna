@@ -1,5 +1,5 @@
-DROP TABLE IF EXISTS tmp_tile;
-CREATE TEMP TABLE tmp_tile AS (
+DROP TABLE IF EXISTS tmp_this_block;
+CREATE TEMP TABLE tmp_this_block AS (
     SELECT
         {blocks_id_col} AS id,
         {blocks_geom_col} AS geom

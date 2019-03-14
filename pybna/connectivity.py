@@ -268,20 +268,20 @@ class Connectivity(DBUtils):
                 raise ValueError("table %s not found" % self.db_connectivity_table)
 
         # get raw queries
-        q_filter_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","10_filter_tile.sql"))
-        q_unit_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","20_unit_nodes_blocks.sql"))
+        q_filter_this_block = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","10_filter_this_block.sql"))
+        q_assign_nodes_to_blocks = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","20_assign_nodes_to_blocks.sql"))
         q_network_subset = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","30_network_subset.sql"))
-        q_units_in_this_tile = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","35_units_in_this_tile.sql"))
+        q_this_block_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","35_this_block_nodes.sql"))
         q_distance_table = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","40_distance_table.sql"))
-        q_flatten = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","50_flatten_blocks.sql"))
-        q_cost_to_units = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","60_cost_to_units.sql"))
+        q_cost_to_blocks = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","60_cost_to_blocks.sql"))
 
         q_combine = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","70_combine_cost_matrices.sql"))
 
         block_progress = tqdm(blocks)
-        failed_units = list()
+        failed_blocks = list()
 
         for block_id in block_progress:
+            failure = False
             block_progress.set_description("Block id: "+str(block_id))
             subs["block_id"] = sql.Literal(block_id)
 
@@ -289,14 +289,14 @@ class Connectivity(DBUtils):
             cur = conn.cursor()
 
             # filter blocks
-            q = sql.SQL(q_filter_tile).format(**subs)
+            q = sql.SQL(q_filter_this_block).format(**subs)
             if dry:
                 print(q.as_string(conn))
             else:
                 cur.execute(q)
 
-            # associate units and nodes
-            q = sql.SQL(q_unit_nodes).format(**subs)
+            # associate blocks and nodes
+            q = sql.SQL(q_assign_nodes_to_blocks).format(**subs)
             if dry:
                 print(q.as_string(conn))
             else:
@@ -328,29 +328,24 @@ class Connectivity(DBUtils):
             cur.execute("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net")
             ls_nodes = set(n[0] for n in cur.fetchall())
 
-            # retrieve units and loop through
-            if dry:
-                units = [(-100,[-200])]
+            # retrieve nodes for this block and loop through
+            q = sql.SQL(q_this_block_nodes).format(**subs)
+            cur.execute(q)
+            node_ids = set(cur.fetchone()[0])
+            hs_node_ids = list(node_ids & hs_nodes)
+            ls_node_ids = list(node_ids & ls_nodes)
+
+            # get hs block costs
+            subs["node_ids"] = sql.Literal(hs_node_ids)
+            subs["net_table"] = sql.Identifier("tmp_hs_net")
+            subs["distance_table"] = sql.Identifier("tmp_hs_distance")
+            subs["cost_to_blocks"] = sql.Identifier("tmp_hs_cost_to_blocks")
+
+            if len(hs_node_ids) == 0:
+                cur2 = conn.cursor()
+                cur2.execute("create temp table tmp_hs_cost_to_blocks (id int, agg_cost float)")
+                cur2.close()
             else:
-                q = sql.SQL(q_units_in_this_tile).format(**subs)
-                cur.execute(q)
-                units = cur.fetchall()
-
-            unit_progress = tqdm(units)
-            for unit in unit_progress:
-                failure = False
-                unit_id = unit[0]
-                node_ids = set(unit[1])
-                hs_node_ids = list(node_ids & hs_nodes)
-                ls_node_ids = list(node_ids & ls_nodes)
-                subs["unit_id"] = sql.Literal(unit_id)
-
-                # get hs unit costs
-                subs["node_ids"] = sql.Literal(hs_node_ids)
-                subs["net_table"] = sql.Identifier("tmp_hs_net")
-                subs["distance_table"] = sql.Identifier("tmp_hs_distance")
-                subs["cost_to_units"] = sql.Identifier("tmp_hs_cost_to_units")
-
                 q = sql.SQL(q_distance_table).format(**subs)
                 if dry:
                     print(q.as_string(conn))
@@ -361,11 +356,11 @@ class Connectivity(DBUtils):
                         cur2.close()
                     except:
                         failure = True
-                        failed_units.append(unit_id)
+                        failed_blocks.append(block_id)
                         time.sleep(2)
                         continue
 
-                q = sql.SQL(q_flatten).format(**subs)
+                q = sql.SQL(q_cost_to_blocks).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
@@ -375,11 +370,22 @@ class Connectivity(DBUtils):
                         cur2.close()
                     except:
                         failure = True
-                        failed_units.append(unit_id)
+                        failed_blocks.append(block_id)
                         time.sleep(2)
                         continue
 
-                q = sql.SQL(q_cost_to_units).format(**subs)
+            # get ls block costs
+            subs["node_ids"] = sql.Literal(ls_node_ids)
+            subs["net_table"] = sql.Identifier("tmp_ls_net")
+            subs["distance_table"] = sql.Identifier("tmp_ls_distance")
+            subs["cost_to_blocks"] = sql.Identifier("tmp_ls_cost_to_blocks")
+
+            if len(ls_node_ids) == 0:
+                cur2 = conn.cursor()
+                cur2.execute("create temp table tmp_ls_cost_to_blocks (id int, agg_cost float)")
+                cur2.close()
+            else:
+                q = sql.SQL(q_distance_table).format(**subs)
                 if dry:
                     print(q.as_string(conn))
                 else:
@@ -389,76 +395,50 @@ class Connectivity(DBUtils):
                         cur2.close()
                     except:
                         failure = True
-                        failed_units.append(unit_id)
+                        failed_blocks.append(block_id)
+                        time.sleep(2)
+                        continue
+                q = sql.SQL(q_cost_to_blocks).format(**subs)
+                if dry:
+                    print(q.as_string(conn))
+                else:
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(q)
+                        cur2.close()
+                    except:
+                        failure = True
+                        failed_blocks.append(block_id)
                         time.sleep(2)
                         continue
 
-                # get ls unit costs
-                subs["node_ids"] = sql.Literal(ls_node_ids)
-                subs["net_table"] = sql.Identifier("tmp_ls_net")
-                subs["distance_table"] = sql.Identifier("tmp_ls_distance")
-                subs["cost_to_units"] = sql.Identifier("tmp_ls_cost_to_units")
-
-                if len(ls_node_ids) == 0:
+            # build combined cost table and write to connectivity table
+            q = sql.SQL(q_combine).format(**subs)
+            if dry:
+                print(q.as_string(conn))
+            else:
+                try:
                     cur2 = conn.cursor()
-                    cur2.execute("create temp table tmp_ls_cost_to_units (id int, agg_cost float)")
+                    cur2.execute(q)
                     cur2.close()
-                else:
-                    q = sql.SQL(q_distance_table).format(**subs)
-                    if dry:
-                        print(q.as_string(conn))
-                    else:
-                        try:
-                            cur2 = conn.cursor()
-                            cur2.execute(q)
-                            cur2.close()
-                        except:
-                            failure = True
-                            failed_units.append(unit_id)
-                            time.sleep(2)
-                            continue
-                    q = sql.SQL(q_cost_to_units).format(**subs)
-                    if dry:
-                        print(q.as_string(conn))
-                    else:
-                        try:
-                            cur2 = conn.cursor()
-                            cur2.execute(q)
-                            cur2.close()
-                        except:
-                            failure = True
-                            failed_units.append(unit_id)
-                            time.sleep(2)
-                            continue
+                except:
+                    failure = True
+                    failed_blocks.append(block_id)
+                    time.sleep(2)
+                    continue
 
-                # build combined cost table and write to connectivity table
-                q = sql.SQL(q_combine).format(**subs)
-                if dry:
-                    print(q.as_string(conn))
-                else:
-                    try:
-                        cur2 = conn.cursor()
-                        cur2.execute(q)
-                        cur2.close()
-                    except:
-                        failure = True
-                        failed_units.append(unit_id)
-                        time.sleep(2)
-                        continue
-
-                # if dry, break after one go-round so we don't overload the output
-                if dry:
-                    unit_progress.close()
-                    break
+            # if dry, break after one go-round so we don't overload the output
+            if dry:
+                break
 
             if not dry:
                 conn.commit()
             conn.close()
 
         print("\n\n------------------------------------")
-        print("Process completed with %i failed units" % len(failed_units))
-        if len(failed_units) > 0:
-            print(failed_units)
+        print("Process completed with %i failed units" % len(failed_blocks))
+        if len(failed_blocks) > 0:
+            print(failed_blocks)
         print("------------------------------------\n")
 
         if not dry and not append:
