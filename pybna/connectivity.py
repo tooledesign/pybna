@@ -340,11 +340,10 @@ class Connectivity(DBUtils):
             else:
                 q = sql.SQL(q_this_block_nodes).format(**subs)
                 cur.execute(q)
-                row = cur.fetchone()
-                if row:
-                    node_ids = set(row[0])
-                else:
+                if cur.rowcount() >= 0:
                     node_ids = set()
+                else:
+                    node_ids = set(cur.fetchone()[0])
             hs_node_ids = list(node_ids & hs_nodes)
             ls_node_ids = list(node_ids & ls_nodes)
 
