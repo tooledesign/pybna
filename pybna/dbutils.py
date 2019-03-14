@@ -237,8 +237,8 @@ class DBUtils:
         Drops the given table from the database
 
         args:
-        table -- table name
-        schema -- schema name (default: inferred)
+        table -- table name (optionally schema-qualified)
+        schema -- schema name (incompatible with schema-qualified table name)
         conn -- a psycopg2 connection object (default: create new connection)
         """
         transaction = True
@@ -247,23 +247,18 @@ class DBUtils:
             conn = self.get_db_connection()
         cur = conn.cursor()
 
-        if isinstance(table, str):
-            if schema is None:
-                try:
-                    schema, table = table.split(".")
-                    table = sql.Identifier(table)
-                except:
-                    pass
-            else:
-                table = sql.Identifier(table)
-        if schema is not None and isinstance(schema, str):
-            schema = sql.Identifier(schema)
-
         if schema is None:
-            cur.execute(sql.SQL("drop table if exists {}").format(table))
-        else:
-            cur.execute(sql.SQL("drop table if exists {}.{}").format(
-                schema, table))
+            try:
+                schema, table = table.split(".")
+            except:
+                schema = self.get_schema(table)
+                
+        cur.execute(
+            sql.SQL("drop table if exists {}.{}").format(
+                sql.Identifier(schema),
+                sql.Identifier(table)
+            )
+        )
 
         if not transaction:
             conn.commit()
