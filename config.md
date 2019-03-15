@@ -56,22 +56,6 @@ geom | Name of the geometry column |
 roads_tolerance | Tolerance used when searching for roads that are associated with a block | X
 min_road_length | Length a roadway must share with a block area in order to be considered associated with that block | X
 
-### tiles
-
-```
-    tiles:
-        table: "grid_bna"
-        geom: "geom"
-```
-
-Tiles are used to break the analysis up into manageable chunks. It's not necessary to provide tiles to pyBNA, but it allows you to track progress more accurately and may prevent failures due to high memory usage for larger analyses.
-
-Entry | Description | Required
-:--- | :--- | :---:
-table | Name of the table | X
-schema | Name of the schema |
-geom | Name of the geometry column |
-
 ### network
 
 ```

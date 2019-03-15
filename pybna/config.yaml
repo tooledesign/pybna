@@ -29,12 +29,6 @@ bna:
         roads_tolerance: 15     # determines whether a road is considered "connected" to a block
         min_road_length: 30     # determines whether a road is considered "connected" to a block
 
-    tiles:
-        # file: "/path/to/shapefile.shp"
-        table: "grid_bna"
-        geom: "geom"
-        # columns: ["column1","column2"] # note: pybna already grabs the id column
-
     network:
         roads:
             table: "neighborhood_ways"
@@ -66,10 +60,6 @@ bna:
             id_column: vert_id
 
     connectivity:
-        zones:
-            table: "zones"
-            # schema: "automated"
-            # uid: id
         table: "neighborhood_connected_census_blocks"
         source_column: "source_blockid10"
         target_column: "target_blockid10"

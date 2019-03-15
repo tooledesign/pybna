@@ -16,12 +16,11 @@ from tqdm import tqdm
 from core import Core
 from connectivity import Connectivity
 from destinations import Destinations
-from zones import Zones
 from conf import Conf
 from dbutils import DBUtils
 
 
-class pyBNA(DBUtils,Conf,Zones,Destinations,Connectivity,Core):
+class pyBNA(DBUtils,Conf,Destinations,Connectivity,Core):
     """Parent BNA class that glues together the subclasses"""
 
     def __init__(self, config="config.yaml", force_net_build=False,
@@ -41,7 +40,6 @@ class pyBNA(DBUtils,Conf,Zones,Destinations,Connectivity,Core):
 
         return: pyBNA object
         """
-        Zones.__init__(self)
         Destinations.__init__(self)
         Connectivity.__init__(self)
         Core.__init__(self)

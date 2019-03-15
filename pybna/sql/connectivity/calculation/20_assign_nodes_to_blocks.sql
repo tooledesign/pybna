@@ -6,15 +6,16 @@ CREATE TEMP TABLE tmp_blocks AS (
         ST_Buffer(blocks.{blocks_geom_col},{blocks_roads_tolerance}) AS geom
     FROM
         {blocks_schema}.{blocks_table} blocks,
-        tmp_tile
-    WHERE ST_DWithin(blocks.{blocks_geom_col},tmp_tile.geom,{connectivity_max_distance})
+        tmp_this_block
+    WHERE ST_DWithin(blocks.{blocks_geom_col},tmp_this_block.geom,{connectivity_max_distance})
 );
 CREATE INDEX tsidx_b ON tmp_blocks USING GIST (geom);
+ALTER TABLE tmp_blocks ADD PRIMARY KEY (id);
 ANALYZE tmp_blocks;
 
 -- find matching roads
-DROP TABLE IF EXISTS tmp_block_roads;
-CREATE TEMP TABLE tmp_block_roads AS (
+DROP TABLE IF EXISTS tmp_blocks_roads;
+CREATE TEMP TABLE tmp_blocks_roads AS (
     SELECT
         blocks.id,
         roads.{roads_id_col} AS road_id
@@ -29,20 +30,19 @@ CREATE TEMP TABLE tmp_block_roads AS (
         )
 );
 
-DROP TABLE IF EXISTS tmp_unit_nodes;
-CREATE TEMP TABLE tmp_unit_nodes AS (
+DROP TABLE IF EXISTS tmp_blocks_nodes;
+CREATE TEMP TABLE tmp_blocks_nodes AS (
     SELECT
-        tmp_block_roads.id,
+        tmp_blocks_roads.id,
         nodes.{nodes_id_col} AS node_id
     FROM
-        tmp_block_roads,
+        tmp_blocks_roads,
         {nodes_schema}.{nodes_table} nodes
-    WHERE tmp_block_roads.road_id = nodes.road_id
+    WHERE tmp_blocks_roads.road_id = nodes.road_id
 );
 
-CREATE INDEX idx_tmp_unit_nodes_node_id ON tmp_unit_nodes (node_id);
-ANALYZE tmp_unit_nodes;
+CREATE INDEX idx_tmp_blocks_nodes_node_id ON tmp_blocks_nodes (node_id);
+ANALYZE tmp_blocks_nodes;
 
 -- drop tables that don't need to be carried through
-DROP TABLE IF EXISTS tmp_blocks;
-DROP TABLE IF EXISTS tmp_block_roads;
+DROP TABLE IF EXISTS tmp_blocks_roads;
