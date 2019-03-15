@@ -343,7 +343,11 @@ class Connectivity(DBUtils):
                 if cur.rowcount <= 0:
                     node_ids = set()
                 else:
-                    node_ids = set(cur.fetchone()[0])
+                    node_ids = cur.fetchone()[0]
+                    if node_ids is None:
+                        node_ids = set()
+                    else:
+                        node_ids = set(node_ids)
             hs_node_ids = list(node_ids & hs_nodes)
             ls_node_ids = list(node_ids & ls_nodes)
 
