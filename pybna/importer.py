@@ -17,7 +17,7 @@ from dbutils import DBUtils
 class Importer(DBUtils,Conf):
     """Standalone class to import pyBNA datasets"""
 
-    def __init__(self, config="config.yaml", verbose=False, debug=False,
+    def __init__(self, config=None, verbose=False, debug=False,
                  host=None, db_name=None, user=None, password=None):
         """
         Reads the config file and sets up a connection to the database
@@ -35,6 +35,8 @@ class Importer(DBUtils,Conf):
         self.verbose = verbose
         self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
+        if config is None:
+            config = os.path.join(self.module_dir,"config.yaml")
         self.config = self.parse_config(yaml.safe_load(open(config)))
         print("Connecting to database")
         if host is None:
