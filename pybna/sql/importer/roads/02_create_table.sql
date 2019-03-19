@@ -1,11 +1,12 @@
 CREATE TABLE {roads_schema}.{roads_table} (
     {roads_id_col} INTEGER PRIMARY KEY,
     {roads_geom_col} geometry(linestring,{srid}),
+    osmid BIGINT,
     functional_class TEXT,
     path_id INTEGER,
-    speed_limit INTEGER,
     {roads_oneway_col} TEXT,
     width_ft INTEGER,
+    speed_limit INTEGER,
     ft_bike_infra TEXT,
     ft_bike_infra_width FLOAT,
     tf_bike_infra TEXT,

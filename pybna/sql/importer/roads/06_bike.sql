@@ -195,38 +195,3 @@ CREATE TEMP TABLE tmp_bike_infra AS (
         END AS tf_bike_infra_width
     FROM {osm_ways_schema}.{osm_ways_table} osm
 );
-
--- -- insert
--- INSERT INTO {roads_schema}.{roads_table} --(
--- --     {roads_id_col},
--- --     {roads_geom_col},
--- --     functional_class,
--- --     path_id,
--- --     speed_limit,
--- --     {roads_oneway_col},
--- --     width_ft,
--- --     ft_bike_infra,
--- --     ft_bike_infra_width,
--- --     tf_bike_infra,
--- --     tf_bike_infra_width,
--- --     ft_lanes,
--- --     tf_lanes,
--- --     ft_cross_lanes,
--- --     tf_cross_lanes,
--- --     twltl_cross_lanes,
--- --     ft_park,
--- --     tf_park,
--- --     {roads_stress_seg_fwd},
--- --     {roads_stress_cross_fwd},
--- --     {roads_stress_seg_bwd},
--- --     {roads_stress_cross_bwd},
--- --     xwalk
--- -- )
--- SELECT
---     osm.id,
---     osm.geom,
---     osm.highway, --functional_class
---     NULL, --path_id
---     osm.maxspeed,
---
--- FROM
