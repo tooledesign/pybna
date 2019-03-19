@@ -40,6 +40,7 @@ class Conf(DBUtils):
         returns:
         dictionary of SQL substitutions
         """
+        default_schema = self.get_default_schema()
         boundary = config.bna.boundary
         blocks = config.bna.blocks
         network = config.bna.network
@@ -49,7 +50,10 @@ class Conf(DBUtils):
         if "schema" in boundary:
             boundary_schema = boundary.schema
         else:
-            boundary_schema = self.get_schema(boundary.table)
+            try:
+                boundary_schema = self.get_schema(boundary.table)
+            except:
+                boundary_schema = default_schema
         if "geom" in boundary:
             boundary_geom = boundary.geom
         else:
@@ -59,7 +63,10 @@ class Conf(DBUtils):
         if "schema" in blocks:
             blocks_schema = blocks.schema
         else:
-            blocks_schema = self.get_schema(blocks.table)
+            try:
+                blocks_schema = self.get_schema(blocks.table)
+            except:
+                blocks_schema = default_schema
         if "uid" in blocks:
             blocks_id_col = blocks.uid
         else:
@@ -73,7 +80,10 @@ class Conf(DBUtils):
         if "schema" in network.roads:
             roads_schema = network.roads.schema
         else:
-            roads_schema = self.get_schema(network.roads.table)
+            try:
+                roads_schema = self.get_schema(network.roads.table)
+            except:
+                roads_schema = default_schema
         if "uid" in network.roads:
             roads_id_col = network.roads.uid
         else:
@@ -87,7 +97,10 @@ class Conf(DBUtils):
         if "schema" in network.intersections:
             ints_schema = network.intersections.schema
         else:
-            ints_schema = self.get_schema(network.intersections.table)
+            try:
+                ints_schema = self.get_schema(network.intersections.table)
+            except:
+                ints_schema = default_schema
         if "uid" in network.intersections:
             ints_id_col = network.intersections.uid
         else:

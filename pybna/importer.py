@@ -204,22 +204,22 @@ class Importer(DBUtils,Conf):
             if "table" in self.config.bna.network.roads:
                 roads_table = self.config.bna.network.roads.table
             else:
-                raise ValueError("No ways table given. Must be specified as an arg or in config file.")
+                raise ValueError("No roads table given. Must be specified as an arg or in config file.")
         if roads_schema is None:
             if "schema" in self.config.bna.network.roads:
                 roads_schema = self.config.bna.network.roads.schema
             else:
-                raise ValueError("No ways schema given. Must be specified as an arg or in config file.")
+                raise ValueError("No roads schema given. Must be specified as an arg or in config file.")
         if ints_table is None:
-            if "table" in self.self.config.bna.network.intersections:
-                ints_table = self.self.config.bna.network.intersections.table
+            if "table" in self.config.bna.network.intersections:
+                ints_table = self.config.bna.network.intersections.table
             else:
                 raise ValueError("No intersections table given. Must be specified as an arg or in config file.")
         if ints_schema is None:
-            if "schema" in self.self.config.bna.network.intersections:
-                ints_schema = self.self.config.bna.network.intersections.schema
+            if "schema" in self.config.bna.network.intersections:
+                ints_schema = self.config.bna.network.intersections.schema
             else:
-                raise ValueError("No ways schema given. Must be specified as an arg or in config file.")
+                raise ValueError("No intersections schema given. Must be specified as an arg or in config file.")
         if not overwrite and self.table_exists(roads_table,roads_schema):
             raise ValueError("Table %s.%s already exists" % (roads_table,roads_schema))
         if not overwrite and self.table_exists(ints_table,ints_schema):
@@ -252,6 +252,7 @@ class Importer(DBUtils,Conf):
         boundary = boundary.unary_union
 
         # load OSM
+        print("Downloading OSM data")
         ways, nodes = self._osm_net_from_osmnx(boundary)
         ways = ways.to_crs(crs)
         nodes = nodes.to_crs(crs)
@@ -260,6 +261,10 @@ class Importer(DBUtils,Conf):
         print("Copying OSM ways to database")
 
         subs = dict(self.sql_subs)
+        subs["roads_table"] = sql.Identifier(roads_table)
+        subs["roads_schema"] = sql.Identifier(roads_schema)
+        subs["ints_table"] = sql.Identifier(ints_table)
+        subs["ints_schema"] = sql.Identifier(ints_schema)
         subs["osm_ways_table"] = sql.Identifier(osm_ways_table)
         subs["osm_ways_schema"] = sql.Identifier(osm_ways_schema)
         subs["osm_nodes_table"] = sql.Identifier(osm_nodes_table)
@@ -285,6 +290,9 @@ class Importer(DBUtils,Conf):
             conn=conn
         )
 
+        conn.commit()
+
+        # process things in the db
         road_queries = [os.path.join(self.module_dir,"sql","importer","roads",f) for f in os.listdir(os.path.join(self.module_dir,"sql","importer","roads"))]
         road_queries = sorted(road_queries)
         int_queries = [os.path.join(self.module_dir,"sql","importer","intersections",f) for f in os.listdir(os.path.join(self.module_dir,"sql","importer","intersections"))]
@@ -292,12 +300,15 @@ class Importer(DBUtils,Conf):
         queries = list(road_queries)
         queries.extend(int_queries)
 
+        print("Processing OSM data in database")
+
         if overwrite:
             self.drop_table(roads_table,schema=roads_schema,conn=conn)
             self.drop_table(ints_table,schema=ints_schema,conn=conn)
 
-        for query in queries:
+        for fquery in queries:
             cur = conn.cursor()
+            query = self.read_sql_from_file(fquery)
             q = sql.SQL(query).format(**subs)
             cur.execute(q)
             cur.close()
@@ -413,6 +424,7 @@ class Importer(DBUtils,Conf):
             truncate_by_edge=False,timeout=180,clean_periphery=True,
             custom_filter=None
         )
+        G = ox.get_undirected(G)
         gdfs = ox.graph_to_gdfs(G)
         return gdfs[1], gdfs[0]
 
@@ -495,7 +507,8 @@ class Importer(DBUtils,Conf):
             else:
                 boundary_schema = self.get_schema(self.config.bna.boundary.table)
             conn = self.get_db_connection()
-            q = sql.SQL("select * from {}.{}").format(
+            q = sql.SQL("select {} from {}.{}").format(
+                sql.Identifier(boundary_geom),
                 sql.Identifier(boundary_schema),
                 sql.Identifier(self.config.bna.boundary.table)
             ).as_string(conn)

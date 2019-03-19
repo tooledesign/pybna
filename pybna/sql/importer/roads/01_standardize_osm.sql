@@ -66,7 +66,7 @@ ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "one_way
 -- set one_way_car
 UPDATE {osm_ways_schema}.{osm_ways_table}
 SET one_way_car = 'ft'
-WHERE trim(oneway) IN ('1','yes')
+WHERE trim(oneway) IN ('1','yes','true')
 ;
 
 UPDATE {osm_ways_schema}.{osm_ways_table}

@@ -86,6 +86,20 @@ class DBUtils:
         return cur.next()[0]
 
 
+    def get_default_schema(self):
+        """
+        Returns the name of the default schema in the database (i.e. the first
+        schema in the search path)
+        """
+        conn = self.get_db_connection()
+        cur = conn.cursor()
+        cur.execute("show search_path")
+        path = cur.next()[0]
+        schema = path.split(',')[0].strip()
+        conn.close()
+        return schema
+
+
     def get_srid(self,table,geom="geom",schema=None):
         if schema is None:
             schema = self.get_schema(table)
@@ -252,7 +266,7 @@ class DBUtils:
                 schema, table = table.split(".")
             except:
                 schema = self.get_schema(table)
-                
+
         cur.execute(
             sql.SQL("drop table if exists {}.{}").format(
                 sql.Identifier(schema),
