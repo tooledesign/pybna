@@ -191,6 +191,7 @@ class Conf(DBUtils):
             "ints_schema": sql.Identifier(ints_schema),
             "ints_id_col": sql.Identifier(ints_id_col),
             "ints_geom_col": sql.Identifier(ints_geom_col),
+            "ints_cluster_distance": sql.Literal(network.intersections.cluster_distance),
             "edges_table": sql.Identifier(network.edges.table),
             "edges_schema": sql.Identifier(edges_schema),
             "edges_id_col": sql.Identifier(edges_id_col),

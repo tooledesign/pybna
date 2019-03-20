@@ -153,13 +153,13 @@ CREATE TEMP TABLE tmp_bike_infra AS (
                 THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
 
             -- no units (default=meters)
-            WHEN osm."cycleway:right:width" IS NOT NULL
+            WHEN COALESCE(osm."cycleway:right:width",'NaN') != 'NaN'
                 THEN 3.28084 * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'ft' AND osm."cycleway:left:width" IS NOT NULL
                 THEN 3.28084 * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
-            WHEN osm."cycleway:both:width" IS NOT NULL
+            WHEN COALESCE(osm."cycleway:both:width",'NaN') != 'NaN'
                 THEN 3.28084 * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
-            WHEN osm."cycleway:width" IS NOT NULL
+            WHEN COALESCE(osm."cycleway:width",'NaN') != 'NaN'
                 THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
         END AS ft_bike_infra_width,
         CASE        -- tf_bike_infra_width
@@ -184,13 +184,13 @@ CREATE TEMP TABLE tmp_bike_infra AS (
                 THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
 
             -- no units (default=meters)
-            WHEN osm."cycleway:left:width" IS NOT NULL
+            WHEN COALESCE(osm."cycleway:left:width",'NaN') != 'NaN'
                 THEN 3.28084 * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'tf' AND osm."cycleway:right:width" IS NOT NULL
                 THEN 3.28084 * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
-            WHEN osm."cycleway:both:width" IS NOT NULL
+            WHEN COALESCE(osm."cycleway:both:width",'NaN') != 'NaN'
                 THEN 3.28084 * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
-            WHEN osm."cycleway:width" IS NOT NULL
+            WHEN COALESCE(osm."cycleway:width",'NaN') != 'NaN'
                 THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
         END AS tf_bike_infra_width
     FROM {osm_ways_schema}.{osm_ways_table} osm

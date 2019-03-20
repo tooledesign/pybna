@@ -48,6 +48,7 @@ bna:
             table: "neighborhood_ways_intersections"
             geom: "geom"
             uid: "int_id"
+            cluster_distance: 25
         edges:
             table: "neighborhood_ways_net_link"
             source_column: "source_vert"

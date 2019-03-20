@@ -4,7 +4,7 @@ CREATE TEMP TABLE tmp_combined AS (
         osm.id,
         osm.geom,
         osm.osmid,
-        osm.highway,
+        tmp_func.functional_class,
         NULL,   --path_id
         tmp_oneway.oneway,
         tmp_width.width,
@@ -22,6 +22,8 @@ CREATE TEMP TABLE tmp_combined AS (
         tmp_park.tf_park
     FROM
         {osm_ways_schema}.{osm_ways_table} osm
+        LEFT JOIN tmp_func
+            ON osm.id = tmp_func.id
         LEFT JOIN tmp_oneway
             ON osm.id = tmp_oneway.id
         LEFT JOIN tmp_width
@@ -51,3 +53,12 @@ FROM tmp_combined
 
 CREATE INDEX {roads_geom_idx} ON {roads_schema}.{roads_table} USING GIST ({roads_geom_col});
 ANALYZE {roads_schema}.{roads_table};
+
+DROP TABLE tmp_func;
+DROP TABLE tmp_oneway;
+DROP TABLE tmp_width;
+DROP TABLE tmp_speed;
+DROP TABLE tmp_bike_infra;
+DROP TABLE tmp_lanes;
+DROP TABLE tmp_cross;
+DROP TABLE tmp_park;
