@@ -183,7 +183,8 @@ class Importer(DBUtils,Conf):
 
     def import_osm_network(self,roads_table=None,roads_schema=None,ints_table=None,
                            ints_schema=None,boundary_file=None,boundary_buffer=None,
-                           keep_holding_tables=False,srid=None,overwrite=False):
+                           osm_file=None,keep_holding_tables=False,srid=None,
+                           overwrite=False):
         """
         Processes OSM ways and copies the data into the database with attributes
         needed for LTS scoring.
@@ -196,6 +197,7 @@ class Importer(DBUtils,Conf):
         boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
         boundary_buffer -- distance (in units of the boundary) outside of the
             boundary to pull network features (if none use max_distance from config)
+        osm_file -- an OSM XML file to use instead of pulling data from the network
         keep_holding_tables -- if true, saves the raw OSM import to the roads/ints schemas
         srid -- projection to use
         overwrite -- whether to overwrite any existing tables
@@ -252,8 +254,11 @@ class Importer(DBUtils,Conf):
         boundary = boundary.unary_union
 
         # load OSM
-        print("Downloading OSM data")
-        ways, nodes = self._osm_net_from_osmnx(boundary)
+        if osm_file:
+            print("Processing OSM data")
+        else:
+            print("Downloading OSM data")
+        ways, nodes = self._osm_net_from_osmnx(boundary,osm_file)
         ways = ways.to_crs(crs)
         nodes = nodes.to_crs(crs)
 
@@ -319,12 +324,13 @@ class Importer(DBUtils,Conf):
         conn.close()
 
 
-    def _osm_net_from_osmnx(self,boundary):
+    def _osm_net_from_osmnx(self,boundary,osm_file=None):
         """
         Submits an Overpass API query and returns a geodataframe of results
 
         args
         boundary -- shapely geometry representing the boundary for pulling the network
+        osm_file -- an OSM XML file to use instead of downloading data from the network
         """
         # https://osmnx.readthedocs.io/en/stable/osmnx.html#osmnx.save_load.graph_to_gdfs
         node_tags = [
@@ -421,11 +427,18 @@ class Importer(DBUtils,Conf):
         ]
 
         ox.config(useful_tags_node=node_tags,useful_tags_path=way_tags)
-        G = ox.graph_from_polygon(
-            boundary,network_type='all',simplify=True,retain_all=False,
-            truncate_by_edge=False,timeout=180,clean_periphery=True,
-            custom_filter=None
-        )
+        if osm_file:
+            G = ox.graph_from_file(
+                osm_file,
+                simplify=True,
+                retain_all=False
+            )
+        else:
+            G = ox.graph_from_polygon(
+                boundary,network_type='all',simplify=True,retain_all=False,
+                truncate_by_edge=False,timeout=180,clean_periphery=True,
+                custom_filter=None
+            )
         G = ox.get_undirected(G)
         gdfs = ox.graph_to_gdfs(G)
         return gdfs[1], gdfs[0]

@@ -5,7 +5,7 @@ CREATE TEMP TABLE tmp_combined AS (
         osm.geom,
         osm.osmid,
         tmp_func.functional_class,
-        NULL,   --path_id
+        NULL::INTEGER AS path_id,   --path_id
         tmp_oneway.oneway,
         tmp_width.width,
         tmp_speed.speed,
@@ -15,14 +15,14 @@ CREATE TEMP TABLE tmp_combined AS (
         tmp_bike_infra.tf_bike_infra_width,
         tmp_lanes.ft_lanes,
         tmp_lanes.tf_lanes,
-        tmp_cross.ft_cross_lanes,
-        tmp_cross.tf_cross_lanes,
-        tmp_cross.twltl_cross_lanes,
+        NULL::INTEGER AS ft_cross_lanes, -- tmp_cross.ft_cross_lanes,
+        NULL::INTEGER AS tf_cross_lanes, -- tmp_cross.tf_cross_lanes,
+        NULL::INTEGER AS twltl_cross_lanes, -- tmp_cross.twltl_cross_lanes,
         tmp_park.ft_park,
         tmp_park.tf_park
     FROM
         {osm_ways_schema}.{osm_ways_table} osm
-        LEFT JOIN tmp_func
+        JOIN tmp_func
             ON osm.id = tmp_func.id
         LEFT JOIN tmp_oneway
             ON osm.id = tmp_oneway.id
@@ -34,8 +34,8 @@ CREATE TEMP TABLE tmp_combined AS (
             ON osm.id = tmp_bike_infra.id
         LEFT JOIN tmp_lanes
             ON osm.id = tmp_lanes.id
-        LEFT JOIN tmp_cross
-            ON osm.id = tmp_cross.id
+        -- LEFT JOIN tmp_cross
+            -- ON osm.id = tmp_cross.id
         LEFT JOIN tmp_park
             ON osm.id = tmp_park.id
     -- any where conditions? maybe service roads?
@@ -43,7 +43,27 @@ CREATE TEMP TABLE tmp_combined AS (
 
 INSERT INTO {roads_schema}.{roads_table}
 SELECT
-    *,
+    id,
+    geom,
+    osmid,
+    functional_class,
+    path_id,   --path_id
+    oneway,
+    NULL, -- network source to be filled in later
+    NULL, -- network target to be filled in later
+    width,
+    speed,
+    ft_bike_infra,
+    ft_bike_infra_width,
+    tf_bike_infra,
+    tf_bike_infra_width,
+    ft_lanes,
+    tf_lanes,
+    ft_cross_lanes, -- tmp_cross.ft_cross_lanes,
+    tf_cross_lanes, -- tmp_cross.tf_cross_lanes,
+    twltl_cross_lanes, -- tmp_cross.twltl_cross_lanes,
+    ft_park,
+    tf_park,
     NULL,   --stress to be calculated later
     NULL,   --stress to be calculated later
     NULL,   --stress to be calculated later
@@ -60,5 +80,5 @@ DROP TABLE tmp_width;
 DROP TABLE tmp_speed;
 DROP TABLE tmp_bike_infra;
 DROP TABLE tmp_lanes;
-DROP TABLE tmp_cross;
+-- DROP TABLE tmp_cross;
 DROP TABLE tmp_park;

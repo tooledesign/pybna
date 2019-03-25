@@ -1,4 +1,5 @@
-ALTER TABLE {osm_ways_schema}.{osm_ways_table} ALTER COLUMN osmid TYPE BIGINT USING osmid::BIGINT;
+ALTER TABLE {osm_ways_schema}.{osm_ways_table} ALTER COLUMN osmid TYPE BIGINT[]
+USING ('{{' || trim(both '{{' from trim(both '}}' from osmid)) || '}}')::BIGINT[];
 
 -- add any missing columns to raw OSM
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "access" TEXT;

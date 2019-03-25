@@ -7,7 +7,7 @@ CREATE TEMP TABLE tmp_islands AS (
         {ints_schema}.{ints_table} i,
         {osm_nodes_schema}.{osm_nodes_table} osm
     WHERE
-        ST_DWithin(i.{ints_geom_col},osm.geom,{cluster_distance})
+        ST_DWithin(i.{ints_geom_col},osm.geom,{ints_cluster_distance})
         AND osm.highway = 'crossing'
         AND osm.crossing = 'island'
 );

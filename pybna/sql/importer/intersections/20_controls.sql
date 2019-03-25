@@ -12,7 +12,7 @@ CREATE TEMP TABLE tmp_signals AS (
         {ints_schema}.{ints_table} i,
         {osm_nodes_schema}.{osm_nodes_table} osm
     WHERE
-        ST_DWithin(i.{ints_geom_col},osm.geom,{cluster_distance})
+        ST_DWithin(i.{ints_geom_col},osm.geom,{ints_cluster_distance})
         AND osm.highway = 'traffic_signals'
     UNION
     SELECT DISTINCT r.{roads_target_col} AS id
@@ -41,7 +41,7 @@ CREATE TEMP TABLE tmp_hawks AS (
         {ints_schema}.{ints_table} i,
         {osm_nodes_schema}.{osm_nodes_table} osm
     WHERE
-        ST_DWithin(i.{ints_geom_col},osm.geom,{cluster_distance})
+        ST_DWithin(i.{ints_geom_col},osm.geom,{ints_cluster_distance})
         AND osm.highway = 'crossing'
         AND osm.crossing IN ('traffic_signals','pelican','toucan')
 );
@@ -55,7 +55,7 @@ CREATE TEMP TABLE tmp_rrfbs AS (
         {ints_schema}.{ints_table} i,
         {osm_nodes_schema}.{osm_nodes_table} osm
     WHERE
-        ST_DWithin(i.{ints_geom_col},osm.geom,{cluster_distance})
+        ST_DWithin(i.{ints_geom_col},osm.geom,{ints_cluster_distance})
         AND osm.highway = 'crossing'
         AND osm.flashing_lights = 'yes'
 );
@@ -69,7 +69,7 @@ CREATE TEMP TABLE tmp_stops AS (
         {ints_schema}.{ints_table} i,
         {osm_nodes_schema}.{osm_nodes_table} osm
     WHERE
-        ST_DWithin(i.{ints_geom_col},osm.geom,{cluster_distance})
+        ST_DWithin(i.{ints_geom_col},osm.geom,{ints_cluster_distance})
         AND osm.highway = 'stop'
         AND osm.stop = 'all'
 );

@@ -53,3 +53,5 @@ CREATE TEMP TABLE tmp_func AS (
         LEFT JOIN tmp_bike_infra
             ON osm.id = tmp_bike_infra.id
 );
+
+DELETE FROM tmp_func WHERE functional_class IS NULL;
