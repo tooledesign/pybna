@@ -58,6 +58,17 @@ class Importer(DBUtils,Conf):
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
         self.sql_subs = self.make_sql_substitutions(self.config)
 
+        # mi/km
+        if "units" in self.config:
+            if self.config.units == "mi":
+                self.km = False
+            elif self.config.units == "km":
+                self.km = True
+            else:
+                raise ValueError("Invalid units \"{}\" in config".format(self.config.units))
+        else:
+            self.km = False
+
 
     def __repr__(self):
         return "pyBNA Importer connected with {%s}" % self.db_connection_string
@@ -276,6 +287,12 @@ class Importer(DBUtils,Conf):
         subs["osm_ways_schema"] = sql.Identifier(osm_ways_schema)
         subs["osm_nodes_table"] = sql.Identifier(osm_nodes_table)
         subs["osm_nodes_schema"] = sql.Identifier(osm_nodes_schema)
+        if self.km:
+            subs["km_multiplier"] = sql.Literal(1)
+            subs["mi_multiplier"] = sql.Literal(1.609344)
+        else:
+            subs["km_multiplier"] = sql.Literal(0.6213712)
+            subs["mi_multiplier"] = sql.Literal(1)
 
         conn = self.get_db_connection()
         self.gdf_to_postgis(

@@ -52,6 +52,17 @@ class pyBNA(DBUtils,Conf,Destinations,Connectivity,Core):
         self.db_connectivity_table = self.config["bna"]["connectivity"]["table"]
         self.net_config = self.config["bna"]["network"]
 
+        # km/mi
+        if "units" in self.config:
+            if self.config.units == "mi":
+                self.km = False
+            elif self.config.units == "km":
+                self.km = True
+            else:
+                raise ValueError("Invalid units \"{}\" in config".format(self.config.units))
+        else:
+            self.km = False
+
         if self.verbose:
             print("")
             print("---------------pyBNA---------------")

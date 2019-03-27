@@ -8,6 +8,7 @@
 # unusual circumstance
 #############################################
 # srid: 4326
+units: mi # either km (metric) or mi (imperial), default is "mi" if not given
 
 db:
     user: "gis"
