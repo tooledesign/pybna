@@ -447,12 +447,12 @@ class Importer(DBUtils,Conf):
         if osm_file:
             G = ox.graph_from_file(
                 osm_file,
-                simplify=False,
+                simplify=True,
                 retain_all=False
             )
         else:
             G = ox.graph_from_polygon(
-                boundary,network_type='all',simplify=False,retain_all=False,
+                boundary,network_type='all',simplify=True,retain_all=False,
                 truncate_by_edge=False,timeout=180,clean_periphery=True,
                 custom_filter=None
             )

@@ -1,5 +1,17 @@
-DROP TABLE IF EXISTS tmp_func;
-CREATE TEMP TABLE tmp_func AS (
+DROP TABLE IF EXISTS tmp_unnest;
+CREATE TEMP TABLE tmp_unnest AS (
+    SELECT
+        osm.id,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from osm.highway)) || '}}')::TEXT[]) AS highway,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from osm.tracktype)) || '}}')::TEXT[]) AS tracktype,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from osm.footway)) || '}}')::TEXT[]) AS footway,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from osm.access)) || '}}')::TEXT[]) AS access,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from osm.bicycle)) || '}}')::TEXT[]) AS bicycle
+    FROM {osm_ways_schema}.{osm_ways_table} osm
+);
+
+DROP TABLE IF EXISTS tmp_raw_func;
+CREATE TEMP TABLE tmp_raw_func AS (
     SELECT
         osm.id,
         CASE
@@ -38,7 +50,7 @@ CREATE TEMP TABLE tmp_func AS (
                 AND COALESCE(osm.access,'yes') NOT IN ('no','private')
                 AND tmp_width.width >= 8
                 THEN 'path'
-            WHEN osm.highway='service' AND osm.bicycle='designated'
+            WHEN osm.highway='service' AND osm.bicycle IN ('designated','yes')
                 THEN 'path'
             WHEN
                 osm.highway = 'pedestrian'
@@ -47,11 +59,46 @@ CREATE TEMP TABLE tmp_func AS (
                 THEN 'living_street'
             END AS functional_class
     FROM
-        {osm_ways_schema}.{osm_ways_table} osm
+        tmp_unnest osm
         LEFT JOIN tmp_width
             ON osm.id = tmp_width.id
         LEFT JOIN tmp_bike_infra
             ON osm.id = tmp_bike_infra.id
 );
 
-DELETE FROM tmp_func WHERE functional_class IS NULL;
+DROP TABLE IF EXISTS tmp_order;
+CREATE TEMP TABLE tmp_order(o,f) AS (
+    VALUES
+        (1,'motorway_link'),
+        (2,'motorway'),
+        (3,'tertiary_link'),
+        (4,'tertiary'),
+        (5,'trunk_link'),
+        (6,'trunk'),
+        (7,'primary_link'),
+        (8,'primary'),
+        (9,'secondary_link'),
+        (10,'secondary'),
+        (11,'unclassified'),
+        (12,'residential'),
+        (13,'living_street'),
+        (14,'path')
+);
+
+DROP TABLE IF EXISTS tmp_func;
+CREATE TEMP TABLE tmp_func AS (
+    SELECT DISTINCT ON (tmp_raw_func.id)
+        tmp_raw_func.id,
+        tmp_raw_func.functional_class
+    FROM
+        tmp_raw_func,
+        tmp_order
+    WHERE tmp_raw_func.functional_class = tmp_order.f
+    ORDER BY
+        tmp_raw_func.id,
+        tmp_order.o DESC
+);
+
+DROP TABLE tmp_unnest;
+DROP TABLE tmp_raw_func;
+DROP TABLE tmp_order;
