@@ -7,9 +7,9 @@ CREATE TEMP TABLE tmp_unnest AS (
         "parking:lane:right".*
     FROM
         {osm_ways_schema}.{osm_ways_table} osm,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."parking:lane:both",'{NaN}'))) || '}}')::TEXT[]) "parking:lane:both",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."parking:lane:left",'{NaN}'))) || '}}')::TEXT[]) "parking:lane:left",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."parking:lane:right",'{NaN}'))) || '}}')::TEXT[]) "parking:lane:right"
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."parking:lane:both",'{{NaN}}'))) || '}}')::TEXT[]) "parking:lane:both",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."parking:lane:left",'{{NaN}}'))) || '}}')::TEXT[]) "parking:lane:left",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."parking:lane:right",'{{NaN}}'))) || '}}')::TEXT[]) "parking:lane:right"
 );
 
 DROP TABLE IF EXISTS tmp_park_raw;

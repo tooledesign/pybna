@@ -197,7 +197,7 @@ class Importer(DBUtils,Conf):
                            osm_file=None,keep_holding_tables=False,srid=None,
                            overwrite=False):
         """
-        Processes OSM ways and copies the data into the database with attributes
+        Imports OSM ways/nodes and copies the data into the database with attributes
         needed for LTS scoring.
 
         args
@@ -234,9 +234,9 @@ class Importer(DBUtils,Conf):
             else:
                 raise ValueError("No intersections schema given. Must be specified as an arg or in config file.")
         if not overwrite and self.table_exists(roads_table,roads_schema):
-            raise ValueError("Table %s.%s already exists" % (roads_table,roads_schema))
+            raise ValueError("Table %s.%s already exists" % (roads_schema,roads_table))
         if not overwrite and self.table_exists(ints_table,ints_schema):
-            raise ValueError("Table %s.%s already exists" % (ints_table,ints_schema))
+            raise ValueError("Table %s.%s already exists" % (ints_schema,ints_table))
         if boundary_buffer is None:
             boundary_buffer = self.config.bna.connectivity.max_distance
         if srid is None:
@@ -275,6 +275,57 @@ class Importer(DBUtils,Conf):
 
         # copy to db
         print("Copying OSM ways to database")
+        conn = self.get_db_connection()
+        self.gdf_to_postgis(
+            ways,
+            osm_ways_table,
+            osm_ways_schema,
+            srid=srid,
+            overwrite=overwrite,
+            conn=conn
+        )
+        print("Copying OSM intersections to database")
+        self.gdf_to_postgis(
+            nodes,
+            osm_nodes_table,
+            osm_nodes_schema,
+            srid=srid,
+            overwrite=overwrite,
+            conn=conn
+        )
+
+        conn.commit()
+
+        self._process_osm(
+            roads_table,roads_schema,ints_table,ints_schema,osm_ways_table,
+            osm_ways_schema,osm_nodes_table,osm_nodes_schema,overwrite,conn
+        )
+
+        conn.commit()
+        conn.close()
+
+
+    def _process_osm(self,roads_table,roads_schema,ints_table,ints_schema,
+                     osm_ways_table,osm_ways_schema,osm_nodes_table,
+                     osm_nodes_schema,overwrite=None,conn=None):
+        """
+        Processes OSM import by running through the import scripts in the sql directory
+
+        args:
+        roads_table -- name of the roads table
+        roads_schema -- name of the roads schema
+        ints_table -- name of the intersections table
+        ints_schema -- name of the intersections schema
+        osm_ways_table -- name of the OSM ways table
+        osm_ways_schema -- name of the OSM ways schema
+        osm_nodes_table -- name of the OSM nodes table
+        osm_nodes_schema -- name of the OSM nodes schema
+        conn -- a connection object (if none a new connection is created)
+        """
+        commit = False
+        if conn is None:
+            conn = self.get_db_connection()
+            commit = True
 
         subs = dict(self.sql_subs)
         subs["roads_table"] = sql.Identifier(roads_table)
@@ -293,28 +344,6 @@ class Importer(DBUtils,Conf):
         else:
             subs["km_multiplier"] = sql.Literal(0.6213712)
             subs["mi_multiplier"] = sql.Literal(1)
-
-        conn = self.get_db_connection()
-        self.gdf_to_postgis(
-            ways,
-            osm_ways_table,
-            osm_ways_schema,
-            srid=srid,
-            overwrite=overwrite,
-            conn=conn
-        )
-
-        print("Copying OSM intersections to database")
-        self.gdf_to_postgis(
-            nodes,
-            osm_nodes_table,
-            osm_nodes_schema,
-            srid=srid,
-            overwrite=overwrite,
-            conn=conn
-        )
-
-        conn.commit()
 
         # process things in the db
         road_queries = [os.path.join(self.module_dir,"sql","importer","roads",f) for f in os.listdir(os.path.join(self.module_dir,"sql","importer","roads"))]
@@ -337,8 +366,9 @@ class Importer(DBUtils,Conf):
             cur.execute(q)
             cur.close()
 
-        conn.commit()
-        conn.close()
+        if commit:
+            conn.commit()
+            conn.close()
 
 
     def _osm_net_from_osmnx(self,boundary,osm_file=None):

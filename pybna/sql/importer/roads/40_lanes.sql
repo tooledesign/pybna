@@ -13,14 +13,14 @@ CREATE TEMP TABLE tmp_unnest AS (
         "turn:lanes:forward".*
     FROM
         {osm_ways_schema}.{osm_ways_table} osm,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes",'{NaN}'))) || '}}')::TEXT[]) "lanes",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:forward",'{NaN}'))) || '}}')::TEXT[]) "lanes:forward",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:backward",'{NaN}'))) || '}}')::TEXT[]) "lanes:backward",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:both_ways",'{NaN}'))) || '}}')::TEXT[]) "lanes:both_ways",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:both_ways",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes:both_ways",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:backward",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes:backward",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:forward",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes:forward"
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes",'{{NaN}}'))) || '}}')::TEXT[]) "lanes",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:forward",'{{NaN}}'))) || '}}')::TEXT[]) "lanes:forward",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:backward",'{{NaN}}'))) || '}}')::TEXT[]) "lanes:backward",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:both_ways",'{{NaN}}'))) || '}}')::TEXT[]) "lanes:both_ways",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes",'{{NaN}}'))) || '}}')::TEXT[]) "turn:lanes",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:both_ways",'{{NaN}}'))) || '}}')::TEXT[]) "turn:lanes:both_ways",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:backward",'{{NaN}}'))) || '}}')::TEXT[]) "turn:lanes:backward",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:forward",'{{NaN}}'))) || '}}')::TEXT[]) "turn:lanes:forward"
 );
 
 DROP TABLE IF EXISTS tmp_lanes_raw;
@@ -48,7 +48,7 @@ CREATE TEMP TABLE tmp_lanes_raw AS (
                 THEN substring(osm."lanes:forward" FROM '\d+')::INT
             WHEN COALESCE(osm."lanes",'NaN') != 'NaN' AND one_way_car = 'ft'
                 THEN substring(osm."lanes" FROM '\d+')::INT
-            WHEN COALESCE(osm."lanes",'NaN') != 'NaN'
+            WHEN COALESCE(osm."lanes",'NaN') != 'NaN' AND COALESCE(one_way_car,'tf') != 'tf'
                 THEN ceil(substring(osm."lanes" FROM '\d+')::FLOAT / 2)
             END AS ft_lanes,
         CASE
@@ -72,7 +72,7 @@ CREATE TEMP TABLE tmp_lanes_raw AS (
                 THEN substring(osm."lanes:backward" FROM '\d+')::INT
             WHEN COALESCE(osm."lanes",'NaN') != 'NaN' AND one_way_car = 'tf'
                 THEN substring(osm."lanes" FROM '\d+')::INT
-            WHEN COALESCE(osm."lanes",'NaN') != 'NaN'
+            WHEN COALESCE(osm."lanes",'NaN') != 'NaN' AND COALESCE(one_way_car,'ft') != 'ft'
                 THEN ceil(substring(osm."lanes" FROM '\d+')::FLOAT / 2)
             END AS tf_lanes
     FROM tmp_unnest osm

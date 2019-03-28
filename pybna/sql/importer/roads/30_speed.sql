@@ -5,7 +5,7 @@ CREATE TEMP TABLE tmp_unnest AS (
         maxspeed.*
     FROM
         {osm_ways_schema}.{osm_ways_table} osm,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.maxspeed,'{NaN}'))) || '}}')::TEXT[]) maxspeed
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.maxspeed,'{{NaN}}'))) || '}}')::TEXT[]) maxspeed
 );
 
 DROP TABLE IF EXISTS tmp_raw_speed;

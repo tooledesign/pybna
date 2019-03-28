@@ -18,19 +18,19 @@ CREATE TEMP TABLE tmp_unnest AS (
         "cycleway:both:width".*
     FROM
         {osm_ways_schema}.{osm_ways_table} osm,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway",'{NaN}'))) || '}}')::TEXT[]) "cycleway",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left",'{NaN}'))) || '}}')::TEXT[]) "cycleway:left",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right",'{NaN}'))) || '}}')::TEXT[]) "cycleway:right",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."oneway:bicycle",'{NaN}'))) || '}}')::TEXT[]) "oneway:bicycle",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both",'{NaN}'))) || '}}')::TEXT[]) "cycleway:both",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:buffer",'{NaN}'))) || '}}')::TEXT[]) "cycleway:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left:buffer",'{NaN}'))) || '}}')::TEXT[]) "cycleway:left:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right:buffer",'{NaN}'))) || '}}')::TEXT[]) "cycleway:right:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both:buffer",'{NaN}'))) || '}}')::TEXT[]) "cycleway:both:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:width",'{NaN}'))) || '}}')::TEXT[]) "cycleway:width",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left:width",'{NaN}'))) || '}}')::TEXT[]) "cycleway:left:width",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right:width",'{NaN}'))) || '}}')::TEXT[]) "cycleway:right:width",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both:width",'{NaN}'))) || '}}')::TEXT[]) "cycleway:both:width"
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:left",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:right",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."oneway:bicycle",'{{NaN}}'))) || '}}')::TEXT[]) "oneway:bicycle",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:both",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:buffer",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:left:buffer",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:right:buffer",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:both:buffer",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:width",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:left:width",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:right:width",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:both:width"
 );
 
 -- ft_bike_infra

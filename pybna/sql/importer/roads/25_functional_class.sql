@@ -9,11 +9,11 @@ CREATE TEMP TABLE tmp_unnest AS (
         bicycle.*
     FROM
         {osm_ways_schema}.{osm_ways_table} osm,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.highway,'{NaN}'))) || '}}')::TEXT[]) highway,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.tracktype,'{NaN}'))) || '}}')::TEXT[]) tracktype,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.footway,'{NaN}'))) || '}}')::TEXT[]) footway,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.access,'{NaN}'))) || '}}')::TEXT[]) access,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.bicycle,'{NaN}'))) || '}}')::TEXT[]) bicycle
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.highway,'{{NaN}}'))) || '}}')::TEXT[]) highway,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.tracktype,'{{NaN}}'))) || '}}')::TEXT[]) tracktype,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.footway,'{{NaN}}'))) || '}}')::TEXT[]) footway,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.access,'{{NaN}}'))) || '}}')::TEXT[]) access,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.bicycle,'{{NaN}}'))) || '}}')::TEXT[]) bicycle
 );
 
 DROP TABLE IF EXISTS tmp_raw_func;
