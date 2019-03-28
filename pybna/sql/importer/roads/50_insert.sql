@@ -13,13 +13,13 @@ CREATE TEMP TABLE tmp_combined AS (
         tmp_bike_infra.ft_bike_infra_width,
         tmp_bike_infra.tf_bike_infra,
         tmp_bike_infra.tf_bike_infra_width,
-        tmp_lanes.ft_lanes,
-        tmp_lanes.tf_lanes,
+        tmp_ft_lanes.ft_lanes,
+        tmp_tf_lanes.tf_lanes,
         NULL::INTEGER AS ft_cross_lanes, -- tmp_cross.ft_cross_lanes,
         NULL::INTEGER AS tf_cross_lanes, -- tmp_cross.tf_cross_lanes,
         NULL::INTEGER AS twltl_cross_lanes, -- tmp_cross.twltl_cross_lanes,
-        tmp_park.ft_park,
-        tmp_park.tf_park
+        tmp_park_ft.ft_park,
+        tmp_park_tf.tf_park
     FROM
         {osm_ways_schema}.{osm_ways_table} osm
         JOIN tmp_func
@@ -32,13 +32,16 @@ CREATE TEMP TABLE tmp_combined AS (
             ON osm.id = tmp_speed.id
         LEFT JOIN tmp_bike_infra
             ON osm.id = tmp_bike_infra.id
-        LEFT JOIN tmp_lanes
-            ON osm.id = tmp_lanes.id
+        LEFT JOIN tmp_ft_lanes
+            ON osm.id = tmp_ft_lanes.id
+        LEFT JOIN tmp_tf_lanes
+            ON osm.id = tmp_tf_lanes.id
         -- LEFT JOIN tmp_cross
             -- ON osm.id = tmp_cross.id
-        LEFT JOIN tmp_park
-            ON osm.id = tmp_park.id
-    -- any where conditions? maybe service roads?
+        LEFT JOIN tmp_park_ft
+            ON osm.id = tmp_park_ft.id
+        LEFT JOIN tmp_park_tf
+            ON osm.id = tmp_park_tf.id
 );
 
 INSERT INTO {roads_schema}.{roads_table}

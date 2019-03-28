@@ -1,5 +1,30 @@
-DROP TABLE IF EXISTS tmp_lanes;
-CREATE TEMP TABLE tmp_lanes AS (
+DROP TABLE IF EXISTS tmp_unnest;
+CREATE TEMP TABLE tmp_unnest AS (
+    SELECT
+        osm.id,
+        osm.one_way_car,
+        "lanes".*,
+        "lanes:forward".*,
+        "lanes:backward".*,
+        "lanes:both_ways".*,
+        "turn:lanes".*,
+        "turn:lanes:both_ways".*,
+        "turn:lanes:backward".*,
+        "turn:lanes:forward".*
+    FROM
+        {osm_ways_schema}.{osm_ways_table} osm,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes",'{NaN}'))) || '}}')::TEXT[]) "lanes",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:forward",'{NaN}'))) || '}}')::TEXT[]) "lanes:forward",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:backward",'{NaN}'))) || '}}')::TEXT[]) "lanes:backward",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."lanes:both_ways",'{NaN}'))) || '}}')::TEXT[]) "lanes:both_ways",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:both_ways",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes:both_ways",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:backward",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes:backward",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."turn:lanes:forward",'{NaN}'))) || '}}')::TEXT[]) "turn:lanes:forward"
+);
+
+DROP TABLE IF EXISTS tmp_lanes_raw;
+CREATE TEMP TABLE tmp_lanes_raw AS (
     SELECT
         osm.id,
         CASE
@@ -50,7 +75,7 @@ CREATE TEMP TABLE tmp_lanes AS (
             WHEN COALESCE(osm."lanes",'NaN') != 'NaN'
                 THEN ceil(substring(osm."lanes" FROM '\d+')::FLOAT / 2)
             END AS tf_lanes
-    FROM {osm_ways_schema}.{osm_ways_table} osm
+    FROM tmp_unnest osm
     WHERE
         (
             osm."turn:lanes:forward" IS NOT NULL
@@ -82,3 +107,30 @@ CREATE TEMP TABLE tmp_lanes AS (
             AND osm."lanes:backward" != 'NaN'
         )
 );
+
+DROP TABLE IF EXISTS tmp_ft_lanes;
+CREATE TEMP TABLE tmp_ft_lanes AS (
+    SELECT DISTINCT ON (id)
+        id,
+        ft_lanes
+    FROM tmp_lanes_raw
+    WHERE ft_lanes > 0
+    ORDER BY
+        id,
+        ft_lanes DESC
+);
+
+DROP TABLE IF EXISTS tmp_tf_lanes;
+CREATE TEMP TABLE tmp_tf_lanes AS (
+    SELECT DISTINCT ON (id)
+        id,
+        tf_lanes
+    FROM tmp_lanes_raw
+    WHERE tf_lanes > 0
+    ORDER BY
+        id,
+        tf_lanes DESC
+);
+
+DROP TABLE tmp_unnest;
+DROP TABLE tmp_lanes_raw;
