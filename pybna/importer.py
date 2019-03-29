@@ -541,7 +541,10 @@ class Importer(DBUtils,Conf):
         max_lat -- Maximum latitude
         tags -- list of osm tags to use for filtering this destination type
         """
-        pass
+        # https://github.com/jwass/geopandas_osm   ????
+        api = overpass.API()
+        slc = api.get('node["name"="Salt Lake City"]')
+        gdf = gpd.GeoDataFrame.from_features(slc)
 
 
     def _load_boundary_as_dataframe(self,boundary_file=None,srid=None):
