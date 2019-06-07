@@ -322,17 +322,17 @@ class DBUtils:
                 g1 = shapely_type[0]
                 g2 = shapely_type[1]
                 if g1 is Point and g2 is MultiPoint:
-                    continue
+                    pass
                 elif g1 is MultiPoint and g2 is Point:
-                    continue
+                    pass
                 elif g1 is LineString and g2 is MultiLineString:
-                    continue
+                    pass
                 elif g1 is MultiLineString and g2 is LineString:
-                    continue
+                    pass
                 elif g1 is Polygon and g2 is MultiPolygon:
-                    continue
+                    pass
                 elif g1 is MultiPolygon and g2 is Polygon:
-                    continue
+                    pass
                 else:
                     raise ValueError("Can't process more than one geometry type")
             else:
