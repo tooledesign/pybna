@@ -279,7 +279,8 @@ class DBUtils:
 
 
     def gdf_to_postgis(self,gdf,table,schema,columns=None,geom="geom",id="id",
-                       keep_case=False,srid=None,conn=None,overwrite=False):
+                       multi=True,keep_case=False,srid=None,conn=None,
+                       overwrite=False):
         """
         Saves a geopandas geodataframe to Postgis.
 
@@ -290,6 +291,7 @@ class DBUtils:
         columns -- a list of columns to save (if empty, save all columns)
         geom -- name to use for the geom column
         id -- name to use for the id/primary key column (created if it doesn't match anything in columns)
+        multi -- convert single to multi if mixed types are found
         keep_case -- prevents conversion of column names to lower case
         srid -- the projection to use (if none inferred from data)
         conn -- an open psycopg2 connection
@@ -314,18 +316,50 @@ class DBUtils:
         # get geom column type
         shapely_type = gdf.geometry.apply(lambda x: type(x)).unique()
         if len(shapely_type) > 1:
-            raise ValueError("Can't process more than one geometry type")
+            if len(shapely_type) > 2:
+                raise ValueError("Can't process more than one geometry type")
+            elif multi:
+                g1 = shapely_type[0]
+                g2 = shapely_type[1]
+                if g1 is Point and g2 is MultiPoint:
+                    continue
+                elif g1 is MultiPoint and g2 is Point:
+                    continue
+                elif g1 is LineString and g2 is MultiLineString:
+                    continue
+                elif g1 is MultiLineString and g2 is LineString:
+                    continue
+                elif g1 is Polygon and g2 is MultiPolygon:
+                    continue
+                elif g1 is MultiPolygon and g2 is Polygon:
+                    continue
+                else:
+                    raise ValueError("Can't process more than one geometry type")
+            else:
+                raise ValueError("Can't process more than one geometry type")
+        else:
+            multi = False
+
         shapely_type = shapely_type[0]
         if shapely_type is Point:
-            geom_type = "point"
+            if multi:
+                geom_type = "multipoint"
+            else:
+                geom_type = "point"
         elif shapely_type is MultiPoint:
             geom_type = "multipoint"
         elif shapely_type is LineString:
-            geom_type = "linestring"
+            if multi:
+                geom_type = "multilinestring"
+            else:
+                geom_type = "linestring"
         elif shapely_type is MultiLineString:
             geom_type = "multilinestring"
         elif shapely_type is Polygon:
-            geom_type = "polygon"
+            if multi:
+                geom_type = "multipolygon"
+            else:
+                geom_type = "polygon"
         elif shapely_type is MultiPolygon:
             geom_type = "multipolygon"
         else:
@@ -394,12 +428,20 @@ class DBUtils:
             "srid": sql.Literal(srid),
             "index": sql.Identifier("sidx_"+table)
         }
-        q = sql.SQL(" \
-            ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
-            USING ST_SetSRID({geom}::geometry,{srid}); \
-            CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
-            ANALYZE {schema}.{table};"
-        ).format(**subs)
+        if multi:
+            q = sql.SQL(" \
+                ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
+                USING ST_Multi(ST_SetSRID({geom}::geometry,{srid})); \
+                CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
+                ANALYZE {schema}.{table};"
+            ).format(**subs)
+        else:
+            q = sql.SQL(" \
+                ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
+                USING ST_SetSRID({geom}::geometry,{srid}); \
+                CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
+                ANALYZE {schema}.{table};"
+            ).format(**subs)
         cur.execute(q)
         cur.close()
         if not transaction:
