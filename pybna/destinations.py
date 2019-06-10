@@ -286,14 +286,18 @@ class Destinations(DBUtils):
             subs["cumul_score"] = sql.Literal(cumul_score)
             if method == "count":
                 subs["val"] = sql.SQL("{ls_column}").format(**subs)
+                case += sql.SQL(" \
+                    WHEN {val} = {break} THEN {score} + {cumul_score} \
+                    WHEN {val} < {break} \
+                        THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score}) \
+                ").format(**subs)
             elif method == "percentage":
                 subs["val"] = sql.SQL("({ls_column}::FLOAT/{hs_column})").format(**subs)
-
-            case += sql.SQL(" \
-                WHEN {val} = {break} THEN {score} + {cumul_score} \
-                WHEN {val} < {break} \
-                    THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score}) \
-            ").format(**subs)
+                case += sql.SQL(" \
+                    WHEN {val} = {break} THEN {score} \
+                    WHEN {val} < {break} \
+                        THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score}) \
+                ").format(**subs)
 
             prev_break = b[0]
             if method == "count":       # parks score is calculating wrong on 311090002021011
