@@ -24,7 +24,6 @@ class Core(DBUtils):
         self.debug = None
         self.srid = None
         self.sql_subs = None
-        self.default_schema = None
 
 
     def set_destinations(self):
@@ -67,7 +66,7 @@ class Core(DBUtils):
         pass
 
 
-    def travel_sheds(self,block_ids,out_table,schema=None,composite=True,
+    def travel_sheds(self,block_ids,out_table,composite=True,
                      overwrite=False,dry=False):
         """
         Creates a new DB table showing the high- and low-stress travel sheds
@@ -78,15 +77,14 @@ class Core(DBUtils):
         args
         block_ids -- the ids to use building travel sheds
         out_table -- the table to save travel sheds to
-        schema -- the db schema to save the table to (defaults to where census blocks are stored)
         composite -- whether to save the output as a composite of all blocks or as individual sheds for each block
         overwrite -- whether to overwrite an existing table
         """
         conn = self.get_db_connection()
 
+        schema, out_table = self.parse_table_name(out_table)
         if schema is None:
-            schema = self.default_schema
-
+            schema = self.get_default_schema()
 
         if overwrite and not dry:
             self.drop_table(out_table,conn=conn,schema=schema)

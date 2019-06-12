@@ -100,6 +100,21 @@ class DBUtils:
         return schema
 
 
+    def parse_table_name(self,name):
+        """
+        Separates the given name into a schema and table and returns them as a
+        list. If no schema is given, returns None for the schema.
+
+        args
+        name -- the name to parse
+        """
+        try:
+            schema, table = name.split(".")
+            return schema, table
+        except:
+            return None, name
+
+
     def get_srid(self,table,geom="geom",schema=None):
         if schema is None:
             schema = self.get_schema(table)
@@ -262,10 +277,10 @@ class DBUtils:
         cur = conn.cursor()
 
         if schema is None:
-            try:
-                schema, table = table.split(".")
-            except:
-                schema = self.get_schema(table)
+            schema, table = self.parse_table_name(table)
+
+        if schema is None:
+            raise ValueError("Schema must either be given explicitly or qualified in table name")
 
         cur.execute(
             sql.SQL("drop table if exists {}.{}").format(
@@ -278,7 +293,7 @@ class DBUtils:
             conn.commit()
 
 
-    def gdf_to_postgis(self,gdf,table,schema,columns=None,geom="geom",id="id",
+    def gdf_to_postgis(self,gdf,table,schema=None,columns=None,geom="geom",id="id",
                        multi=True,keep_case=False,srid=None,conn=None,
                        overwrite=False):
         """
@@ -287,7 +302,7 @@ class DBUtils:
         args:
         gdf -- the GeoDataFrame to save
         table -- the table name
-        schema -- the schema name
+        schema -- the schema name (not necessary if schema is qualified in table name)
         columns -- a list of columns to save (if empty, save all columns)
         geom -- name to use for the geom column
         id -- name to use for the id/primary key column (created if it doesn't match anything in columns)
@@ -298,6 +313,10 @@ class DBUtils:
         overwrite -- drops an existing table
         """
         # process inputs
+        if schema is None:
+            schema, table = self.parse_table_name(table)
+        if schema is None:
+            raise ValueError("Schema must either be given explicitly or qualified in table name")
         transaction = True
         if conn is None:
             transaction = False

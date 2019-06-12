@@ -13,13 +13,13 @@ db:
     dbname: "bna"
 ```
 
-The second section, under the `bna` root, contains all the references to data and assumptions. Entries that aren't required can often be inferred by pyBNA, however, ambiguities in your data may result in an error or unusual results.
+The second section, under the `bna` root, contains all the references to data and assumptions. Entries that aren't required can often be inferred by pyBNA, however, ambiguities in your data may result in an error or unusual results. Schemas can be qualified in the table name.
 
 ### boundary
 
 ```
     boundary:
-        table: "neighborhood_boundary"
+        table: "received.neighborhood_boundary"
         geom: "geom"
 ```
 
@@ -28,15 +28,13 @@ The boundary tells pyBNA the extents of the area of analysis.
 Entry | Description | Required
 :--- | :--- | :---:
 table | Name of the table | X
-schema | Name of the schema |
 geom | Name of the geometry column |
 
 ### blocks
 
 ```
     blocks:
-        table: "neighborhood_census_blocks"
-        schema: "generated"
+        table: "generated.neighborhood_census_blocks"
         id_column: "blockid10"
         population: "pop10"
         geom: "geom"
@@ -49,7 +47,6 @@ This section tells pyBNA about the table of population areas used as the unit of
 Entry | Description | Required
 :--- | :--- | :---:
 table | Name of the table | X
-schema | Name of the schema |
 id_column | Name of the table's primary key |
 population | Name of the population attribute | X
 geom | Name of the geometry column |
@@ -98,7 +95,6 @@ The network settings tell pyBNA what your road dataset looks like and designate 
 Entry | Description | Required
 :--- | :--- | :---:
 table | Name of the table | X
-schema | Name of the schema |
 geom | Name of the geometry column |
 uid | Primary key |
 source_column | ID of the intersection at the start of the line | X
@@ -131,7 +127,6 @@ backward | Crossing LTS rating in the backward direction | X
 Entry | Description | Required
 :--- | :--- | :---:
 table | Name of the table | X
-schema | Name of the schema |
 geom | Name of the geometry column |
 uid | Primary key |
 
@@ -140,7 +135,6 @@ uid | Primary key |
 Entry | Description | Required
 :--- | :--- | :---:
 table | Name of the table | X
-schema | Name of the schema |
 source_column | Name of the attribute indicating the source node | X
 target_column | Name of the attribute indicating the target node | X
 stress_column | Name of the attribute indicating the LTS on the edge | X
@@ -152,7 +146,6 @@ id_column | Primary key | X
 Entry | Description | Required
 :--- | :--- | :---:
 table | Name of the table | X
-schema | Name of the schema |
 id_column | Primary key | X
 
 ### connectivity
@@ -164,7 +157,6 @@ connectivity information.
 Entry | Description | Required
 :--- | :--- | :---:
 table | Name of the table | X
-schema | Name of the schema |
 source_column | Name of the attribute holding the ID of the source block | X
 target_column | Name of the attribute holding the ID of the target block | X
 max_distance | The maximum distance to search for possible block connections | X
@@ -197,7 +189,6 @@ Entry | Description | Required
 name | Category name | X
 weight | Category weight | X
 table | Name of the table | X
-schema | Name of the schema |
 method | Either "count" or "percentage" | X
 datafield | Attribute used to calculate percentage<br>(only used for "percentage" method) | depends
 maxpoints | Total possible points for this category | X

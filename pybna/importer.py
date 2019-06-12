@@ -86,8 +86,8 @@ class Importer(DBUtils,Conf):
 
 
     def import_census_blocks(self,fips=None,url=None,fpath=None,table=None,
-                             schema=None,keep_case=False,columns=None,id=None,
-                             geom=None,srid=None,boundary_file=None,overwrite=False):
+                             keep_case=False,columns=None,id=None,geom=None,
+                             srid=None,boundary_file=None,overwrite=False):
         """
         Retrieves census block features and saves them to the
         designated blocks table in the DB. Can take a FIPS code to download
@@ -99,8 +99,7 @@ class Importer(DBUtils,Conf):
         fips -- the two digit fips code that identifies the state
         url -- url to download a file from
         fpath -- path to a file
-        table -- the table name to save blocks to (if none use config)
-        schema -- the schema to save blocks to (if none use config)
+        table -- the table name to save blocks to (if none use config) (must be schema-qualified)
         keep_case -- whether to prevent column names from being converted to lower case
         columns -- list of columns in the dataset to keep (if none keeps all)
         id -- name for the id/primary key column (if none use config)
@@ -126,14 +125,13 @@ class Importer(DBUtils,Conf):
                 raise ValueError("File not found at %s" % fpath)
         if table is None:
             if "table" in self.config.bna.blocks:
-                table = self.config.bna.blocks.table
+                schema, table = self.parse_table_name(self.config.bna.blocks.table)
             else:
                 raise ValueError("No table given. Must be specified as an arg or in config file.")
+        else:
+            schema, table = self.parse_table_name(table)
         if schema is None:
-            if "schema" in self.config.bna.blocks:
-                schema = self.config.bna.blocks.schema
-            else:
-                raise ValueError("No schema given. Must be specified as an arg or in config file.")
+            raise ValueError("No schema given. Must be qualified with table name.")
         if not overwrite and self.table_exists(table,schema):
             raise ValueError("Table %s.%s already exists" % (schema,table))
         if id is None:
@@ -192,8 +190,8 @@ class Importer(DBUtils,Conf):
         )
 
 
-    def import_osm_network(self,roads_table=None,roads_schema=None,ints_table=None,
-                           ints_schema=None,boundary_file=None,boundary_buffer=None,
+    def import_osm_network(self,roads_table=None,ints_table=None,
+                           boundary_file=None,boundary_buffer=None,
                            osm_file=None,keep_holding_tables=False,srid=None,
                            overwrite=False):
         """
@@ -201,10 +199,8 @@ class Importer(DBUtils,Conf):
         needed for LTS scoring.
 
         args
-        roads_table -- name of the table to save the OSM ways to (if none use config)
-        roads_schema -- the schema to create the ways table in (if none use config)
-        ints_table -- name of the table to save the OSM intersections to (if none use config)
-        ints_schema -- the schema to create the intersections table in (if none use config)
+        roads_table -- name of the table to save the OSM ways to (if none use config) (must be schema-qualified)
+        ints_table -- name of the table to save the OSM intersections to (if none use config) (must be schema-qualified)
         boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
         boundary_buffer -- distance (in units of the boundary) outside of the
             boundary to pull network features (if none use max_distance from config)
@@ -215,24 +211,22 @@ class Importer(DBUtils,Conf):
         """
         if roads_table is None:
             if "table" in self.config.bna.network.roads:
-                roads_table = self.config.bna.network.roads.table
+                roads_schema, roads_table = self.parse_table_name(self.config.bna.network.roads.table)
             else:
                 raise ValueError("No roads table given. Must be specified as an arg or in config file.")
+        else:
+            roads_schema, roads_table = self.parse_table_name(roads_table)
         if roads_schema is None:
-            if "schema" in self.config.bna.network.roads:
-                roads_schema = self.config.bna.network.roads.schema
-            else:
-                raise ValueError("No roads schema given. Must be specified as an arg or in config file.")
+            raise ValueError("No roads schema given. Must be qualified with table name.")
         if ints_table is None:
             if "table" in self.config.bna.network.intersections:
-                ints_table = self.config.bna.network.intersections.table
+                ints_schema, ints_table = self.parse_table_name(self.config.bna.network.intersections.table)
             else:
                 raise ValueError("No intersections table given. Must be specified as an arg or in config file.")
+        else:
+            ints_schema, ints_table = self.parse_table_name(ints_table)
         if ints_schema is None:
-            if "schema" in self.config.bna.network.intersections:
-                ints_schema = self.config.bna.network.intersections.schema
-            else:
-                raise ValueError("No intersections schema given. Must be specified as an arg or in config file.")
+            raise ValueError("No intersections schema given. Must be qualified with table name.")
         if not overwrite and self.table_exists(roads_table,roads_schema):
             raise ValueError("Table %s.%s already exists" % (roads_schema,roads_table))
         if not overwrite and self.table_exists(ints_table,ints_schema):
@@ -567,15 +561,14 @@ class Importer(DBUtils,Conf):
                 boundary_geom = self.config.bna.boundary.geom
             else:
                 boundary_geom = "geom"
-            if "schema" in self.config.bna.boundary:
-                boundary_schema = self.config.bna.boundary.schema
-            else:
-                boundary_schema = self.get_schema(self.config.bna.boundary.table)
+            boundary_schema, boundary_table = self.parse_table_name(self.config.bna.boundary.table)
+            if boundary_schema is None:
+                boundary_schema = self.get_schema(boundary_table)
             conn = self.get_db_connection()
             q = sql.SQL("select {} from {}.{}").format(
                 sql.Identifier(boundary_geom),
                 sql.Identifier(boundary_schema),
-                sql.Identifier(self.config.bna.boundary.table)
+                sql.Identifier(boundary_table)
             ).as_string(conn)
             boundary = gpd.GeoDataFrame.from_postgis(
                 sql=q,

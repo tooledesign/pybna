@@ -18,12 +18,11 @@ db:
 
 bna:
     boundary:
-        table: "neighborhood_boundary"
+        table: "received.neighborhood_boundary" # tables are optionally schema-qualified
         geom: "geom"
 
     blocks:
-        table: "neighborhood_census_blocks"
-        # schema: "generated"
+        table: "generated.neighborhood_census_blocks"
         uid: "blockid10"
         population: "pop10"
         geom: "geom"
