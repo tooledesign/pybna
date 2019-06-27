@@ -27,6 +27,15 @@ The imposm library requires some additional packages to be installed. Consult th
 sudo apt install build-essential python-devel protobuf-compiler libprotobuf-dev
 ```
 
+## Importing data
+
+pyBNA includes a workflow to import data from publicly available sources (for
+the United States, at least). Automatic import of demographic data relies on US
+Census 2010 data. Street network and bicycle facility data is imported from
+OpenStreetMap.
+
+For more guidance on the import process, see our [import instructions](import.md).
+
 ## Getting started
 
 First, import pybna and create a pyBNA object by pointing it to the config file.
