@@ -103,12 +103,6 @@ class pyBNA(DBUtils,Conf,Destinations,Connectivity,Core):
             pass
             # self.set_destinations()
 
-        # default schema
-        if "schema" in self.config.bna.blocks:
-            self.default_schema = self.config.bna.blocks.schema
-        else:
-            self.default_schema = self.get_schema(self.config.bna.blocks.table)
-
         self.sql_subs = self.make_sql_substitutions(self.config)
 
         if force_net_build:

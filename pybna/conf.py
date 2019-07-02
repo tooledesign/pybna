@@ -47,9 +47,8 @@ class Conf(DBUtils):
         connectivity = config.bna.connectivity
 
         # boundary
-        if "schema" in boundary:
-            boundary_schema = boundary.schema
-        else:
+        boundary_schema, boundary.table = self.parse_table_name(boundary.table)
+        if boundary_schema is None:
             try:
                 boundary_schema = self.get_schema(boundary.table)
             except:
@@ -60,9 +59,8 @@ class Conf(DBUtils):
             boundary_geom = "geom"
 
         # blocks
-        if "schema" in blocks:
-            blocks_schema = blocks.schema
-        else:
+        blocks_schema, blocks.table = self.parse_table_name(blocks.table)
+        if blocks_schema is None:
             try:
                 blocks_schema = self.get_schema(blocks.table)
             except:
@@ -77,9 +75,8 @@ class Conf(DBUtils):
             blocks_geom_col = "geom"
 
         # roads
-        if "schema" in network.roads:
-            roads_schema = network.roads.schema
-        else:
+        roads_schema, network.roads.table = self.parse_table_name(network.roads.table)
+        if roads_schema is None:
             try:
                 roads_schema = self.get_schema(network.roads.table)
             except:
@@ -94,9 +91,8 @@ class Conf(DBUtils):
             roads_geom_col = "geom"
 
         # intersections
-        if "schema" in network.intersections:
-            ints_schema = network.intersections.schema
-        else:
+        ints_schema, network.intersections.table = self.parse_table_name(network.intersections.table)
+        if ints_schema is None:
             try:
                 ints_schema = self.get_schema(network.intersections.table)
             except:
@@ -111,12 +107,12 @@ class Conf(DBUtils):
             ints_geom_col = "geom"
 
         # edges
-        if "schema" in network.edges:
-            edges_schema = network.edges.schema
-        elif self.table_exists(network.edges.table):
-            edges_schema = self.get_schema(network.edges.table)
-        else:
-            edges_schema = roads_schema
+        edges_schema, network.edges.table = self.parse_table_name(network.edges.table)
+        if edges_schema is None:
+            if self.table_exists(network.edges.table):
+                edges_schema = self.get_schema(network.edges.table)
+            else:
+                edges_schema = roads_schema
         if "uid" in network.edges:
             edges_id_col = network.edges.uid
         elif self.table_exists(network.edges.table,edges_schema):
@@ -131,12 +127,12 @@ class Conf(DBUtils):
             edges_geom_col = "geom"
 
         # nodes
-        if "schema" in network.nodes:
-            nodes_schema = network.nodes.schema
-        elif self.table_exists(network.nodes.table):
-            nodes_schema = self.get_schema(network.nodes.table)
-        else:
-            nodes_schema = roads_schema
+        nodes_schema, network.nodes.table = self.parse_table_name(network.nodes.table)
+        if nodes_schema is None:
+            if self.table_exists(network.nodes.table):
+                nodes_schema = self.get_schema(network.nodes.table)
+            else:
+                nodes_schema = roads_schema
         if "uid" in network.nodes:
             nodes_id_col = network.nodes.uid
         elif self.table_exists(network.nodes.table,nodes_schema):
@@ -151,9 +147,8 @@ class Conf(DBUtils):
             nodes_geom_col = "geom"
 
         # connectivity
-        if "schema" in connectivity:
-            connectivity_schema = connectivity.schema
-        else:
+        connectivity_schema, connectivity.table = self.parse_table_name(connectivity.table)
+        if connectivity_schema is None:
             connectivity_schema = blocks_schema
 
         # srid

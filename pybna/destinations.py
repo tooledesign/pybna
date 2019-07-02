@@ -24,18 +24,19 @@ class Destinations(DBUtils):
         self.srid = None
 
 
-    def score_destinations(self,output_table,schema=None,with_geoms=False,overwrite=False,dry=False):
+    def score_destinations(self,output_table,with_geoms=False,overwrite=False,dry=False):
         """
         Creates a new db table of scores for each block
 
         args:
-        output_table -- table to create
-        schema -- schema for the table. default is the schema where the census block table is stored.
+        output_table -- table to create (optionally schema-qualified)
         overwrite -- overwrite a pre-existing table
         dry -- print the assembled query instead of executing in the database
         """
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
+
+        schema, output_table = self.parse_table_name(output_table)
 
         subs["scores_table"] = sql.Identifier(output_table)
         if schema is not None:

@@ -194,15 +194,7 @@ class Connectivity(DBUtils):
                 AND d.deptype = 'i' \
             WHERE  i.indrelid = {}::regclass \
             AND    d.objid IS NULL \
-        ").format(
-            sql.Literal(
-                "'" +
-                self.config.bna.connectivity.schema +
-                "'.'" +
-                self.config.bna.connectivity.table +
-                "'"
-            )
-        )
+        ").format(sql.Literal(self.config.bna.connectivity.table))
         for row in cur:
             if row[0] is None:
                 pass
@@ -222,7 +214,9 @@ class Connectivity(DBUtils):
         """
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
-        subs["connectivity_index"] = sql.Identifier("idx_" + self.config.bna.connectivity.table + "_low_stress")
+        s,t = self.parse_table_name(self.config.bna.connectivity.table)
+        idx = "idx_" + t + "_low_stress"
+        subs["connectivity_index"] = sql.Identifier(idx)
 
         conn = self.get_db_connection()
         cur = conn.cursor()

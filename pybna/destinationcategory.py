@@ -24,10 +24,8 @@ class DestinationCategory:
         self.config = config
         self.query_path = query_path
         self.category = self.config["name"]
-        self.table = self.config["table"]
-        if "schema" in self.config:
-            self.schema = self.config["schema"]
-        else:
+        self.schema, self.table = self.parse_table_name(self.config["table"])
+        if self.schema is None:
             self.schema = self.bna.get_schema(self.table)
         self.blocks_col = self.config["blocks"]
         if "uid" in self.config:
