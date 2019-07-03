@@ -9,6 +9,7 @@ import overpass
 import osmnx as ox
 import random
 import string
+from shapely.geometry import shape
 
 from conf import Conf
 from dbutils import DBUtils
@@ -523,9 +524,13 @@ class Importer(DBUtils,Conf):
 
         conn = self.get_db_connection()
         for d in destinations:
-            print("Copying {} to database".format(table))
             table = d["table"]
+            if not overwrite and self.table_exists(table,schema):
+                conn.rollback()
+                conn.close()
+                raise ValueError("Table %s.%s already exists" % (schema,table))
             tags = d["tags_query"]
+            print("Copying {} to database".format(table))
             ways, nodes = self._osm_destinations_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
 
             # set attributes
@@ -534,28 +539,130 @@ class Importer(DBUtils,Conf):
                 attributes = attributes.union(set(feature["properties"].keys()))
             for feature in nodes["features"]:
                 attributes = attributes.union(set(feature["properties"].keys()))
-            attributes = [sql.Identifier(a) for a in attributes]
-            query_attributes = sql.SQL(" text,").join(attributes)
+            attributes = list(attributes)
+            attributes.sort()
+            attributes_sql = [sql.Identifier(a) for a in attributes]
+            query_attributes = sql.SQL(" text,").join(attributes_sql)
+            if len(attributes) > 0:
+                query_attributes = sql.SQL(",") + query_attributes + sql.SQL(" text")
 
             # make tables
-            query_make_table_ways = sql.SQL("create table {}.{} (geom geometry(multipolygon,4326),{})").format(
+            query_make_table_ways = sql.SQL(
+                "create table {}.{} (geom text,osmid bigint{})"
+            ).format(
                 sql.Identifier(schema),
                 sql.Identifier(table_prefix+"_"+table+"_ways"),
                 query_attributes
             )
-            query_make_table_nodes = sql.SQL("create table {}.{} (geom geometry(point,4326),{})").format(
+            query_make_table_nodes = sql.SQL(
+                "create table {}.{} (geom text,osmid bigint{})"
+            ).format(
                 sql.Identifier(schema),
                 sql.Identifier(table_prefix+"_"+table+"_nodes"),
                 query_attributes
             )
+            try:
+                cur = conn.cursor()
+                cur.execute(query_make_table_ways)
+                cur.execute(query_make_table_nodes)
+                cur.close()
+            except Exception as e:
+                conn.rollback()
+                conn.close()
+                raise e
+
+            # insert data
+            ids_already_processed = set()
+            for feature in ways["features"]:
+                if feature["id"] in ids_already_processed:
+                    # short circuit insertion if we've already seen this feature.
+                    # for some reason duplicates are imported from osm
+                    continue
+                else:
+                    ids_already_processed.add(feature["id"])
+                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_ways")
+            ids_already_processed = set()
+            for feature in nodes["features"]:
+                if feature["id"] in ids_already_processed:
+                    # short circuit insertion if we've already seen this feature.
+                    # for some reason duplicates are imported from osm
+                    continue
+                else:
+                    ids_already_processed.add(feature["id"])
+                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_nodes")
+
+            # process in the db
+            subs = {
+                "schema": sql.Identifier(schema),
+                "final_table": sql.Identifier(table),
+                "ways_table": sql.Identifier(table_prefix+"_"+table+"_ways"),
+                "nodes_table": sql.Identifier(table_prefix+"_"+table+"_nodes"),
+                "srid": sql.Literal(srid),
+                "sidx": sql.Identifier("sidx_"+table),
+                "pkey": sql.Identifier("id")
+            }
+            qpath = os.path.join(self.module_dir,"sql","importer","process_destinations.sql")
+            if overwrite:
+                self.drop_table(table,schema=schema,conn=conn)
+            query = self.read_sql_from_file(qpath)
+            q = sql.SQL(query).format(**subs)
+            try:
+                cur = conn.cursor()
+                cur.execute(q)
+                cur.close()
+            except Exception as e:
+                cur.close()
+                conn.rollback()
+                conn.close()
+                raise e
+
+            if not keep_intermediates:
+                self.drop_table(table_prefix+"_"+table+"_ways",schema=schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_nodes",schema=schema,conn=conn)
+
+        conn.commit()
+        conn.close()
+
+
+    def _osm_destinations_table_insert(self,conn,attributes,feature,schema,table):
+        """
+        Copies features from the OSM GeoJSON into the database
+        """
+        # convert geom to wkt
+        # from pybna import Importer
+        # i = Importer(host="192.168.60.220",db_name="indianapolis",user="gis",password="gis")
+        # i.import_osm_destinations(schema="scratch",boundary_file="/home/spencer/gis/test_outline.shp",srid=26911)
+        geom = shape(feature["geometry"]).wkt
+
+        values = []
+        values.append(sql.Literal(geom))
+        values.append(sql.Literal(feature["id"]))
+        for a in attributes:
+            # values.append(
+            #     sql.SQL(
+            #         "ST_SetSRID(ST_Multi(ST_MakePolygon(ST_GeomFromGeoJSON({}))),4326)"
+            #     ).format(
+            #         sql.Literal(feature["geometry"])
+            #     )
+            # )
+            if a in feature["properties"].keys():
+                values.append(sql.Literal(feature["properties"][a]))
+            else:
+                values.append(sql.SQL("NULL"))
+
+        query_insert = sql.SQL("insert into {}.{} values({})").format(
+            sql.Identifier(schema),
+            sql.Identifier(table),
+            sql.SQL(",").join(values)
+        )
+        try:
             cur = conn.cursor()
-            cur.execute(query_make_table_ways)
-            cur.execute(query_make_table_nodes)
-            for feature in ways:
-                query_insert = sql.SQL("insert into {}.{}")
-                ...
-
-
+            cur.execute(query_insert)
+            cur.close()
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            raise e
 
 
     def _osm_destinations_from_overpass(self,min_lon,min_lat,max_lon,max_lat,tags):
@@ -590,9 +697,6 @@ class Importer(DBUtils,Conf):
         # -117.456097,47.666798,-117.439232,47.673358 # holmes
 
         return ways, nodes
-
-
-
 
 
     def _load_boundary_as_dataframe(self,boundary_file=None,srid=None):
