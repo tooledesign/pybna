@@ -485,47 +485,80 @@ class Importer(DBUtils,Conf):
         return gdfs[1], gdfs[0]
 
 
-    def import_osm_destinations(self,schema,boundary_file=None,srid=None,overwrite=False):
+    def import_osm_destinations(self,schema=None,boundary_file=None,srid=None,overwrite=False,keep_intermediates=False):
         """
         Processes OSM destinations and copies the data into the database.
 
         args
-        schema -- the schema to create the tables in
-        boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
+        schema -- the schema to create the tables in (if not given, uses the DB default)
+        boundary_file -- a boundary file path. if not given uses the boundary specified in the config
         srid -- projection to use
         overwrite -- whether to overwrite any existing tables
+        keep_intermediates -- saves the intermediate tables used to generate the final tables
         """
+        if schema is None:
+            schema = self.get_default_schema()
+
         if srid is None:
             if "srid" in self.config:
                 srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
-        epsg = "epsg:%i" % srid
+        # epsg = "epsg:%i" % srid
 
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
         boundary = boundary.to_crs({"init": "epsg:4326"})
         min_lon,min_lat,max_lon,max_lat = boundary.total_bounds
 
+        table_prefix = ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
+
         # set up a list of dictionaries with info about each destination
         destinations = [
-            {"table":"schools","tags_query":""},
-            {"table":"parks","tags_query":""}
+            {"table":"schools","tags_query":"['amenity'='school']"},
+            {
+                "table":"parks",
+                "tags_query":"['amenity'='park']['leisure'='park']['leisure'='nature_reserve']['leisure'='playground']"
+            }
         ]
 
+        conn = self.get_db_connection()
         for d in destinations:
+            print("Copying {} to database".format(table))
             table = d["table"]
             tags = d["tags_query"]
-            gdf = self._osm_destination_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
-            print("Copying %s to database" % table)
-            self.gdf_to_postgis(
-                gdf,table,
-                schema=schema,
-                srid=srid,
-                overwrite=overwrite
+            ways, nodes = self._osm_destinations_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
+
+            # set attributes
+            attributes = set()
+            for feature in ways["features"]:
+                attributes = attributes.union(set(feature["properties"].keys()))
+            for feature in nodes["features"]:
+                attributes = attributes.union(set(feature["properties"].keys()))
+            attributes = [sql.Identifier(a) for a in attributes]
+            query_attributes = sql.SQL(" text,").join(attributes)
+
+            # make tables
+            query_make_table_ways = sql.SQL("create table {}.{} (geom geometry(multipolygon,4326),{})").format(
+                sql.Identifier(schema),
+                sql.Identifier(table_prefix+"_"+table+"_ways"),
+                query_attributes
             )
+            query_make_table_nodes = sql.SQL("create table {}.{} (geom geometry(point,4326),{})").format(
+                sql.Identifier(schema),
+                sql.Identifier(table_prefix+"_"+table+"_nodes"),
+                query_attributes
+            )
+            cur = conn.cursor()
+            cur.execute(query_make_table_ways)
+            cur.execute(query_make_table_nodes)
+            for feature in ways:
+                query_insert = sql.SQL("insert into {}.{}")
+                ...
 
 
-    def _osm_destination_from_overpass(self,min_lon,min_lat,max_lon,max_lat,tags):
+
+
+    def _osm_destinations_from_overpass(self,min_lon,min_lat,max_lon,max_lat,tags):
         """
         Submits an Overpass API query and returns a geodataframe of results
 
@@ -535,12 +568,30 @@ class Importer(DBUtils,Conf):
         max_lon -- Maximum longitude
         max_lat -- Maximum latitude
         tags -- list of osm tags to use for filtering this destination type
-        """
-        api = overpass.API()
-        slc = api.get('node["name"="Salt Lake City"]')
-        gdf = gpd.GeoDataFrame.from_features(slc)
 
-        api.get('way["amenity"="restaurant"]["name"="Veraci Pizza - Spokane"]; out geom;')
+        returns
+        geojson of ways, geojson of nodes
+        """
+        query_root = "({},{},{},{}){}; out geom;".format(
+            min_lat,
+            min_lon,
+            max_lat,
+            max_lon,
+            tags
+        )
+        way_query = "way"+query_root
+        node_query = "node"+query_root
+        api = overpass.API()
+        ways = api.get(way_query)
+        nodes = api.get(node_query)
+        # slc = api.get('node["name"="Salt Lake City"]')
+        # gdf = gpd.GeoDataFrame.from_features(slc)
+        # features = api.get('way()["amenity"="restaurant"]["name"="Veraci Pizza - Spokane"]; out geom;')
+        # -117.456097,47.666798,-117.439232,47.673358 # holmes
+
+        return ways, nodes
+
+
 
 
 
