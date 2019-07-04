@@ -124,9 +124,9 @@ pulling data over the network with the `osm_file` option.
 
 Destination data also comes from OpenStreetMap by default. The Importer uses the
 default destination categories and definitions for the BNA, but you can provide
-your own instructions for extracting OSM destinations using the `tags` option.
-To do this, you'll need to create a dictionary of table names and OSM tags that
-mimics the default baked into the code.
+your own instructions for extracting OSM destinations using the
+`destination_tags` option. To do this, you'll need to create a dictionary of
+table names and OSM tags that mimics the default baked into the code.
 
 Importing destinations can be done with:
 ```
