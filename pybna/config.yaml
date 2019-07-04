@@ -7,7 +7,7 @@
 # want to specify these if you have an
 # unusual circumstance
 #############################################
-# srid: 4326
+srid: 4326
 units: mi # units for speed limit, either km (metric) or mi (imperial), default is "mi" if not given
 
 db:

@@ -9,6 +9,7 @@ import overpass
 import osmnx as ox
 import random
 import string
+from shapely.geometry import shape
 
 from conf import Conf
 from dbutils import DBUtils
@@ -485,46 +486,234 @@ class Importer(DBUtils,Conf):
         return gdfs[1], gdfs[0]
 
 
-    def import_osm_destinations(self,schema,boundary_file=None,srid=None,overwrite=False):
+    def import_osm_destinations(self,schema=None,boundary_file=None,srid=None,
+                                destination_tags=None,overwrite=False,
+                                keep_intermediates=False):
         """
         Processes OSM destinations and copies the data into the database.
 
+        Maybe look at https://github.com/dezhin/osmread/ for file-based import?
+
         args
-        schema -- the schema to create the tables in
-        boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
+        schema -- the schema to create the tables in (if not given, uses the DB default)
+        boundary_file -- a boundary file path. if not given uses the boundary specified in the config
         srid -- projection to use
+        destination_tags -- list of destination tags to be used instead of the default
         overwrite -- whether to overwrite any existing tables
+        keep_intermediates -- saves the intermediate tables used to generate the final tables
         """
+        if schema is None:
+            schema = self.get_default_schema()
+
         if srid is None:
             if "srid" in self.config:
                 srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
-        epsg = "epsg:%i" % srid
+        # epsg = "epsg:%i" % srid
 
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
         boundary = boundary.to_crs({"init": "epsg:4326"})
         min_lon,min_lat,max_lon,max_lat = boundary.total_bounds
 
+        table_prefix = ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
+
         # set up a list of dictionaries with info about each destination
-        destinations = [
-            {"table":"schools","tags_query":""},
-            {"table":"parks","tags_query":""}
-        ]
+        if destination_tags is None:
+            destination_tags = [
+                {"table":"colleges","tags_query": ["['amenity'='college']"]},
+                {
+                    "table":"community_centers",
+                    "tags_query": [
+                        "['amenity'='community_centre']",
+                        "['amenity'='community_center']"
+                    ]
+                },
+                {"table":"dentists","tags_query": ["['amenity'='dentist']"]},
+                {
+                    "table":"doctors",
+                    "tags_query": [
+                        "['amenity'='doctors']",
+                        "['amenity'='doctor']",
+                        "['amenity'='clinic']"
+                    ]
+                },
+                {
+                    "table":"hospitals",
+                    "tags_query": [
+                        "['amenity'='hospital']",
+                        "['amenity'='hospitals']"
+                    ]
+                },
+                {
+                    "table":"parks",
+                    "tags_query": [
+                        "['amenity'='park']",
+                        "['leisure'='park']",
+                        "['leisure'='nature_reserve']",
+                        "['leisure'='playground']"
+                    ]
+                },
+                {"table":"pharmacies","tags_query": ["['amenity'='pharmacy']"]},
+                {"table":"retail","tags_query": ["['landuse'='retail']"]},
+                {"table":"schools","tags_query": ["['amenity'='school']"]},
+                {"table":"social_services","tags_query": ["['amenity'='social_facility']"]},
+                {"table":"supermarkets","tags_query": ["['shop'='supermarket']"]},
+                {
+                    "table":"transit",
+                    "tags_query": [
+                        "['amenity'='bus_station']",
+                        "['railway'='station']",
+                        "['public_transport'='station']"
+                    ]
+                },
+                {"table":"universities","tags_query": ["['amenity'='university']"]}
+            ]
 
-        for d in destinations:
+        conn = self.get_db_connection()
+        for d in destination_tags:
             table = d["table"]
+            if not overwrite and self.table_exists(table,schema):
+                conn.rollback()
+                conn.close()
+                raise ValueError("Table %s.%s already exists" % (schema,table))
             tags = d["tags_query"]
-            gdf = self._osm_destination_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
-            print("Copying %s to database" % table)
-            self.gdf_to_postgis(
-                gdf,table,schema,
-                srid=srid,
-                overwrite=overwrite
+            print("Copying {} to database".format(table))
+            ways, nodes = self._osm_destinations_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
+
+            # set attributes
+            attributes = set()
+            for feature in ways["features"]:
+                attributes = attributes.union(set(feature["properties"].keys()))
+            for feature in nodes["features"]:
+                attributes = attributes.union(set(feature["properties"].keys()))
+            attributes = list(attributes)
+            attributes.sort()
+            attributes_sql = [sql.Identifier(a) for a in attributes]
+            query_attributes = sql.SQL(" text,").join(attributes_sql)
+            if len(attributes) > 0:
+                query_attributes = sql.SQL(",") + query_attributes + sql.SQL(" text")
+
+            # make tables
+            query_make_table_ways = sql.SQL(
+                "create table {}.{} (geom text,osmid bigint{})"
+            ).format(
+                sql.Identifier(schema),
+                sql.Identifier(table_prefix+"_"+table+"_ways"),
+                query_attributes
             )
+            query_make_table_nodes = sql.SQL(
+                "create table {}.{} (geom text,osmid bigint{})"
+            ).format(
+                sql.Identifier(schema),
+                sql.Identifier(table_prefix+"_"+table+"_nodes"),
+                query_attributes
+            )
+            try:
+                cur = conn.cursor()
+                cur.execute(query_make_table_ways)
+                cur.execute(query_make_table_nodes)
+                cur.close()
+            except Exception as e:
+                conn.rollback()
+                conn.close()
+                raise e
+
+            # insert data
+            ids_already_processed = set()
+            for feature in ways["features"]:
+                if feature["id"] in ids_already_processed:
+                    # short circuit insertion if we've already seen this feature.
+                    # for some reason duplicates are imported from osm
+                    continue
+                else:
+                    ids_already_processed.add(feature["id"])
+                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_ways")
+            ids_already_processed = set()
+            for feature in nodes["features"]:
+                if feature["id"] in ids_already_processed:
+                    # short circuit insertion if we've already seen this feature.
+                    # for some reason duplicates are imported from osm
+                    continue
+                else:
+                    ids_already_processed.add(feature["id"])
+                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_nodes")
+
+            # process in the db
+            subs = {
+                "schema": sql.Identifier(schema),
+                "final_table": sql.Identifier(table),
+                "ways_table": sql.Identifier(table_prefix+"_"+table+"_ways"),
+                "nodes_table": sql.Identifier(table_prefix+"_"+table+"_nodes"),
+                "srid": sql.Literal(srid),
+                "sidx": sql.Identifier("sidx_"+table),
+                "pkey": sql.Identifier("id")
+            }
+            qpath = os.path.join(self.module_dir,"sql","importer","process_destinations.sql")
+            if overwrite:
+                self.drop_table(table,schema=schema,conn=conn)
+            query = self.read_sql_from_file(qpath)
+            q = sql.SQL(query).format(**subs)
+            try:
+                cur = conn.cursor()
+                cur.execute(q)
+                cur.close()
+            except Exception as e:
+                cur.close()
+                conn.rollback()
+                conn.close()
+                raise e
+
+            if not keep_intermediates:
+                self.drop_table(table_prefix+"_"+table+"_ways",schema=schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_nodes",schema=schema,conn=conn)
+
+        conn.commit()
+        conn.close()
 
 
-    def _osm_destination_from_overpass(self,min_lon,min_lat,max_lon,max_lat,tags):
+    def _osm_destinations_table_insert(self,conn,attributes,feature,schema,table):
+        """
+        Copies features from the OSM GeoJSON into the database
+        """
+        # convert geom to wkt
+        # from pybna import Importer
+        # i = Importer(host="192.168.60.220",db_name="indianapolis",user="gis",password="gis")
+        # i.import_osm_destinations(schema="scratch",boundary_file="/home/spencer/gis/test_outline.shp",srid=26911)
+        geom = shape(feature["geometry"]).wkt
+
+        values = []
+        values.append(sql.Literal(geom))
+        values.append(sql.Literal(feature["id"]))
+        for a in attributes:
+            # values.append(
+            #     sql.SQL(
+            #         "ST_SetSRID(ST_Multi(ST_MakePolygon(ST_GeomFromGeoJSON({}))),4326)"
+            #     ).format(
+            #         sql.Literal(feature["geometry"])
+            #     )
+            # )
+            if a in feature["properties"].keys():
+                values.append(sql.Literal(feature["properties"][a]))
+            else:
+                values.append(sql.SQL("NULL"))
+
+        query_insert = sql.SQL("insert into {}.{} values({})").format(
+            sql.Identifier(schema),
+            sql.Identifier(table),
+            sql.SQL(",").join(values)
+        )
+        try:
+            cur = conn.cursor()
+            cur.execute(query_insert)
+            cur.close()
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            raise e
+
+
+    def _osm_destinations_from_overpass(self,min_lon,min_lat,max_lon,max_lat,tags):
         """
         Submits an Overpass API query and returns a geodataframe of results
 
@@ -534,11 +723,30 @@ class Importer(DBUtils,Conf):
         max_lon -- Maximum longitude
         max_lat -- Maximum latitude
         tags -- list of osm tags to use for filtering this destination type
+
+        returns
+        geojson of ways, geojson of nodes
         """
-        # https://github.com/jwass/geopandas_osm   ????
+        query_root = ["({},{},{},{}){}".format(min_lat,min_lon,max_lat,max_lon,tag) for tag in tags]
+        # query_root = "({},{},{},{}){}".format(
+        #     min_lat,
+        #     min_lon,
+        #     max_lat,
+        #     max_lon,
+        #     tags
+        # )
+        way_query = "way" + ";way".join(query_root) + ";"
+        node_query = "node" + ";node".join(query_root) + ";"
+
         api = overpass.API()
-        slc = api.get('node["name"="Salt Lake City"]')
-        gdf = gpd.GeoDataFrame.from_features(slc)
+        ways = api.get(way_query,verbosity="geom")
+        nodes = api.get(node_query,verbosity="geom")
+        # slc = api.get('node["name"="Salt Lake City"]')
+        # gdf = gpd.GeoDataFrame.from_features(slc)
+        # features = api.get('way()["amenity"="restaurant"]["name"="Veraci Pizza - Spokane"]; out geom;')
+        # -117.456097,47.666798,-117.439232,47.673358 # holmes
+
+        return ways, nodes
 
 
     def _load_boundary_as_dataframe(self,boundary_file=None,srid=None):
