@@ -486,14 +486,19 @@ class Importer(DBUtils,Conf):
         return gdfs[1], gdfs[0]
 
 
-    def import_osm_destinations(self,schema=None,boundary_file=None,srid=None,overwrite=False,keep_intermediates=False):
+    def import_osm_destinations(self,schema=None,boundary_file=None,srid=None,
+                                destination_tags=None,overwrite=False,
+                                keep_intermediates=False):
         """
         Processes OSM destinations and copies the data into the database.
+
+        Maybe look at https://github.com/dezhin/osmread/ for file-based import?
 
         args
         schema -- the schema to create the tables in (if not given, uses the DB default)
         boundary_file -- a boundary file path. if not given uses the boundary specified in the config
         srid -- projection to use
+        destination_tags -- list of destination tags to be used instead of the default
         overwrite -- whether to overwrite any existing tables
         keep_intermediates -- saves the intermediate tables used to generate the final tables
         """
@@ -514,16 +519,59 @@ class Importer(DBUtils,Conf):
         table_prefix = ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
 
         # set up a list of dictionaries with info about each destination
-        destinations = [
-            {"table":"schools","tags_query":"['amenity'='school']"},
-            {
-                "table":"parks",
-                "tags_query":"['amenity'='park']['leisure'='park']['leisure'='nature_reserve']['leisure'='playground']"
-            }
-        ]
+        if destination_tags is None:
+            destination_tags = [
+                {"table":"colleges","tags_query": ["['amenity'='college']"]},
+                {
+                    "table":"community_centers",
+                    "tags_query": [
+                        "['amenity'='community_centre']",
+                        "['amenity'='community_center']"
+                    ]
+                },
+                {"table":"dentists","tags_query": ["['amenity'='dentist']"]},
+                {
+                    "table":"doctors",
+                    "tags_query": [
+                        "['amenity'='doctors']",
+                        "['amenity'='doctor']",
+                        "['amenity'='clinic']"
+                    ]
+                },
+                {
+                    "table":"hospitals",
+                    "tags_query": [
+                        "['amenity'='hospital']",
+                        "['amenity'='hospitals']"
+                    ]
+                },
+                {
+                    "table":"parks",
+                    "tags_query": [
+                        "['amenity'='park']",
+                        "['leisure'='park']",
+                        "['leisure'='nature_reserve']",
+                        "['leisure'='playground']"
+                    ]
+                },
+                {"table":"pharmacies","tags_query": ["['amenity'='pharmacy']"]},
+                {"table":"retail","tags_query": ["['landuse'='retail']"]},
+                {"table":"schools","tags_query": ["['amenity'='school']"]},
+                {"table":"social_services","tags_query": ["['amenity'='social_facility']"]},
+                {"table":"supermarkets","tags_query": ["['shop'='supermarket']"]},
+                {
+                    "table":"transit",
+                    "tags_query": [
+                        "['amenity'='bus_station']",
+                        "['railway'='station']",
+                        "['public_transport'='station']"
+                    ]
+                },
+                {"table":"universities","tags_query": ["['amenity'='university']"]}
+            ]
 
         conn = self.get_db_connection()
-        for d in destinations:
+        for d in destination_tags:
             table = d["table"]
             if not overwrite and self.table_exists(table,schema):
                 conn.rollback()
@@ -679,18 +727,20 @@ class Importer(DBUtils,Conf):
         returns
         geojson of ways, geojson of nodes
         """
-        query_root = "({},{},{},{}){}; out geom;".format(
-            min_lat,
-            min_lon,
-            max_lat,
-            max_lon,
-            tags
-        )
-        way_query = "way"+query_root
-        node_query = "node"+query_root
+        query_root = ["({},{},{},{}){}".format(min_lat,min_lon,max_lat,max_lon,tag) for tag in tags]
+        # query_root = "({},{},{},{}){}".format(
+        #     min_lat,
+        #     min_lon,
+        #     max_lat,
+        #     max_lon,
+        #     tags
+        # )
+        way_query = "way" + ";way".join(query_root) + ";"
+        node_query = "node" + ";node".join(query_root) + ";"
+
         api = overpass.API()
-        ways = api.get(way_query)
-        nodes = api.get(node_query)
+        ways = api.get(way_query,verbosity="geom")
+        nodes = api.get(node_query,verbosity="geom")
         # slc = api.get('node["name"="Salt Lake City"]')
         # gdf = gpd.GeoDataFrame.from_features(slc)
         # features = api.get('way()["amenity"="restaurant"]["name"="Veraci Pizza - Spokane"]; out geom;')
