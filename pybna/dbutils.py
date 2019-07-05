@@ -295,7 +295,7 @@ class DBUtils:
 
     def gdf_to_postgis(self,gdf,table,schema=None,columns=None,geom="geom",id="id",
                        multi=True,keep_case=False,srid=None,conn=None,
-                       overwrite=False):
+                       overwrite=False,no_geom=False):
         """
         Saves a geopandas geodataframe to Postgis.
 
@@ -311,6 +311,7 @@ class DBUtils:
         srid -- the projection to use (if none inferred from data)
         conn -- an open psycopg2 connection
         overwrite -- drops an existing table
+        no_geom -- copies only the table without accompany geometries (or processes a non-geo table)
         """
         # process inputs
         if schema is None:
@@ -327,62 +328,69 @@ class DBUtils:
             columns = gdf.columns
         elif not keep_case:
             columns = [c.lower() for c in columns]
-        if srid is None:
+        if srid is None and not no_geom:
             srid = int(gdf.geometry.crs["init"].split(":")[1])
         if overwrite:
             self.drop_table(table,schema,conn)
 
-        # get geom column type
-        shapely_type = gdf.geometry.apply(lambda x: type(x)).unique()
-        if len(shapely_type) > 1:
-            if len(shapely_type) > 2:
-                raise ValueError("Can't process more than one geometry type")
-            elif multi:
-                g1 = shapely_type[0]
-                g2 = shapely_type[1]
-                if g1 is Point and g2 is MultiPoint:
-                    pass
-                elif g1 is MultiPoint and g2 is Point:
-                    pass
-                elif g1 is LineString and g2 is MultiLineString:
-                    pass
-                elif g1 is MultiLineString and g2 is LineString:
-                    pass
-                elif g1 is Polygon and g2 is MultiPolygon:
-                    pass
-                elif g1 is MultiPolygon and g2 is Polygon:
-                    pass
+        if no_geom:
+            # remove a geom column  (if there is one)
+            try:
+                gdf.drop(gdf.geometry.name,axis=1,inplace=True)
+            except:
+                pass
+        else:
+            # get geom column type
+            shapely_type = gdf.geometry.apply(lambda x: type(x)).unique()
+            if len(shapely_type) > 1:
+                if len(shapely_type) > 2:
+                    raise ValueError("Can't process more than one geometry type")
+                elif multi:
+                    g1 = shapely_type[0]
+                    g2 = shapely_type[1]
+                    if g1 is Point and g2 is MultiPoint:
+                        pass
+                    elif g1 is MultiPoint and g2 is Point:
+                        pass
+                    elif g1 is LineString and g2 is MultiLineString:
+                        pass
+                    elif g1 is MultiLineString and g2 is LineString:
+                        pass
+                    elif g1 is Polygon and g2 is MultiPolygon:
+                        pass
+                    elif g1 is MultiPolygon and g2 is Polygon:
+                        pass
+                    else:
+                        raise ValueError("Can't process more than one geometry type")
                 else:
                     raise ValueError("Can't process more than one geometry type")
             else:
-                raise ValueError("Can't process more than one geometry type")
-        else:
-            multi = False
+                multi = False
 
-        shapely_type = shapely_type[0]
-        if shapely_type is Point:
-            if multi:
+            shapely_type = shapely_type[0]
+            if shapely_type is Point:
+                if multi:
+                    geom_type = "multipoint"
+                else:
+                    geom_type = "point"
+            elif shapely_type is MultiPoint:
                 geom_type = "multipoint"
-            else:
-                geom_type = "point"
-        elif shapely_type is MultiPoint:
-            geom_type = "multipoint"
-        elif shapely_type is LineString:
-            if multi:
+            elif shapely_type is LineString:
+                if multi:
+                    geom_type = "multilinestring"
+                else:
+                    geom_type = "linestring"
+            elif shapely_type is MultiLineString:
                 geom_type = "multilinestring"
-            else:
-                geom_type = "linestring"
-        elif shapely_type is MultiLineString:
-            geom_type = "multilinestring"
-        elif shapely_type is Polygon:
-            if multi:
+            elif shapely_type is Polygon:
+                if multi:
+                    geom_type = "multipolygon"
+                else:
+                    geom_type = "polygon"
+            elif shapely_type is MultiPolygon:
                 geom_type = "multipolygon"
             else:
-                geom_type = "polygon"
-        elif shapely_type is MultiPolygon:
-            geom_type = "multipolygon"
-        else:
-            raise ValueError("Incompatible geometry type %s" % shapely_type)
+                raise ValueError("Incompatible geometry type %s" % shapely_type)
 
         # remove geom column and any columns that aren't in the gdf
         tmp_cols = list()
@@ -394,11 +402,13 @@ class DBUtils:
 
         db_columns = list()
         types = list()
-        db_columns.append(geom)
-        types.append("text")
+        if not no_geom:
+            db_columns.append(geom)
+            types.append("text")
         for c in columns:
-            if c == gdf.geometry.name:
-                continue
+            if not no_geom:
+                if c == gdf.geometry.name:
+                    continue
             dtype = "text"
             if gdf[c].dtype in (np.int64,np.uint64):
                 dtype = "bigint"
@@ -434,35 +444,37 @@ class DBUtils:
         insert_sql += " VALUES %s"
 
         # convert geoms to wkt
-        gdf["wkbs"] = gdf.geometry.apply(lambda x: x.wkb).apply(hexlify).apply(upper)
-        gdf = gdf.drop(gdf.geometry.name,axis=1)
-        gdf = gdf.rename(columns={"wkbs": geom})
+        if not no_geom:
+            gdf["wkbs"] = gdf.geometry.apply(lambda x: x.wkb).apply(hexlify).apply(upper)
+            gdf = gdf.drop(gdf.geometry.name,axis=1)
+            gdf = gdf.rename(columns={"wkbs": geom})
 
         execute_values(cur,insert_sql,gdf[db_columns].values)
-        subs = {
-            "schema": sql.Identifier(schema),
-            "table": sql.Identifier(table),
-            "geom": sql.Identifier(geom),
-            "geom_type": sql.SQL(geom_type),
-            "srid": sql.Literal(srid),
-            "index": sql.Identifier("sidx_"+table)
-        }
-        if multi:
-            q = sql.SQL(" \
-                ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
-                USING ST_Multi(ST_SetSRID({geom}::geometry,{srid})); \
-                CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
-                ANALYZE {schema}.{table};"
-            ).format(**subs)
-        else:
-            q = sql.SQL(" \
-                ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
-                USING ST_SetSRID({geom}::geometry,{srid}); \
-                CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
-                ANALYZE {schema}.{table};"
-            ).format(**subs)
-        cur.execute(q)
-        cur.close()
+        if not no_geom:
+            subs = {
+                "schema": sql.Identifier(schema),
+                "table": sql.Identifier(table),
+                "geom": sql.Identifier(geom),
+                "geom_type": sql.SQL(geom_type),
+                "srid": sql.Literal(srid),
+                "index": sql.Identifier("sidx_"+table)
+            }
+            if multi:
+                q = sql.SQL(" \
+                    ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
+                    USING ST_Multi(ST_SetSRID({geom}::geometry,{srid})); \
+                    CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
+                    ANALYZE {schema}.{table};"
+                ).format(**subs)
+            else:
+                q = sql.SQL(" \
+                    ALTER TABLE {schema}.{table} ALTER COLUMN {geom} TYPE geometry({geom_type},{srid}) \
+                    USING ST_SetSRID({geom}::geometry,{srid}); \
+                    CREATE INDEX {index} ON {schema}.{table} USING GIST ({geom}); \
+                    ANALYZE {schema}.{table};"
+                ).format(**subs)
+            cur.execute(q)
+            cur.close()
         if not transaction:
             conn.commit()
             conn.close()
