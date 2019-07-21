@@ -14,8 +14,8 @@ import pandas as pd
 FORWARD_DIRECTION = "forward"
 BACKWARD_DIRECTION = "backward"
 
-class Stress(DBUtils):
-    def __init__(self, config, create_lookups=True,
+class Stress(DBUtils,Conf):
+    def __init__(self, config=None, create_lookups=True,
                  verbose=False,debug=False):
         """
         Reads the config file, sets up a connection
@@ -26,30 +26,35 @@ class Stress(DBUtils):
         verbose -- output useful messages
         debug -- generates debug outputs
         """
+        Conf.__init__(self)
         self.verbose = verbose
         self.debug = debug
-        if self.verbose:
-            print("Loading configuration")
-        path = os.path.dirname(os.path.abspath(__file__)) # can't use dbutils yet
-        self.config = yaml.safe_load(open(os.path.join(path,config)))
-
-        # set up db connection
-        host = self.config["db"]["host"]
-        db = self.config["db"]["dbname"]
-        user = self.config['db']["user"]
-        password = self.config['db']["password"]
-        DBUtils.__init__(self, host=host, db=db, user=user, password=password,
-                         verbose=verbose, debug=debug, filename=__file__)
-
-        schema, table = self.parse_table_name(self.config["stress"]["table"]["name"])
-        self.table = table
-        if schema is None:
-            self.schema = self._get_schema(self.table)
-        else:
-            self.schema = schema
-        self.geom = self.config["stress"]["table"]["geom"]
-        self.srid = self._get_srid(self.table,self.geom,self.schema)
-
+        self.module_dir = os.path.dirname(os.path.abspath(__file__))
+        if config is None:
+            config = os.path.join(self.module_dir,"config.yaml")
+        self.config = self.parse_config(yaml.safe_load(open(config)))
+        print("Connecting to database")
+        host = self.config.db.host
+        db_name = self.config.db.dbname
+        user = self.config.db.user
+        password = self.config.db.password
+        db_connection_string = " ".join([
+            "dbname=" + db_name,
+            "user=" + user,
+            "host=" + host,
+            "password=" + password
+        ])
+        DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
+        self.bna_subs = self.make_sql_substitutions(self.config)
+        # schema, table = self.parse_table_name(self.config.stress.table.name)
+        # self.table = table
+        # if schema is None:
+        #     self.schema = self._get_schema(self.table)
+        # else:
+        #     self.schema = schema
+        # self.geom = self.config.stress.table.geom
+        # self.srid = self._get_srid(self.table,self.geom,self.schema)
+        #
         # check for and set lookup tables
         if self.verbose:
             print("Checking lookup tables")
@@ -82,7 +87,7 @@ class Stress(DBUtils):
         list
         """
         missing = []
-        for k, v in self.config["stress"]["lookup_tables"].iteritems():
+        for k, v in self.config.stress.lookup_tables.iteritems():
             schema, table = self.parse_table_name(v)
             if not self.table_exists(table,schema):
                 missing.append((k,table,schema))
@@ -189,8 +194,8 @@ class Stress(DBUtils):
         returns:
         a dictionary holding SQL objects
         """
-        assumptions = self.config["stress"]["assumptions"]["segment"]
-        settings = self.config["stress"]["segment"][direction]
+        assumptions = self.config.stress.assumptions.segment
+        settings = self.config.stress.segment[direction]
 
         # check required inputs
         if "lanes" not in settings and "lanes" not in assumptions:
@@ -239,7 +244,7 @@ class Stress(DBUtils):
             oneway_value = sql.Literal(settings["oneway"]["val"])
             all_oneways = list()
             for d in [FORWARD_DIRECTION,BACKWARD_DIRECTION]:
-                s = self.config["stress"]["segment"][d]
+                s = self.config.stress.segment[d]
                 all_oneways.append(sql.Literal(s["oneway"]["val"]))
             all_oneway_values = sql.SQL(",").join(all_oneways)
         else:
@@ -325,21 +330,21 @@ class Stress(DBUtils):
         )
 
         # other vals
-        schema, table = self.parse_table_name(self.config["stress"]["table"]["name"])
+        schema, table = self.parse_table_name(self.config.stress.table.name)
         if schema is None:
             schema = self._get_schema(table)
-        if "id" in self.config["stress"]["table"]:
-            id_column = self.config["stress"]["table"]["id"]
+        if "id" in self.config.stress.table:
+            id_column = self.config.stress.table.id
         else:
             id_column = self._get_pkid_col(table,schema)
-        if "geom" in self.config["stress"]["table"]:
-            geom = self.config["stress"]["table"]["geom"]
+        if "geom" in self.config.stress.table:
+            geom = self.config.stress.table.geom
         else:
             geom = self._get_geom_column(table,schema)
-        shared_lts_schema, shared_lts_table = self.parse_table_name(self.config["stress"]["lookup_tables"]["shared"])
+        shared_lts_schema, shared_lts_table = self.parse_table_name(self.config.stress.lookup_tables.shared)
         if shared_lts_schema is None:
             shared_lts_schema = self._get_schema(shared_lts_table)
-        bike_lane_lts_schema, bike_lane_lts_table = self.parse_table_name(self.config["stress"]["lookup_tables"]["bike_lane"])
+        bike_lane_lts_schema, bike_lane_lts_table = self.parse_table_name(self.config.stress.lookup_tables.bike_lane)
         if bike_lane_lts_schema is None:
             bike_lane_lts_schema = self._get_schema(bike_lane_lts_table)
 
@@ -389,56 +394,56 @@ class Stress(DBUtils):
         returns:
         a dictionary holding SQL objects
         """
-        assumptions = self.config["stress"]["assumptions"]["crossing"]
-        if self.config["stress"]["crossing"][direction] is None:
+        assumptions = self.config.stress.assumptions.crossing
+        if self.config.stress.crossing[direction] is None:
             settings = dict()
         else:
-            settings = self.config["stress"]["crossing"][direction]
+            settings = self.config.stress.crossing[direction]
 
         # check required inputs
-        if "intersection_tolerance" not in self.config["stress"]["crossing"]:
+        if "intersection_tolerance" not in self.config.stress.crossing:
             raise ValueError("Intersection tolerance not specified in config")
-        if "control" not in self.config["stress"]["crossing"]:
+        if "control" not in self.config.stress.crossing:
             raise ValueError("Control data not specified in config")
 
-        intersection_tolerance = self.config["stress"]["crossing"]["intersection_tolerance"]
+        intersection_tolerance = self.config.stress.crossing.intersection_tolerance
 
         # stress table
-        schema, table = self.parse_table_name(self.config["stress"]["table"]["name"])
+        schema, table = self.parse_table_name(self.config.stress.table.name)
         if schema is None:
             schema = self._get_schema(table)
-        if "id" in self.config["stress"]["table"]:
-            id_column = self.config["stress"]["table"]["id"]
+        if "id" in self.config.stress.table:
+            id_column = self.config.stress.table.id
         else:
             id_column = self._get_pkid_col(table,schema)
-        if "geom" in self.config["stress"]["table"]:
-            geom = self.config["stress"]["table"]["geom"]
+        if "geom" in self.config.stress.table:
+            geom = self.config.stress.table.geom
         else:
             geom = self._get_geom_column(table,schema)
 
         # control
-        control_schema, control_table = self.parse_table_name(self.config["stress"]["crossing"]["control"]["table"])
+        control_schema, control_table = self.parse_table_name(self.config.stress.crossing.control.table)
         if control_schema is None:
             control_schema = self._get_schema(control_table)
-        if "geom" in self.config["stress"]["crossing"]["control"]:
-            control_geom = self.config["stress"]["crossing"]["control"]["geom"]
+        if "geom" in self.config.stress.crossing.control:
+            control_geom = self.config.stress.crossing.control.geom
         else:
             control_geom = self._get_geom_column(control_table,control_schema)
-        control_column = self.config["stress"]["crossing"]["control"]["column"]["name"]
-        four_way_stop = self.config["stress"]["crossing"]["control"]["column"]["four_way_stop"]
-        signal = self.config["stress"]["crossing"]["control"]["column"]["signal"]
-        rrfb = self.config["stress"]["crossing"]["control"]["column"]["rrfb"]
-        hawk = self.config["stress"]["crossing"]["control"]["column"]["hawk"]
+        control_column = self.config.stress.crossing.control.column.name
+        four_way_stop = self.config.stress.crossing.control.column.four_way_stop
+        signal = self.config.stress.crossing.control.column.signal
+        rrfb = self.config.stress.crossing.control.column.rrfb
+        hawk = self.config.stress.crossing.control.column.hawk
 
         # island
-        island_schema, island_table = self.parse_table_name(self.config["stress"]["crossing"]["island"]["table"])
+        island_schema, island_table = self.parse_table_name(self.config.stress.crossing.island.table)
         if island_schema is None:
             island_schema = self._get_schema(island_table)
-        if "geom" in self.config["stress"]["crossing"]["island"]:
-            island_geom = self.config["stress"]["crossing"]["island"]["geom"]
+        if "geom" in self.config.stress.crossing.island:
+            island_geom = self.config.stress.crossing.island.geom
         else:
             island_geom = self._get_geom_column(island_table,island_schema)
-        island_column = self.config["stress"]["crossing"]["island"]["column"]["name"]
+        island_column = self.config.stress.crossing.island.column.name
 
         # directional_attribute_aggregation
         f = open(os.path.join(self.module_dir(),"crossing","directional_attributes.sql"))
@@ -483,7 +488,7 @@ class Stress(DBUtils):
             cross_island = sql.SQL("NULL")
 
         # misc
-        cross_lts_schema, cross_lts_table = self.parse_table_name(self.config["stress"]["lookup_tables"]["crossing"])
+        cross_lts_schema, cross_lts_table = self.parse_table_name(self.config.stress.lookup_tables.crossing)
         if cross_lts_schema is None:
             cross_lts_schema = self._get_schema(cross_lts_table)
 
@@ -924,15 +929,15 @@ class Stress(DBUtils):
                 close_conn = True
             self._run_sql_script("01_create_table.sql",subs,dir_name=["make_carto_layer","single","directional"],dry=dry,conn=conn)
             subs["forward_oneway"] = sql.SQL("{c}={v}").format(
-                c=sql.Identifier(self.config["stress"]["segment"]["forward"]["oneway"]["name"]),
-                v=sql.Literal(self.config["stress"]["segment"]["forward"]["oneway"]["val"]),
+                c=sql.Identifier(self.config.stress.segment.forward.oneway.name),
+                v=sql.Literal(self.config.stress.segment.forward.oneway.val),
             )
             subs["backward_oneway"] = sql.SQL("{c}={v}").format(
-                c=sql.Identifier(self.config["stress"]["segment"]["backward"]["oneway"]["name"]),
-                v=sql.Literal(self.config["stress"]["segment"]["backward"]["oneway"]["val"]),
+                c=sql.Identifier(self.config.stress.segment.backward.oneway.name),
+                v=sql.Literal(self.config.stress.segment.backward.oneway.val),
             )
             subs["twoway"] = sql.SQL("{c}=NULL").format(
-                c=sql.Identifier(self.config["stress"]["segment"]["forward"]["oneway"]["name"])
+                c=sql.Identifier(self.config.stress.segment.forward.oneway.name)
             )
             self._run_sql_script("02_insert.sql",subs,dir_name=["make_carto_layer","single","directional"],dry=dry,conn=conn)
             self._run_sql_script("03_cleanup.sql",subs,dir_name=["make_carto_layer","single","directional"],dry=dry,conn=conn)
@@ -1021,7 +1026,7 @@ class Stress(DBUtils):
         Returns a pivot table dataframe of the shared LTS table
         """
         conn = self._get_connection()
-        q = sql.SQL("select * from {}").format(sql.Identifier(self.config["stress"]["lookup_tables"]["shared"]))
+        q = sql.SQL("select * from {}").format(sql.Identifier(self.config.stress.lookup_tables.shared))
         df = pd.read_sql(q.as_string(conn),conn,index_col="id")
         df = df.rename(columns={"lanes":"Lanes","effective_aadt":"Effective AADT","speed":"Prevailing speed"})
         return pd.pivot_table(df,values="stress",index=["Lanes","Effective AADT"],columns=["Prevailing speed"])
@@ -1032,7 +1037,7 @@ class Stress(DBUtils):
         Returns a pivot table dataframe of the bike lane LTS table
         """
         conn = self._get_connection()
-        q = sql.SQL("select * from {}").format(sql.Identifier(self.config["stress"]["lookup_tables"]["bike_lane"]))
+        q = sql.SQL("select * from {}").format(sql.Identifier(self.config.stress.lookup_tables.bike_lane))
         df = pd.read_sql(q.as_string(conn),conn,index_col="id")
         df.oneway = df.oneway.fillna(False)
         mapping = {
@@ -1050,7 +1055,7 @@ class Stress(DBUtils):
         Returns a pivot table dataframe of the crossing LTS table
         """
         conn = self._get_connection()
-        q = sql.SQL("select * from {}").format(sql.Identifier(self.config["stress"]["lookup_tables"]["crossing"]))
+        q = sql.SQL("select * from {}").format(sql.Identifier(self.config.stress.lookup_tables.crossing))
         df = pd.read_sql(q.as_string(conn),conn,index_col="id")
         df.control = df.control.fillna("Uncontrolled")
         mapping = {
