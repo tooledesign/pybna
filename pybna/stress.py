@@ -31,7 +31,7 @@ class Stress(DBUtils,Conf):
         self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
         if config is None:
-            config = os.path.join(self.module_dir,"config.yaml")
+            config = os.path.join(self.module_dir,"stress_config.yaml")
         self.config = self.parse_config(yaml.safe_load(open(config)))
         print("Connecting to database")
         host = self.config.db.host
@@ -45,16 +45,15 @@ class Stress(DBUtils,Conf):
             "password=" + password
         ])
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
-        self.bna_subs = self.make_sql_substitutions(self.config)
-        # schema, table = self.parse_table_name(self.config.stress.table.name)
-        # self.table = table
-        # if schema is None:
-        #     self.schema = self._get_schema(self.table)
-        # else:
-        #     self.schema = schema
-        # self.geom = self.config.stress.table.geom
-        # self.srid = self._get_srid(self.table,self.geom,self.schema)
-        #
+        schema, table = self.parse_table_name(self.config.stress.table.name)
+        self.table = table
+        if schema is None:
+            self.schema = self._get_schema(self.table)
+        else:
+            self.schema = schema
+        self.geom = self.config.stress.table.geom
+        self.srid = self._get_srid(self.table,self.geom,self.schema)
+
         # check for and set lookup tables
         if self.verbose:
             print("Checking lookup tables")
