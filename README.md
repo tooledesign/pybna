@@ -27,6 +27,34 @@ The imposm library requires some additional packages to be installed. Consult th
 sudo apt install build-essential python-devel protobuf-compiler libprotobuf-dev
 ```
 
+## tl;dr (Simple run)
+
+The most simple BNA run, using stock datasets and no customization, can be
+completed in a few easy steps. The following assumes you already have a database
+running named "bna" on the local machine.
+
+```
+import pybna
+
+# imports
+i = pybna.Importer()
+i.import_boundary('/path/to/your/boundary/file')
+i.import_census_blocks(fips=16)
+i.import_census_jobs(state="ID")
+i.import_osm_network()
+i.import_osm_destinations()
+
+# stress
+s = pybna.Stress()
+s.segment_stress()
+s.crossing_stress()
+
+# connectivity
+b = pybna.pyBNA()
+b.calculate_connectivity()
+b.score_destinations()
+```
+
 ## Importing data
 
 pyBNA includes a workflow to import data from publicly available sources (for
