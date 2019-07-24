@@ -7,8 +7,10 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import DictCursor
 import yaml
-from tooles import DBUtils
 import pandas as pd
+
+from conf import Conf
+from dbutils import DBUtils
 
 FORWARD_DIRECTION = "forward"
 BACKWARD_DIRECTION = "backward"
