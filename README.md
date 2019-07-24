@@ -40,7 +40,7 @@ import pybna
 i = pybna.Importer()
 i.import_boundary('/path/to/your/boundary/file')
 i.import_census_blocks(fips=16)
-i.import_census_jobs(state="ID")
+i.import_census_jobs("received.neighborhood_census_block_jobs",state="ID")
 i.import_osm_network()
 i.import_osm_destinations()
 
