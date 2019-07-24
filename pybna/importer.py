@@ -4,6 +4,7 @@ import tempfile
 import os
 from shutil import copy
 import geopandas as gpd
+import pandas as pd
 from psycopg2 import sql
 import overpass
 import osmnx as ox
@@ -214,6 +215,93 @@ class Importer(DBUtils,Conf):
             columns=columns,
             overwrite=overwrite
         )
+
+
+    def import_census_jobs(self,table,state=None,url_main=None,url_aux=None,
+                           fpath_main=None,fpath_aux=None,overwrite=False):
+        """
+        Retrieves LEHD journey-to-work tables saves them to the
+        designated jobs table in the DB. Can take a two letter state abbreviation
+        to download directly from the US Census, or can take a URL or file path
+
+        args
+        table -- the table name to save blocks to (if none use config) (must be schema-qualified)
+        state -- the two letter state abbreviation
+        url_main -- url to download the "main" file from
+        url_aux -- url to download the "aux" file from
+        fpath_main -- path to the "main" file
+        fpath_aux -- path to the "aux" file
+        overwrite -- deletes an existing table
+
+        https://lehd.ces.census.gov/data/lodes/LODES7/wy/od/wy_od_aux_JT00_2013.csv.gz
+        https://lehd.ces.census.gov/data/lodes/LODES7/wy/od/wy_od_main_JT00_2014.csv.gz
+        """
+        # check inputs
+        if int(url_main is None) + int(url_aux is None) == 1:
+            raise ValueError("A URL must be provided for both the main and aux tables")
+        if int(fpath_main is None) + int(fpath_aux is None) == 1:
+            raise ValueError("Files must be provided for both the main and aux tables")
+        if state is None and url_main is None and fpath_main is None:
+            raise ValueError("Either state abbreviation, URL, or file path must be given")
+        if state is not None and url_main is not None:
+            raise ValueError("Can't accept a state abbreviation _and_ a URL")
+        if state is not None and fpath_main is not None:
+            raise ValueError("Can't accept a state abbreviation _and_ a file name")
+        if fpath_main is not None and url_main is not None:
+            raise ValueError("Can't accept a file name _and_ a URL")
+        if state is not None:
+            state = state.lower()
+        if fpath_main is not None:
+            if not os.path.isfile(fpath_main):
+                raise ValueError("File not found at %s" % fpath_main)
+            if not os.path.isfile(fpath_aux):
+                raise ValueError("File not found at %s" % fpath_aux)
+        schema, table = self.parse_table_name(table)
+        if schema is None:
+            raise ValueError("No schema given. Must be qualified with table name.")
+        if not overwrite and self.table_exists(table,schema):
+            raise ValueError("Table %s.%s already exists" % (schema,table))
+
+        # copy the shapefile to temporary directory and load into geopandas
+        if not state is None:
+            print("Loading data for state {}".format(state.upper()))
+            year = 2014
+            success = False
+            while not success:
+                if year < 2010:
+                    raise ValueError("Could not find jobs data for state {}".format(state))
+                try:
+                    src_main = "https://lehd.ces.census.gov/data/lodes/LODES7/"+state+"/od/"+state+"_od_main_JT00_"+str(year)+".csv.gz"
+                    src_aux = "https://lehd.ces.census.gov/data/lodes/LODES7/"+state+"/od/"+state+"_od_aux_JT00_"+str(year)+".csv.gz"
+                    jobs_main = pd.read_csv(src_main)
+                    jobs_aux = pd.read_csv(src_aux)
+                    success = True
+                except:
+                    print("No data for state {} for year {}. Checking previous year.".format(state.upper(),year))
+                    year -= 1
+        else:
+            if not fpath_main is None:
+                src_main = fpath_main
+                src_aux = fpath_aux
+            if not url_main is None:
+                src_main = url_main
+                src_aux = url_aux
+            print("Loading main data from %s" % src_main)
+            jobs_main = pd.read_csv(src_main)
+            print("Loading aux data from %s" % src_aux)
+            jobs_aux = pd.read_csv(src_aux)
+
+        # copy data to db
+        jobs_main = jobs_main[["w_geocode","S000"]]
+        jobs_main.columns = ["blockid10","jobs"]
+        jobs_aux = jobs_aux[["w_geocode","S000"]]
+        jobs_aux.columns = ["blockid10","jobs"]
+        jobs = jobs_main.append(jobs_aux,ignore_index=True)
+        jobs = jobs.groupby(["blockid10"],as_index=False).sum()
+        jobs["blockid10"] = jobs["blockid10"].astype("str").str.rjust(15,"0")
+
+        print("Copying jobs to database")
+        self.gdf_to_postgis(jobs,table,schema,overwrite=overwrite,no_geom=True)
 
 
     def import_osm_network(self,roads_table=None,ints_table=None,
@@ -535,7 +623,6 @@ class Importer(DBUtils,Conf):
                 srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
-        # epsg = "epsg:%i" % srid
 
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
         boundary = boundary.to_crs({"init": "epsg:4326"})
@@ -701,23 +788,12 @@ class Importer(DBUtils,Conf):
         """
         Copies features from the OSM GeoJSON into the database
         """
-        # convert geom to wkt
-        # from pybna import Importer
-        # i = Importer(host="192.168.60.220",db_name="indianapolis",user="gis",password="gis")
-        # i.import_osm_destinations(schema="scratch",boundary_file="/home/spencer/gis/test_outline.shp",srid=26911)
         geom = shape(feature["geometry"]).wkt
 
         values = []
         values.append(sql.Literal(geom))
         values.append(sql.Literal(feature["id"]))
         for a in attributes:
-            # values.append(
-            #     sql.SQL(
-            #         "ST_SetSRID(ST_Multi(ST_MakePolygon(ST_GeomFromGeoJSON({}))),4326)"
-            #     ).format(
-            #         sql.Literal(feature["geometry"])
-            #     )
-            # )
             if a in feature["properties"].keys():
                 values.append(sql.Literal(feature["properties"][a]))
             else:
@@ -753,23 +829,12 @@ class Importer(DBUtils,Conf):
         geojson of ways, geojson of nodes
         """
         query_root = ["({},{},{},{}){}".format(min_lat,min_lon,max_lat,max_lon,tag) for tag in tags]
-        # query_root = "({},{},{},{}){}".format(
-        #     min_lat,
-        #     min_lon,
-        #     max_lat,
-        #     max_lon,
-        #     tags
-        # )
         way_query = "way" + ";way".join(query_root) + ";"
         node_query = "node" + ";node".join(query_root) + ";"
 
         api = overpass.API()
         ways = api.get(way_query,verbosity="geom")
         nodes = api.get(node_query,verbosity="geom")
-        # slc = api.get('node["name"="Salt Lake City"]')
-        # gdf = gpd.GeoDataFrame.from_features(slc)
-        # features = api.get('way()["amenity"="restaurant"]["name"="Veraci Pizza - Spokane"]; out geom;')
-        # -117.456097,47.666798,-117.439232,47.673358 # holmes
 
         return ways, nodes
 
