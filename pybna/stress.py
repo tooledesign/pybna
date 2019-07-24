@@ -7,7 +7,6 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import DictCursor
 import yaml
-from beautifultable import BeautifulTable
 from tooles import DBUtils
 import pandas as pd
 
