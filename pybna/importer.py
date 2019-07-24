@@ -225,7 +225,7 @@ class Importer(DBUtils,Conf):
         to download directly from the US Census, or can take a URL or file path
 
         args
-        table -- the table name to save blocks to (if none use config) (must be schema-qualified)
+        table -- the table name to save blocks to
         state -- the two letter state abbreviation
         url_main -- url to download the "main" file from
         url_aux -- url to download the "aux" file from
@@ -258,7 +258,7 @@ class Importer(DBUtils,Conf):
                 raise ValueError("File not found at %s" % fpath_aux)
         schema, table = self.parse_table_name(table)
         if schema is None:
-            raise ValueError("No schema given. Must be qualified with table name.")
+            schema = self.get_default_schema()
         if not overwrite and self.table_exists(table,schema):
             raise ValueError("Table %s.%s already exists" % (schema,table))
 
@@ -331,7 +331,7 @@ class Importer(DBUtils,Conf):
         else:
             roads_schema, roads_table = self.parse_table_name(roads_table)
         if roads_schema is None:
-            raise ValueError("No roads schema given. Must be qualified with table name.")
+            roads_schema = self.get_default_schema()
         if ints_table is None:
             if "table" in self.config.bna.network.intersections:
                 ints_schema, ints_table = self.parse_table_name(self.config.bna.network.intersections.table)
@@ -340,7 +340,7 @@ class Importer(DBUtils,Conf):
         else:
             ints_schema, ints_table = self.parse_table_name(ints_table)
         if ints_schema is None:
-            raise ValueError("No intersections schema given. Must be qualified with table name.")
+            ints_schema = self.get_default_schema()
         if not overwrite and self.table_exists(roads_table,roads_schema):
             raise ValueError("Table %s.%s already exists" % (roads_schema,roads_table))
         if not overwrite and self.table_exists(ints_table,ints_schema):
