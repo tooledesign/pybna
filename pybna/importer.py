@@ -100,7 +100,7 @@ class Importer(DBUtils,Conf):
         else:
             schema, table = self.parse_table_name(table)
         if schema is None:
-            schema = schema = self.get_default_schema()
+            schema = self.get_default_schema()
 
         boundary = self._load_boundary_as_dataframe(fpath,srid)
         pk = "id"
@@ -108,7 +108,7 @@ class Importer(DBUtils,Conf):
         while pk in boundary.columns:
             pk = "id_{}".format(i)
             i += 1
-        print("Copying blocks to database")
+        print("Copying boundary to database")
         self.gdf_to_postgis(boundary,table,schema,id=pk,srid=srid,overwrite=overwrite)
 
 
@@ -158,7 +158,7 @@ class Importer(DBUtils,Conf):
         else:
             schema, table = self.parse_table_name(table)
         if schema is None:
-            raise ValueError("No schema given. Must be qualified with table name.")
+            schema = self.get_default_schema()
         if not overwrite and self.table_exists(table,schema):
             raise ValueError("Table %s.%s already exists" % (schema,table))
         if id is None:
