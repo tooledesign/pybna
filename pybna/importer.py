@@ -75,15 +75,40 @@ class Importer(DBUtils,Conf):
         return "pyBNA Importer connected with {%s}" % self.db_connection_string
 
 
-    def import_boundary(self,fpath,srid=None):
+    def import_boundary(self,fpath,srid=None,table=None,overwrite=False):
         """
-        Takes a shapefile input and saves it to the DB (reprojecting if srid is given)
+        Takes a shapefile input and saves it to the DB as the boundary file
+        (reprojecting to the appropriate srid)
 
         args
         fpath -- path to the shapefile
         srid -- projection to use (if not given uses srid defined in config)
+        table -- table to write to (if empty use config)
+        overwrite -- overwrite an existing table
         """
-        pass
+        # process inputs
+        if not os.path.isfile(fpath):
+            raise ValueError("File not found at %s" % fpath)
+        if srid is None:
+            if "srid" in self.config:
+                srid = self.config.srid
+            else:
+                raise ValueError("SRID must be specified as an arg or in the config file")
+        if table is None:
+            schema, table = self.parse_table_name(self.config.bna.boundary.table)
+        else:
+            schema, table = self.parse_table_name(table)
+        if schema is None:
+            schema = schema = self.get_default_schema()
+
+        boundary = self._load_boundary_as_dataframe(fpath,srid)
+        pk = "id"
+        i = 0
+        while pk in boundary.columns:
+            pk = "id_{}".format(i)
+            i += 1
+        print("Copying blocks to database")
+        self.gdf_to_postgis(boundary,table,schema,id=pk,srid=srid,overwrite=overwrite)
 
 
     def import_census_blocks(self,fips=None,url=None,fpath=None,table=None,
