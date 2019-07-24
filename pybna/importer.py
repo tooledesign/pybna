@@ -58,7 +58,7 @@ class Importer(DBUtils,Conf):
         if self.debug:
             print("DB connection: %s" % db_connection_string)
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
-        self.sql_subs = self.make_sql_substitutions(self.config)
+        self.sql_subs = self.make_bna_substitutions(self.config)
 
         # mi/km
         if "units" in self.config:

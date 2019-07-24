@@ -103,7 +103,7 @@ class pyBNA(DBUtils,Conf,Destinations,Connectivity,Core):
             pass
             # self.set_destinations()
 
-        self.sql_subs = self.make_sql_substitutions(self.config)
+        self.sql_subs = self.make_bna_substitutions(self.config)
 
         if force_net_build:
             print("Building network tables in database")

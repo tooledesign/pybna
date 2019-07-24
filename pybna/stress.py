@@ -49,11 +49,9 @@ class Stress(DBUtils,Conf):
         schema, table = self.parse_table_name(self.config.stress.table.name)
         self.table = table
         if schema is None:
-            self.schema = self._get_schema(self.table)
+            self.schema = self.get_schema(self.table)
         else:
             self.schema = schema
-        self.geom = self.config.stress.table.geom
-        self.srid = self._get_srid(self.table,self.geom,self.schema)
 
         # check for and set lookup tables
         if self.verbose:
@@ -122,7 +120,7 @@ class Stress(DBUtils,Conf):
                 ("stress", "integer")
             ]
             if not in_file:
-                in_file = os.path.join(self.module_dir(),"stress_shared.csv")
+                in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_shared.csv")
         elif lu_type == "bike_lane":
             columns = (
                 ("lanes", "integer"),
@@ -133,7 +131,7 @@ class Stress(DBUtils,Conf):
                 ("stress", "integer")
             )
             if not in_file:
-                in_file = os.path.join(self.module_dir(),"stress_bike_lane.csv")
+                in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_bike_lane.csv")
         elif lu_type == "crossing":
             columns = (
                 ("control", "text"),
@@ -143,12 +141,12 @@ class Stress(DBUtils,Conf):
                 ("stress", "integer")
             )
             if not in_file:
-                in_file = os.path.join(self.module_dir(),"stress_crossing.csv")
+                in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_crossing.csv")
         else:
             raise ValueError("Unrecognized lookup table %s" % lu_type)
 
 
-        conn = self._get_connection()
+        conn = self.get_db_connection()
         cur = conn.cursor()
         if schema:
             q = sql.SQL(" \
@@ -332,21 +330,21 @@ class Stress(DBUtils,Conf):
         # other vals
         schema, table = self.parse_table_name(self.config.stress.table.name)
         if schema is None:
-            schema = self._get_schema(table)
+            schema = self.get_schema(table)
         if "id" in self.config.stress.table:
             id_column = self.config.stress.table.id
         else:
-            id_column = self._get_pkid_col(table,schema)
+            id_column = self.get_pkid_col(table,schema)
         if "geom" in self.config.stress.table:
             geom = self.config.stress.table.geom
         else:
             geom = self._get_geom_column(table,schema)
         shared_lts_schema, shared_lts_table = self.parse_table_name(self.config.stress.lookup_tables.shared)
         if shared_lts_schema is None:
-            shared_lts_schema = self._get_schema(shared_lts_table)
+            shared_lts_schema = self.get_schema(shared_lts_table)
         bike_lane_lts_schema, bike_lane_lts_table = self.parse_table_name(self.config.stress.lookup_tables.bike_lane)
         if bike_lane_lts_schema is None:
-            bike_lane_lts_schema = self._get_schema(bike_lane_lts_table)
+            bike_lane_lts_schema = self.get_schema(bike_lane_lts_table)
 
         # set up substitutions
         subs = {
@@ -411,11 +409,11 @@ class Stress(DBUtils,Conf):
         # stress table
         schema, table = self.parse_table_name(self.config.stress.table.name)
         if schema is None:
-            schema = self._get_schema(table)
+            schema = self.get_schema(table)
         if "id" in self.config.stress.table:
             id_column = self.config.stress.table.id
         else:
-            id_column = self._get_pkid_col(table,schema)
+            id_column = self.get_pkid_col(table,schema)
         if "geom" in self.config.stress.table:
             geom = self.config.stress.table.geom
         else:
@@ -424,7 +422,7 @@ class Stress(DBUtils,Conf):
         # control
         control_schema, control_table = self.parse_table_name(self.config.stress.crossing.control.table)
         if control_schema is None:
-            control_schema = self._get_schema(control_table)
+            control_schema = self.get_schema(control_table)
         if "geom" in self.config.stress.crossing.control:
             control_geom = self.config.stress.crossing.control.geom
         else:
@@ -438,7 +436,7 @@ class Stress(DBUtils,Conf):
         # island
         island_schema, island_table = self.parse_table_name(self.config.stress.crossing.island.table)
         if island_schema is None:
-            island_schema = self._get_schema(island_table)
+            island_schema = self.get_schema(island_table)
         if "geom" in self.config.stress.crossing.island:
             island_geom = self.config.stress.crossing.island.geom
         else:
@@ -446,10 +444,10 @@ class Stress(DBUtils,Conf):
         island_column = self.config.stress.crossing.island.column.name
 
         # directional_attribute_aggregation
-        f = open(os.path.join(self.module_dir(),"crossing","directional_attributes.sql"))
+        f = open(os.path.join(self.module_dir,"sql","stress","crossing","directional_attributes.sql"))
         data_insert = f.read()
         f.close()
-        f = open(os.path.join(self.module_dir(),"crossing","directional_attributes_table.sql"))
+        f = open(os.path.join(self.module_dir,"sql","stress","crossing","directional_attributes_table.sql"))
         directional_attributes = f.read()
         f.close()
         data_insert_query = sql.SQL("")
@@ -490,7 +488,7 @@ class Stress(DBUtils,Conf):
         # misc
         cross_lts_schema, cross_lts_table = self.parse_table_name(self.config.stress.lookup_tables.crossing)
         if cross_lts_schema is None:
-            cross_lts_schema = self._get_schema(cross_lts_table)
+            cross_lts_schema = self.get_schema(cross_lts_table)
 
         subs = {
             "directional_attribute_aggregation": directional_attribute_aggregation,
@@ -521,21 +519,21 @@ class Stress(DBUtils,Conf):
         }
 
         # control_assignment
-        f = open(os.path.join(self.module_dir(),"crossing","control_assignment.sql"))
+        f = open(os.path.join(self.module_dir,"sql","stress","crossing","control_assignment.sql"))
         raw = f.read()
         f.close()
         control_assignment = sql.SQL(raw).format(**subs)
         subs["control_assignment"] = control_assignment
 
         # island_assignment
-        f = open(os.path.join(self.module_dir(),"crossing","island_assignment.sql"))
+        f = open(os.path.join(self.module_dir,"sql","stress","crossing","island_assignment.sql"))
         raw = f.read()
         f.close()
         island_assignment = sql.SQL(raw).format(**subs)
         subs["island_assignment"] = island_assignment
 
         # priority_assignment
-        f = open(os.path.join(self.module_dir(),"crossing","priority_assignment.sql"))
+        f = open(os.path.join(self.module_dir,"sql","stress","crossing","priority_assignment.sql"))
         raw = f.read()
         f.close()
         priority_assignment = sql.SQL("")
@@ -593,7 +591,7 @@ class Stress(DBUtils,Conf):
         if self.debug:
             dry = True
 
-        conn = self._get_connection()
+        conn = self.get_db_connection()
         try:
             for direction in [FORWARD_DIRECTION,BACKWARD_DIRECTION]:
                 if self.verbose:
@@ -752,7 +750,7 @@ class Stress(DBUtils,Conf):
         if self.debug:
             dry = True
 
-        conn = self._get_connection()
+        conn = self.get_db_connection()
         try:
             for direction in [FORWARD_DIRECTION,BACKWARD_DIRECTION]:
                 print("  ....{}".format(direction))
