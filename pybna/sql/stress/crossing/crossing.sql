@@ -30,7 +30,7 @@ CREATE TEMP TABLE pg_temp.tmp_allconnections AS (
     SELECT
         this.id AS this_id,
         that.id AS that_id,
-        tdg_CompareAzimuths(this.{line},that.forward_ln) AS angle
+        bna_CompareAzimuths(this.{line},that.forward_ln) AS angle
     FROM
         pg_temp.tmp_combineddirs this,
         pg_temp.tmp_combineddirs that
@@ -42,7 +42,7 @@ CREATE TEMP TABLE pg_temp.tmp_allconnections AS (
     SELECT
         this.id AS this_id,
         that.id AS that_id,
-        tdg_CompareAzimuths(this.{line},that.backward_ln) AS angle
+        bna_CompareAzimuths(this.{line},that.backward_ln) AS angle
     FROM
         pg_temp.tmp_combineddirs this,
         pg_temp.tmp_combineddirs that

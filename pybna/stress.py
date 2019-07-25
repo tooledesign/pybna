@@ -61,6 +61,12 @@ class Stress(DBUtils,Conf):
             for t in missing:
                 self._create_lookup_table(*t)
 
+        # add functions to db
+        self._run_sql_script("bna_CompareAzimuths.sql",dict(),dirs=["sql","stress","db_functions"])
+        self._run_sql_script("bna_IsCorridor.sql",dict(),dirs=["sql","stress","db_functions"])
+        self._run_sql_script("bna_MultiEndPoint.sql",dict(),dirs=["sql","stress","db_functions"])
+        self._run_sql_script("bna_MultiStartPoint.sql",dict(),dirs=["sql","stress","db_functions"])
+
         # build SQL substitutions
         self.segment_subs = dict()
         for direction in [FORWARD_DIRECTION,BACKWARD_DIRECTION]:
@@ -166,7 +172,7 @@ class Stress(DBUtils,Conf):
 
         try:
             cur.execute(q)
-        except Exception, e:
+        except Exception as e:
             print("Error creating table %s" % table)
             raise e
 
@@ -577,7 +583,7 @@ class Stress(DBUtils,Conf):
             indicate the direction the score applies to.
         table_filter -- SQL filter to limit rows that should be updated
         dry -- file path to save sql statements to instead of running them in
-            the DB (if simply True print them to stdout)
+            the DB
         """
         schema, table = self.parse_table_name(table)
         if schema is None:
@@ -588,8 +594,9 @@ class Stress(DBUtils,Conf):
         else:
             table_filter = sql.SQL("TRUE")
 
-        if self.debug:
-            dry = True
+        if not dry is None:
+            if os.path.isfile(dry):
+                raise ValueError("File already exists at {}".format(dry))
 
         conn = self.get_db_connection()
         try:
@@ -601,7 +608,7 @@ class Stress(DBUtils,Conf):
                 subs = self.segment_subs[direction].copy()
                 subs["out_schema"] = sql.Identifier(schema)
                 subs["out_table"] = sql.Identifier("_".join([table,direction]))
-                self._run_sql_script("create_output.sql",subs,dir_name="segment",conn=conn,dry=dry)
+                self._run_sql_script("create_output.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
                 # call the various segment stress methods
                 self._segment_stress_shared(conn,subs,table_filter,dry=dry)
@@ -609,8 +616,9 @@ class Stress(DBUtils,Conf):
                 self._segment_stress_track(conn,subs,table_filter,dry=dry)
                 self._segment_stress_path(conn,subs,table_filter,dry=dry)
         except Exception as e:
-            conn.rollback()
-            conn.close()
+            if conn.closed == 0:
+                conn.rollback()
+                conn.close()
             raise e
 
         conn.commit()
@@ -642,7 +650,7 @@ class Stress(DBUtils,Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("shared.sql",subs,dir_name="segment",conn=conn,dry=dry)
+        self._run_sql_script("shared.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
     def _segment_stress_bike_lane(self,conn,subs,table_filter=None,dry=False):
@@ -671,7 +679,7 @@ class Stress(DBUtils,Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("bike_lane.sql",subs,dir_name="segment",conn=conn,dry=dry)
+        self._run_sql_script("bike_lane.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
     def _segment_stress_track(self,conn,subs,table_filter=None,dry=False):
@@ -699,7 +707,7 @@ class Stress(DBUtils,Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("track.sql",subs,dir_name="segment",conn=conn,dry=dry)
+        self._run_sql_script("track.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
     def _segment_stress_path(self,conn,subs,table_filter=None,dry=False):
@@ -726,7 +734,7 @@ class Stress(DBUtils,Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("path.sql",subs,dir_name="segment",conn=conn,dry=dry)
+        self._run_sql_script("path.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
     def crossing_stress(self,table,angle=20,table_filter=None,dry=None):
@@ -763,11 +771,12 @@ class Stress(DBUtils,Conf):
                 cross_subs["line"] = sql.Identifier("_".join([direction,"ln"]))
 
                 # execute the query
-                self._run_sql_script("create_output.sql",cross_subs,dir_name="crossing",conn=conn,dry=dry)
-                self._run_sql_script("crossing.sql",cross_subs,dir_name="crossing",conn=conn,dry=dry)
+                self._run_sql_script("create_output.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
+                self._run_sql_script("crossing.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
         except Exception as e:
-            conn.rollback()
-            conn.close()
+            if conn.closed == 0:
+                conn.rollback()
+                conn.close()
             raise e
 
         conn.commit()

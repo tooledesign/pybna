@@ -19,5 +19,5 @@ select
 from {in_table} this_way, {seg} crossing_way
 where this_way.{id_column} = {fid}
 and this_way.{way_int} IN (crossing_way.{net_source}, crossing_way.{net_target})
-and not tdg_iscorridor(this_way.{geom},crossing_way.{geom},{angle})
+and not bna_iscorridor(this_way.{geom},crossing_way.{geom},{angle})
 group by priority,priority_cross,control,control_cross,lanes,lanes_a,speed,speed_a;

@@ -11,9 +11,9 @@ DROP TABLE IF EXISTS pg_temp.tmp_combineddirs;
 SELECT DISTINCT ON (tmp_alldirs.id)
     tmp_alldirs.id,
     o.{geom} AS geom,
-    tdg_MultiEndPoint(o.{geom}) AS forward_pt,
+    bna_MultiEndPoint(o.{geom}) AS forward_pt,
     ST_MakeLine(ST_PointN(o.{geom},-2),ST_EndPoint(o.{geom})) AS forward_ln,
-    tdg_MultiStartPoint(o.{geom}) AS backward_pt,
+    bna_MultiStartPoint(o.{geom}) AS backward_pt,
     ST_MakeLine(ST_PointN(o.{geom},2),ST_StartPoint(o.{geom})) AS backward_ln,
     SUM(tmp_alldirs.lanes) AS lanes,
     MAX(tmp_alldirs.speed) AS speed
