@@ -16,15 +16,39 @@ pyBNA is tested with Python 2.7. The following libraries are required:
 - geopandas
 - munch
 - overpass
+- omsnx
 
 You can install these via pip:
 ```
-pip install psycopg2 tqdm pyyaml geopandas munch overpass
+pip install psycopg2 tqdm pyyaml geopandas munch overpass osmnx
 ```
 
-The imposm library requires some additional packages to be installed. Consult the imposm documentation for details, but as of this writing you can handle the dependencies by running the following on a recent Ubuntu install
+## tl;dr (Simple run)
+
+The most simple BNA run, using stock datasets and no customization, can be
+completed in a few easy steps. The following assumes you already have a database
+running named "bna" on the local machine.
+
 ```
-sudo apt install build-essential python-devel protobuf-compiler libprotobuf-dev
+import pybna
+
+# imports
+i = pybna.Importer()
+i.import_boundary('/path/to/your/boundary/file')
+i.import_census_blocks(fips=16)
+i.import_census_jobs("received.neighborhood_census_block_jobs",state="ID")
+i.import_osm_network()
+i.import_osm_destinations()
+
+# stress
+s = pybna.Stress()
+s.segment_stress()
+s.crossing_stress()
+
+# connectivity
+bna = pybna.pyBNA()
+bna.calculate_connectivity()
+bna.score_destinations()
 ```
 
 ## Importing data

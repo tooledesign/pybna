@@ -23,13 +23,13 @@ from dbutils import DBUtils
 class pyBNA(DBUtils,Conf,Destinations,Connectivity,Core):
     """Parent BNA class that glues together the subclasses"""
 
-    def __init__(self, config="config.yaml", force_net_build=False,
+    def __init__(self, config=None, force_net_build=False,
                  verbose=False, debug=False,
                  host=None, db_name=None, user=None, password=None):
         """Connects to the BNA database
 
         kwargs:
-        config -- path to the config file
+        config -- path to the config file, if not given use the default config.yaml
         force_net_build -- force a rebuild of the network even if an existing one is found
         verbose -- output useful messages
         debug -- set to debug mode
@@ -47,6 +47,8 @@ class pyBNA(DBUtils,Conf,Destinations,Connectivity,Core):
         self.verbose = verbose
         self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
+        if config is None:
+            config = os.path.join(self.module_dir,"config.yaml")
         self.config = self.parse_config(yaml.safe_load(open(config)))
         self.config["bna"]["connectivity"]["max_detour"] = float(100 + self.config["bna"]["connectivity"]["max_detour"])/100
         self.db_connectivity_table = self.config["bna"]["connectivity"]["table"]
@@ -103,7 +105,7 @@ class pyBNA(DBUtils,Conf,Destinations,Connectivity,Core):
             pass
             # self.set_destinations()
 
-        self.sql_subs = self.make_sql_substitutions(self.config)
+        self.sql_subs = self.make_bna_substitutions(self.config)
 
         if force_net_build:
             print("Building network tables in database")

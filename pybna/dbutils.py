@@ -32,6 +32,7 @@ class DBUtils:
         self.db_connection_string = db_connection_string
         self.verbose = verbose
         self.debug = debug
+        self.module_dir = os.path.dirname(os.path.abspath(__file__))
 
 
     def get_db_connection(self):
@@ -476,5 +477,52 @@ class DBUtils:
             cur.execute(q)
             cur.close()
         if not transaction:
+            conn.commit()
+            conn.close()
+
+
+    def _run_sql_script(self, fname, subs, dirs, dry=None, conn=None):
+        """Pass substitutions into a sql script, and execute against server.
+
+        fname -- name of the sql file
+        subs -- dict of substitutions for the SQL
+        dirs -- list of directory tree in the submodule
+        dry -- a path to write SQL statements to instead of executing. if None, execute the query
+        conn -- A connection object to work with. if none, create a new one and close it at the end
+        """
+        if conn is None:
+            close_conn = True
+            conn = self.get_db_connection()
+        else:
+            close_conn = False
+
+        # process fname
+        dirs.insert(0,self.module_dir)
+        dirs.append(fname)
+        fpath = os.path.join(*dirs)
+
+        # Read SQL script
+        raw = self.read_sql_from_file(fpath)
+
+        q = sql.SQL(raw).format(**subs)
+        if dry is None:
+            cur = conn.cursor()
+            try:
+                cur.execute(q)
+            except Exception as e:
+                if conn.closed == 0:
+                    conn.rollback()
+                    conn.close()
+                raise e
+            cur.close()
+        else:
+            append = 'w'
+            if fpath and os.path.isfile(dry):
+                append = 'a'
+            with open(dry,append) as f:
+                f.write(q.as_string(conn))
+                f.write("\n")
+
+        if close_conn:
             conn.commit()
             conn.close()

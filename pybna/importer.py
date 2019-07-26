@@ -58,7 +58,7 @@ class Importer(DBUtils,Conf):
         if self.debug:
             print("DB connection: %s" % db_connection_string)
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
-        self.sql_subs = self.make_sql_substitutions(self.config)
+        self.sql_subs = self.make_bna_substitutions(self.config)
 
         # mi/km
         if "units" in self.config:
@@ -100,7 +100,7 @@ class Importer(DBUtils,Conf):
         else:
             schema, table = self.parse_table_name(table)
         if schema is None:
-            schema = schema = self.get_default_schema()
+            schema = self.get_default_schema()
 
         boundary = self._load_boundary_as_dataframe(fpath,srid)
         pk = "id"
@@ -108,7 +108,7 @@ class Importer(DBUtils,Conf):
         while pk in boundary.columns:
             pk = "id_{}".format(i)
             i += 1
-        print("Copying blocks to database")
+        print("Copying boundary to database")
         self.gdf_to_postgis(boundary,table,schema,id=pk,srid=srid,overwrite=overwrite)
 
 
@@ -158,7 +158,7 @@ class Importer(DBUtils,Conf):
         else:
             schema, table = self.parse_table_name(table)
         if schema is None:
-            raise ValueError("No schema given. Must be qualified with table name.")
+            schema = self.get_default_schema()
         if not overwrite and self.table_exists(table,schema):
             raise ValueError("Table %s.%s already exists" % (schema,table))
         if id is None:
@@ -225,7 +225,7 @@ class Importer(DBUtils,Conf):
         to download directly from the US Census, or can take a URL or file path
 
         args
-        table -- the table name to save blocks to (if none use config) (must be schema-qualified)
+        table -- the table name to save blocks to
         state -- the two letter state abbreviation
         url_main -- url to download the "main" file from
         url_aux -- url to download the "aux" file from
@@ -258,7 +258,7 @@ class Importer(DBUtils,Conf):
                 raise ValueError("File not found at %s" % fpath_aux)
         schema, table = self.parse_table_name(table)
         if schema is None:
-            raise ValueError("No schema given. Must be qualified with table name.")
+            schema = self.get_default_schema()
         if not overwrite and self.table_exists(table,schema):
             raise ValueError("Table %s.%s already exists" % (schema,table))
 
@@ -331,7 +331,7 @@ class Importer(DBUtils,Conf):
         else:
             roads_schema, roads_table = self.parse_table_name(roads_table)
         if roads_schema is None:
-            raise ValueError("No roads schema given. Must be qualified with table name.")
+            roads_schema = self.get_default_schema()
         if ints_table is None:
             if "table" in self.config.bna.network.intersections:
                 ints_schema, ints_table = self.parse_table_name(self.config.bna.network.intersections.table)
@@ -340,7 +340,7 @@ class Importer(DBUtils,Conf):
         else:
             ints_schema, ints_table = self.parse_table_name(ints_table)
         if ints_schema is None:
-            raise ValueError("No intersections schema given. Must be qualified with table name.")
+            ints_schema = self.get_default_schema()
         if not overwrite and self.table_exists(roads_table,roads_schema):
             raise ValueError("Table %s.%s already exists" % (roads_schema,roads_table))
         if not overwrite and self.table_exists(ints_table,ints_schema):

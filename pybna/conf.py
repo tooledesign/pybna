@@ -32,7 +32,7 @@ class Conf(DBUtils):
         return config
 
 
-    def make_sql_substitutions(self, config):
+    def make_bna_substitutions(self, config):
         """
         Constructs universal SQL substitutions from all of the config
         parameters.
