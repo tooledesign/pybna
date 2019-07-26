@@ -22,7 +22,7 @@ class Stress(DBUtils,Conf):
         Reads the config file, sets up a connection
 
         args
-        config -- a YAML file holding config options, default
+        config -- path to the config file, if not given use the default config.yaml
         create_lookups -- creates lookup tables in the db if none are found
         verbose -- output useful messages
         debug -- generates debug outputs
@@ -32,7 +32,7 @@ class Stress(DBUtils,Conf):
         self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
         if config is None:
-            config = os.path.join(self.module_dir,"stress_config.yaml")
+            config = os.path.join(self.module_dir,"config.yaml")
         self.config = self.parse_config(yaml.safe_load(open(config)))
         print("Connecting to database")
         host = self.config.db.host
@@ -46,7 +46,7 @@ class Stress(DBUtils,Conf):
             "password=" + password
         ])
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
-        schema, table = self.parse_table_name(self.config.stress.table.name)
+        schema, table = self.parse_table_name(self.config.bna.network.roads.table)
         self.table = table
         if schema is None:
             self.schema = self.get_schema(self.table)
@@ -334,15 +334,15 @@ class Stress(DBUtils,Conf):
         )
 
         # other vals
-        schema, table = self.parse_table_name(self.config.stress.table.name)
+        schema, table = self.parse_table_name(self.config.bna.network.roads.table)
         if schema is None:
             schema = self.get_schema(table)
-        if "id" in self.config.stress.table:
-            id_column = self.config.stress.table.id
+        if "uid" in self.config.bna.network.roads:
+            id_column = self.config.bna.network.roads.uid
         else:
             id_column = self.get_pkid_col(table,schema)
-        if "geom" in self.config.stress.table:
-            geom = self.config.stress.table.geom
+        if "geom" in self.config.bna.network.roads:
+            geom = self.config.bna.network.roads.geom
         else:
             geom = self._get_geom_column(table,schema)
         shared_lts_schema, shared_lts_table = self.parse_table_name(self.config.stress.lookup_tables.shared)
@@ -355,6 +355,8 @@ class Stress(DBUtils,Conf):
         # set up substitutions
         subs = {
             "id_column": sql.Identifier(id_column),
+            "segment_stress_forward": sql.Identifier(self.config.bna.network.roads.stress.segment.forward),
+            "segment_stress_backward": sql.Identifier(self.config.bna.network.roads.stress.segment.backward),
             "lanes": lanes,
             "assumed_lanes": assumed_lanes,
             "centerline": centerline,
@@ -413,15 +415,15 @@ class Stress(DBUtils,Conf):
         intersection_tolerance = self.config.stress.crossing.intersection_tolerance
 
         # stress table
-        schema, table = self.parse_table_name(self.config.stress.table.name)
+        schema, table = self.parse_table_name(self.config.bna.network.roads.table)
         if schema is None:
             schema = self.get_schema(table)
-        if "id" in self.config.stress.table:
-            id_column = self.config.stress.table.id
+        if "uid" in self.config.bna.network.roads:
+            id_column = self.config.bna.network.roads.uid
         else:
             id_column = self.get_pkid_col(table,schema)
-        if "geom" in self.config.stress.table:
-            geom = self.config.stress.table.geom
+        if "geom" in self.config.bna.network.roads:
+            geom = self.config.bna.network.roads.geom
         else:
             geom = self._get_geom_column(table,schema)
 
@@ -504,6 +506,8 @@ class Stress(DBUtils,Conf):
             "in_table": sql.Identifier(table),
             "geom": sql.Identifier(geom),
             "id_column": sql.Identifier(id_column),
+            "cross_stress_forward": sql.Identifier(self.config.bna.network.roads.stress.crossing.forward),
+            "cross_stress_backward": sql.Identifier(self.config.bna.network.roads.stress.crossing.backward),
             "control_schema": sql.Identifier(control_schema),
             "control_table": sql.Identifier(control_table),
             "control_geom": sql.Identifier(control_geom),
@@ -615,6 +619,11 @@ class Stress(DBUtils,Conf):
                 self._segment_stress_bike_lane(conn,subs,table_filter,dry=dry)
                 self._segment_stress_track(conn,subs,table_filter,dry=dry)
                 self._segment_stress_path(conn,subs,table_filter,dry=dry)
+
+                # copy back to the base table
+                subs["stress"] = sql.Identifier(self.config.bna.network.roads.stress.segment[direction])
+                self._run_sql_script("copy_to_base.sql",subs,dirs=["sql","stress"],conn=conn,dry=dry)
+
         except Exception as e:
             if conn.closed == 0:
                 conn.rollback()
@@ -653,7 +662,7 @@ class Stress(DBUtils,Conf):
         self._run_sql_script("shared.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
-    def _segment_stress_bike_lane(self,conn,subs,table_filter=None,dry=False):
+    def _segment_stress_bike_lane(self,conn,subs,table_filter=None,dry=None):
         """
         Calculates segment stress for bike lanes
         (includes buffered lanes)
@@ -682,7 +691,7 @@ class Stress(DBUtils,Conf):
         self._run_sql_script("bike_lane.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
-    def _segment_stress_track(self,conn,subs,table_filter=None,dry=False):
+    def _segment_stress_track(self,conn,subs,table_filter=None,dry=None):
         """
         Calculates segment stress for cycle tracks
 
@@ -710,7 +719,7 @@ class Stress(DBUtils,Conf):
         self._run_sql_script("track.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
-    def _segment_stress_path(self,conn,subs,table_filter=None,dry=False):
+    def _segment_stress_path(self,conn,subs,table_filter=None,dry=None):
         """
         Calculates segment stress for cycle tracks
 
@@ -773,6 +782,10 @@ class Stress(DBUtils,Conf):
                 # execute the query
                 self._run_sql_script("create_output.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
                 self._run_sql_script("crossing.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
+
+                # copy back to the base table
+                cross_subs["stress"] = sql.Identifier(self.config.bna.network.roads.stress.crossing[direction])
+                self._run_sql_script("copy_to_base.sql",cross_subs,dirs=["sql","stress"],conn=conn,dry=dry)
         except Exception as e:
             if conn.closed == 0:
                 conn.rollback()

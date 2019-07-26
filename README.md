@@ -50,9 +50,9 @@ s.segment_stress()
 s.crossing_stress()
 
 # connectivity
-b = pybna.pyBNA()
-b.calculate_connectivity()
-b.score_destinations()
+bna = pybna.pyBNA()
+bna.calculate_connectivity()
+bna.score_destinations()
 ```
 
 ## Importing data
