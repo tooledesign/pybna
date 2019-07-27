@@ -10,9 +10,8 @@ from tqdm import tqdm
 from blocks import Blocks
 from dbutils import DBUtils
 
-# from scenario import Scenario
-# from destinations import Destinations
-
+FORWARD_DIRECTION = "forward"
+BACKWARD_DIRECTION = "backward"
 
 class Core(DBUtils):
     """pyBNA Core class"""
