@@ -7,8 +7,10 @@ from psycopg2 import sql
 import pandas as pd
 import geopandas as gpd
 
+from dbutils import DBUtils
 
-class DestinationCategory:
+
+class DestinationCategory(DBUtils):
     def __init__(self,bna,config,query_path,verbose=False,debug=False):
         """Sets up a new category of BNA destinations and retrieves data from
         the given db table
@@ -20,6 +22,7 @@ class DestinationCategory:
 
         return: None
         """
+        DBUtils.__init__(self,"")
         self.bna = bna
         self.config = config
         self.query_path = query_path
