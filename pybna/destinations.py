@@ -146,7 +146,7 @@ class Destinations(DBUtils):
         if "blocks" in node:
 
             # set up destination object
-            destination = DestinationCategory(self, node, os.path.join(self.module_dir,"sql","destinations"), self.verbose, self.debug)
+            destination = DestinationCategory(node, os.path.join(self.module_dir,"sql","destinations"), self.sql_subs)
 
             # set up temporary tables for results
             tbl = ''.join(random.choice(string.ascii_lowercase) for _ in range(7))
@@ -213,7 +213,7 @@ class Destinations(DBUtils):
 
         if "blocks" in node:
             # set up destination object
-            destination = DestinationCategory(self, node, os.path.join(self.module_dir,"sql","destinations"), self.verbose, self.debug)
+            destination = DestinationCategory(node, os.path.join(self.module_dir,"sql","destinations"), self.sql_subs)
             if self.verbose:
                 print("   ... "+node["name"])
             if "breaks" not in node:

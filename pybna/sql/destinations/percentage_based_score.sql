@@ -4,11 +4,11 @@
 DROP TABLE IF EXISTS pg_temp.tmp_dests;
 CREATE TEMP TABLE pg_temp.tmp_dests AS (
     SELECT
-        {destination_id} AS id,
+        {destinations_id_col} AS id,
         {val} AS val,
-        {geom} AS geom
+        {destinations_geom_col} AS geom
     FROM {destinations_schema}.{destinations_table} destinations
-    WHERE {filter}
+    WHERE {destinations_filter}
 );
 CREATE INDEX tsidx_tmp_dests ON pg_temp.tmp_dests USING GIST (geom);
 ANALYZE pg_temp.tmp_dests;
@@ -16,15 +16,15 @@ ANALYZE pg_temp.tmp_dests;
 
 CREATE TEMP TABLE pg_temp.{tmp_table} AS (
     SELECT
-        connections.{source_block} AS block_id,
+        connections.{connectivity_source_col} AS block_id,
         SUM(target_block.val) AS total
     FROM
-        {block_connections} connections,
+        {connectivity_schema}.{connectivity_table} connections,
         pg_temp.tmp_dests target_block
     WHERE
         {connection_true}
-        AND connections.{target_block} = target_block.id
-    GROUP BY connections.{source_block}
+        AND connections.{connectivity_target_col} = target_block.id
+    GROUP BY connections.{connectivity_source_col}
 );
 
 CREATE INDEX {index} ON pg_temp.{tmp_table} (block_id); ANALYZE pg_temp.{tmp_table};

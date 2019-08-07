@@ -78,6 +78,7 @@ bna:
         maxpoints: 100
         breaks: {0.03: 10, 0.2: 40, 0.5: 80}
         uid: blockid10
+        # filter: "filter language here"
       - name: opportunity
         weight: 20
         subcats:

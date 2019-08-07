@@ -4,10 +4,10 @@
 DROP TABLE IF EXISTS pg_temp.tmp_dests;
 CREATE TEMP TABLE pg_temp.tmp_dests AS (
     SELECT
-        {destination_id} AS id,
-        {geom} AS geom
+        {destinations_id_col} AS id,
+        {destinations_geom_col} AS geom
     FROM {destinations_schema}.{destinations_table} destinations
-    WHERE {filter}
+    WHERE {destinations_filter}
 );
 CREATE INDEX tsidx_tmp_dests ON pg_temp.tmp_dests USING GIST (geom);
 ANALYZE pg_temp.tmp_dests;
@@ -21,6 +21,7 @@ CREATE TEMP TABLE pg_temp.tmp_dest_blocks AS (
     FROM
         pg_temp.tmp_dests,
         {blocks_schema}.{blocks_table} blocks
+    WHERE ST_Intersects(tmp_dests.geom,blocks.{blocks_geom_col})
 );
 CREATE INDEX tidx_tmp_dest_blocks ON pg_temp.tmp_dest_blocks (block_id);
 ANALYZE pg_temp.tmp_dest_blocks;
@@ -28,15 +29,15 @@ ANALYZE pg_temp.tmp_dest_blocks;
 
 CREATE TEMP TABLE pg_temp.{tmp_table} AS (
     SELECT
-        connections.{source_block} AS block_id,
+        connections.{connectivity_source_col} AS block_id,
         COUNT(DISTINCT tmp_dest_blocks.dest_id) AS total
     FROM
-        {block_connections} connections,
+        {connectivity_schema}.{connectivity_table} connections,
         pg_temp.tmp_dest_blocks
     WHERE
         {connection_true}
-        AND connections.{target_block} = tmp_dest_blocks.block_id
-    GROUP BY connections.{source_block}
+        AND connections.{connectivity_target_col} = tmp_dest_blocks.block_id
+    GROUP BY connections.{connectivity_source_col}
 );
 
 CREATE INDEX {index} ON pg_temp.{tmp_table} (block_id); ANALYZE pg_temp.{tmp_table};
