@@ -635,17 +635,17 @@ class Importer(DBUtils,Conf):
         # set up a list of dictionaries with info about each destination
         if destination_tags is None:
             destination_tags = [
-                {"table":"colleges","tags_query": ["['amenity'='college']"]},
+                {"table":"bna_colleges","tags_query": ["['amenity'='college']"]},
                 {
-                    "table":"community_centers",
+                    "table":"bna_community_centers",
                     "tags_query": [
                         "['amenity'='community_centre']",
                         "['amenity'='community_center']"
                     ]
                 },
-                {"table":"dentists","tags_query": ["['amenity'='dentist']"]},
+                {"table":"bna_dentists","tags_query": ["['amenity'='dentist']"]},
                 {
-                    "table":"doctors",
+                    "table":"bna_doctors",
                     "tags_query": [
                         "['amenity'='doctors']",
                         "['amenity'='doctor']",
@@ -653,14 +653,14 @@ class Importer(DBUtils,Conf):
                     ]
                 },
                 {
-                    "table":"hospitals",
+                    "table":"bna_hospitals",
                     "tags_query": [
                         "['amenity'='hospital']",
                         "['amenity'='hospitals']"
                     ]
                 },
                 {
-                    "table":"parks",
+                    "table":"bna_parks",
                     "tags_query": [
                         "['amenity'='park']",
                         "['leisure'='park']",
@@ -668,20 +668,20 @@ class Importer(DBUtils,Conf):
                         "['leisure'='playground']"
                     ]
                 },
-                {"table":"pharmacies","tags_query": ["['amenity'='pharmacy']"]},
-                {"table":"retail","tags_query": ["['landuse'='retail']"]},
-                {"table":"schools","tags_query": ["['amenity'='school']"]},
-                {"table":"social_services","tags_query": ["['amenity'='social_facility']"]},
-                {"table":"supermarkets","tags_query": ["['shop'='supermarket']"]},
+                {"table":"bna_pharmacies","tags_query": ["['amenity'='pharmacy']"]},
+                {"table":"bna_retail","tags_query": ["['landuse'='retail']"]},
+                {"table":"bna_schools","tags_query": ["['amenity'='school']"]},
+                {"table":"bna_social_services","tags_query": ["['amenity'='social_facility']"]},
+                {"table":"bna_supermarkets","tags_query": ["['shop'='supermarket']"]},
                 {
-                    "table":"transit",
+                    "table":"bna_transit",
                     "tags_query": [
                         "['amenity'='bus_station']",
                         "['railway'='station']",
                         "['public_transport'='station']"
                     ]
                 },
-                {"table":"universities","tags_query": ["['amenity'='university']"]}
+                {"table":"bna_universities","tags_query": ["['amenity'='university']"]}
             ]
 
         conn = self.get_db_connection()

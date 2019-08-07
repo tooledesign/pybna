@@ -92,108 +92,121 @@ bna:
             uid: blockid10
           - name: schools
             weight: 35
-            table: neighborhood_schools
+            table: bna_schools
             method: count
             maxpoints: 100
             breaks: {1: 30, 2: 20, 3: 20}
             uid: id
+            geom: geom_pt
           - name: colleges
             weight: 10
-            table: neighborhood_colleges
+            table: bna_colleges
             method: count
             maxpoints: 100
             breaks: {1: 70}
             uid: id
+            geom: geom_pt
           - name: universities
             weight: 20
-            table: neighborhood_universities
+            table: bna_universities
             method: count
             maxpoints: 100
             breaks: {1: 70}
             uid: id
+            geom: geom_pt
       - name: core_services
         weight: 20
         subcats:
           - name: doctors
             weight: 20
-            table: neighborhood_doctors
+            table: bna_doctors
             method: count
             maxpoints: 100
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
+            geom: geom_pt
           - name: dentists
             weight: 10
-            table: neighborhood_dentists
+            table: bna_dentists
             method: count
             maxpoints: 100
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
+            geom: geom_pt
           - name: hospitals
             weight: 20
-            table: neighborhood_hospitals
+            table: bna_hospitals
             method: count
             maxpoints: 100
             breaks: {1: 70}
             uid: id
+            geom: geom_pt
           - name: pharmacies
             weight: 10
-            table: neighborhood_pharmacies
+            table: bna_pharmacies
             method: count
             maxpoints: 100
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
+            geom: geom_pt
           - name: supermarkets
             weight: 25
-            table: neighborhood_supermarkets
+            table: bna_supermarkets
             method: count
             maxpoints: 100
             breaks: {1: 60, 2: 20}
             uid: id
+            geom: geom_pt
           - name: social_services
             weight: 15
-            table: neighborhood_social_services
+            table: bna_social_services
             method: count
             maxpoints: 100
             breaks: {1: 70}
             uid: id
+            geom: geom_pt
       - name: recreation
         weight: 15
         subcats:
           - name: parks
             weight: 40
-            table: neighborhood_parks
+            table: bna_parks
             method: count
             maxpoints: 100
             breaks: {1: 30, 2: 20, 3: 20}
             uid: id
+            geom: geom_pt
         #   - name: trails
         #     weight: 35
-        #     table: neighborhood_paths
+        #     table: bna_paths
         #     method: count
         #     maxpoints: 100
         #     breaks: {1: 70, 2: 20}
         #     method: trails
           - name: community_centers
             weight: 25
-            table: neighborhood_community_centers
+            table: bna_community_centers
             method: count
             maxpoints: 100
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
+            geom: geom_pt
       - name: retail
         weight: 15
-        table: neighborhood_retail
+        table: bna_retail
         method: count
         maxpoints: 100
         breaks: {1: 40, 2: 20, 3: 10}
         uid: id
+        geom: geom_pt
       - name: transit
         weight: 15
-        table: neighborhood_transit
+        table: bna_transit
         method: count
         maxpoints: 100
         breaks: {1: 60}
         uid: id
+        geom: geom_pt
 
 stress:
     lookup_tables:

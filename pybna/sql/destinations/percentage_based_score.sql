@@ -5,13 +5,10 @@ DROP TABLE IF EXISTS pg_temp.tmp_dests;
 CREATE TEMP TABLE pg_temp.tmp_dests AS (
     SELECT
         {destinations_id_col} AS id,
-        {val} AS val,
-        {destinations_geom_col} AS geom
+        {val} AS val
     FROM {destinations_schema}.{destinations_table} destinations
     WHERE {destinations_filter}
 );
-CREATE INDEX tsidx_tmp_dests ON pg_temp.tmp_dests USING GIST (geom);
-ANALYZE pg_temp.tmp_dests;
 
 
 CREATE TEMP TABLE pg_temp.{tmp_table} AS (

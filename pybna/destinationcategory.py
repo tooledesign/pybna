@@ -12,7 +12,7 @@ from dbutils import DBUtils
 
 
 class DestinationCategory(DBUtils):
-    def __init__(self,config,query_path,sql_subs):
+    def __init__(self,config,query_path,sql_subs,db_connection_string):
         """Sets up a new category of BNA destinations and retrieves data from
         the given db table
 
@@ -22,7 +22,7 @@ class DestinationCategory(DBUtils):
 
         return: None
         """
-        DBUtils.__init__(self,"")
+        DBUtils.__init__(self,db_connection_string)
         self.config = config
         self.query_path = query_path
         self.category = self.config["name"]
@@ -76,21 +76,21 @@ class DestinationCategory(DBUtils):
 
         sql_subs["destinations_schema"] = sql.Identifier(self.schema)
         sql_subs["destinations_table"] = sql.Identifier(self.table)
+        sql_subs["destinations_id_col"] = sql.Identifier(id_column)
         sql_subs["destinations_filter"] = filter
-        sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
         sql_subs["tmp_table"] = sql.SQL("{tmp_table}")
         sql_subs["connection_true"] = sql.SQL("{connection_true}")
         sql_subs["index"] = sql.SQL("{index}")
         if config["method"] == "count":
+            sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
             sql_file = os.path.join(self.query_path,"count_based_score.sql")
-            sql_subs["destinations_id_col"] = sql.Identifier(id_column)
         elif config["method"] == "percentage":
             sql_file = os.path.join(self.query_path,"percentage_based_score.sql")
             sql_subs["val"] = sql.Identifier(config["datafield"])
         else:
             raise ValueError("Unknown scoring method given for %s" % config["name"])
 
-        raw = read_sql_from_file(sql_file)
+        raw = self.read_sql_from_file(sql_file)
         conn = self.get_db_connection()
         query = sql.SQL(sql.SQL(raw).format(**sql_subs).as_string(conn))
         conn.close()
