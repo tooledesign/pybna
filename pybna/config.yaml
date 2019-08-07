@@ -67,7 +67,7 @@ bna:
         max_distance: 2680
         max_detour: 25      # given as a whole number percentage (i.e. 25 == 25%)
         detour_agnostic_threshold: 400  # under this distance, detour is ignored
-        max_stress: 1
+        max_stress: 2
 
     destinations:
       - name: people
