@@ -1,7 +1,7 @@
 -- combine hs and ls results
 DROP TABLE IF EXISTS tmp_combined;
 SELECT
-    COALESCE(hs.id,ls.id) AS id,
+    COALESCE(hs.id,ls.id)::{blocks_id_type} AS id,
     hs.agg_cost AS hs_cost,
     ls.agg_cost AS ls_cost
 INTO TEMP TABLE tmp_combined
@@ -9,7 +9,7 @@ FROM
     tmp_hs_cost_to_blocks hs
     FULL OUTER JOIN
     tmp_ls_cost_to_blocks ls
-        ON hs.id = ls.id
+        ON hs.id::{blocks_id_type} = ls.id::{blocks_id_type}
 ;
 
 DROP TABLE tmp_hs_cost_to_blocks;
@@ -18,8 +18,8 @@ DROP TABLE tmp_ls_cost_to_blocks;
 -- build connectivity table
 DROP TABLE IF EXISTS tmp_connectivity;
 SELECT
-    oblocks.id AS source,
-    dblocks.id AS target,
+    oblocks.id::{blocks_id_type} AS source,
+    dblocks.id::{blocks_id_type} AS target,
     (hs_cost IS NOT NULL)::BOOLEAN AS hs,
     (
         hs_cost IS NULL
@@ -32,8 +32,8 @@ FROM
     tmp_blocks dblocks,
     tmp_combined
 WHERE
-    oblocks.id = {block_id}
-    AND tmp_combined.id = dblocks.id
+    oblocks.id::{blocks_id_type} = {block_id}::{blocks_id_type}
+    AND tmp_combined.id::{blocks_id_type} = dblocks.id::{blocks_id_type}
 ;
 
 UPDATE tmp_connectivity
