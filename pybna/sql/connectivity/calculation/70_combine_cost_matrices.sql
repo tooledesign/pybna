@@ -1,7 +1,7 @@
 -- combine hs and ls results
 DROP TABLE IF EXISTS tmp_combined;
 SELECT
-    COALESCE(hs.id,ls.id)::{blocks_id_type} AS id,
+    COALESCE(hs.id::{blocks_id_type},ls.id::{blocks_id_type}) AS id,
     hs.agg_cost AS hs_cost,
     ls.agg_cost AS ls_cost
 INTO TEMP TABLE tmp_combined
