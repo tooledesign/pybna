@@ -66,7 +66,7 @@ class Core(DBUtils):
 
 
     def travel_sheds(self,block_ids,out_table,composite=True,
-                     overwrite=False,dry=False):
+                     overwrite=False,dry=None):
         """
         Creates a new DB table showing the high- and low-stress travel sheds
         for the block(s) identified by block_ids. If more than one block is
@@ -78,6 +78,7 @@ class Core(DBUtils):
         out_table -- the table to save travel sheds to
         composite -- whether to save the output as a composite of all blocks or as individual sheds for each block
         overwrite -- whether to overwrite an existing table
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         conn = self.get_db_connection()
 
@@ -85,14 +86,8 @@ class Core(DBUtils):
         if schema is None:
             schema = self.get_default_schema()
 
-        if overwrite and not dry:
+        if overwrite and dry is None:
             self.drop_table(out_table,conn=conn,schema=schema)
-
-        # read in the raw query language
-        if composite:
-            query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","travel_shed_composite.sql"))
-        else:
-            query = self.read_sql_from_file(os.path.join(self.module_dir,"sql","travel_shed.sql"))
 
         # set global sql vars
         subs = dict(self.sql_subs)
@@ -102,14 +97,10 @@ class Core(DBUtils):
         subs["sidx"] = sql.Identifier("sidx_" + out_table + "_geom")
         subs["idx"] = sql.Identifier(out_table + "_source_blockid")
 
-        q = sql.SQL(query).format(**subs)
-
-        if dry:
-            print(q.as_string(conn))
+        if composite:
+            self._run_sql_script("travel_shed_composite.sql",subs,["sql"],dry=dry,conn=conn)
         else:
-            cur = conn.cursor()
-            cur.execute(q)
-            cur.close()
+            self._run_sql_script("travel_shed.sql",subs,["sql"],dry=dry,conn=conn)
 
         conn.commit()
         conn.close()

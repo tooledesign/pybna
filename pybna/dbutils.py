@@ -481,16 +481,20 @@ class DBUtils:
             conn.close()
 
 
-    def _run_sql_script(self, fname, subs, dirs, dry=None, conn=None):
+    def _run_sql_script(self, fname, subs, dirs, ret=False, dry=None, conn=None):
         """Pass substitutions into a sql script, and execute against server.
 
         fname -- name of the sql file
         subs -- dict of substitutions for the SQL
         dirs -- list of directory tree in the submodule
-        dry -- a path to write SQL statements to instead of executing. if None, execute the query
+        ret -- if true, send cursor back to calling routine for further processing
+            (requires a pre-existing connection to be passed)
+        dry -- a path to save SQL statements to instead of executing in DB
         conn -- A connection object to work with. if none, create a new one and close it at the end
         """
         if conn is None:
+            if ret:
+                raise ValueError("Return option requires a pre-existing connection")
             close_conn = True
             conn = self.get_db_connection()
         else:
@@ -514,10 +518,64 @@ class DBUtils:
                     conn.rollback()
                     conn.close()
                 raise e
-            cur.close()
+            if ret:
+                result = cur.fetchall()
+                cur.close()
+                return result
+            else:
+                cur.close()
         else:
             append = 'w'
             if fpath and os.path.isfile(dry):
+                append = 'a'
+            with open(dry,append) as f:
+                f.write(q.as_string(conn))
+                f.write("\n")
+
+        if close_conn:
+            conn.commit()
+            conn.close()
+
+
+    def _run_sql(self, statement, subs=None, ret=False, dry=None, conn=None):
+        """Pass substitutions into a sql script, and execute against server.
+
+        statement -- sql to run
+        subs -- dict of substitutions for the SQL
+        ret -- if true, send cursor back to calling routine for further processing
+            (requires a pre-existing connection to be passed)
+        dry -- a path to save SQL statements to instead of executing in DB
+        conn -- A connection object to work with. if none, create a new one and close it at the end
+        """
+        if conn is None:
+            if ret:
+                raise ValueError("Return option requires a pre-existing connection")
+            close_conn = True
+            conn = self.get_db_connection()
+        else:
+            close_conn = False
+
+        if subs is None:
+            subs = dict()
+        q = sql.SQL(statement).format(**subs)
+        if dry is None:
+            cur = conn.cursor()
+            try:
+                cur.execute(q)
+            except Exception as e:
+                if conn.closed == 0:
+                    conn.rollback()
+                    conn.close()
+                raise e
+            if ret:
+                result = cur.fetchall()
+                cur.close()
+                return result
+            else:
+                cur.close()
+        else:
+            append = 'w'
+            if os.path.isfile(dry):
                 append = 'a'
             with open(dry,append) as f:
                 f.write(q.as_string(conn))

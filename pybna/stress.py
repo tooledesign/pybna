@@ -17,7 +17,7 @@ from core import BACKWARD_DIRECTION
 
 class Stress(DBUtils,Conf):
     def __init__(self, config=None, create_lookups=True,
-                 verbose=False,debug=False):
+                 verbose=False):
         """
         Reads the config file, sets up a connection
 
@@ -25,11 +25,9 @@ class Stress(DBUtils,Conf):
         config -- path to the config file, if not given use the default config.yaml
         create_lookups -- creates lookup tables in the db if none are found
         verbose -- output useful messages
-        debug -- generates debug outputs
         """
         Conf.__init__(self)
         self.verbose = verbose
-        self.debug = debug
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
         if config is None:
             config = os.path.join(self.module_dir,"config.yaml")
@@ -45,7 +43,7 @@ class Stress(DBUtils,Conf):
             "host=" + host,
             "password=" + password
         ])
-        DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
+        DBUtils.__init__(self,db_connection_string,self.verbose,False)
         schema, table = self.parse_table_name(self.config.bna.network.roads.table)
         self.table = table
         if schema is None:
@@ -200,8 +198,7 @@ class Stress(DBUtils,Conf):
             LTS scores. Final table name will have forward/backward appended to
             indicate the direction the score applies to.
         table_filter -- SQL filter to limit rows that should be updated
-        dry -- file path to save sql statements to instead of running them in
-            the DB
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         schema, table = self.parse_table_name(table)
         if schema is None:
@@ -261,8 +258,7 @@ class Stress(DBUtils,Conf):
         conn -- a psycopg2 connection object. if none, procures new one
         subs -- mappings of column names from the config file
         table_filter -- filter to limit rows that should be updated
-        dry -- file path to save sql statements to instead of running them in
-            the DB (if simply True print them to stdout)
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on shared streets")
 
@@ -290,8 +286,7 @@ class Stress(DBUtils,Conf):
         conn -- a psycopg2 connection object. if none, procures new one
         subs -- mappings of column names from the config file
         table_filter -- filter to limit rows that should be updated
-        dry -- file path to save sql statements to instead of running them in
-            the DB (if simply True print them to stdout)
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on streets with bike lanes")
 
@@ -318,8 +313,7 @@ class Stress(DBUtils,Conf):
         conn -- a psycopg2 connection object. if none, procures new one
         subs -- mappings of column names from the config file
         table_filter -- filter to limit rows that should be updated
-        dry -- file path to save sql statements to instead of running them in
-            the DB (if simply True print them to stdout)
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on streets with cycle tracks")
 
@@ -345,8 +339,7 @@ class Stress(DBUtils,Conf):
         args
         subs -- mappings of column names from the config file
         table_filter -- filter to limit rows that should be updated
-        dry -- file path to save sql statements to instead of running them in
-            the DB (if simply True print them to stdout)
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on paths")
 
@@ -371,15 +364,11 @@ class Stress(DBUtils,Conf):
         angle -- the angle that determines whether a connection from
                     one road to another constitutes a crossing
         table_filter -- filter to limit rows that should be updated
-        dry -- file path to save sql statements to instead of running them in
-            the DB (if simply True print them to stdout)
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         schema, table = self.parse_table_name(table)
         if schema is None:
             schema = self.schema
-
-        if self.debug:
-            dry = True
 
         conn = self.get_db_connection()
         try:
