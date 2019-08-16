@@ -24,14 +24,14 @@ class Destinations(DBUtils):
         self.srid = None
 
 
-    def score_destinations(self,output_table,with_geoms=False,overwrite=False,dry=False):
+    def score_destinations(self,output_table,with_geoms=False,overwrite=False,dry=None):
         """
         Creates a new db table of scores for each block
 
         args:
         output_table -- table to create (optionally schema-qualified)
         overwrite -- overwrite a pre-existing table
-        dry -- print the assembled query instead of executing in the database
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
@@ -47,7 +47,7 @@ class Destinations(DBUtils):
         conn = self.get_db_connection()
         cur = conn.cursor()
 
-        if not dry:
+        if dry is None:
             if overwrite:
                 self.drop_table(
                     table=subs["scores_table"],
@@ -86,12 +86,8 @@ class Destinations(DBUtils):
             ALTER TABLE {scores_schema}.{scores_table} ADD PRIMARY KEY ({blocks_id_col}); \
         ").format(**subs)
 
-        if dry:
-            print(q.as_string(conn))
-        else:
-            if self.verbose:
-                print("Compiling destination data for all sources into output table")
-            cur.execute(q)
+        print("Compiling destination data for all sources into output table")
+        self._run_sql(q,dry=dry,conn=conn)
 
         # now use the results to calculate scores
         print("Calculating destination scores")
@@ -107,11 +103,7 @@ class Destinations(DBUtils):
             SET {cases} \
         ").format(**subs)
 
-        if dry:
-            print(q.as_string(conn))
-        else:
-            cur.execute(q)
-            cur.close()
+        self._run_sql(q,dry=dry,conn=conn)
 
         # finally set any category scores
         print("Calculating category scores")
@@ -129,7 +121,7 @@ class Destinations(DBUtils):
         conn.close()
 
 
-    def _concat_dests(self,conn,node,dry=False):
+    def _concat_dests(self,conn,node,dry=None):
         """
         Concatenates the various temporary destination result columns and tables
         together to plug into the query that creates the final score table. Operates
@@ -138,7 +130,7 @@ class Destinations(DBUtils):
         args
         conn -- psycopg2 connection object from the parent method
         node -- current node in the config file
-        dry -- prints sql commands instead of executing them in the db
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         columns = sql.SQL("")
         tables = sql.SQL("")
@@ -176,20 +168,8 @@ class Destinations(DBUtils):
             hs_query = destination.query.format(**hs_subs)
             ls_query = destination.query.format(**ls_subs)
 
-            if dry:
-                print(hs_query.as_string(conn))
-                print(ls_query.as_string(conn))
-            else:
-                try:
-                    cur = conn.cursor()
-                    cur.execute(hs_query)
-                    cur.execute(ls_query)
-                    cur.close()
-                except psycopg2.Error as error:
-                    conn.rollback()
-                    conn.close()
-                    raise error
-
+            self._run_sql(hs_query,dry=dry,conn=conn)
+            self._run_sql(ls_query,dry=dry,conn=conn)
 
             hs_tmptable = sql.Identifier(tbl_hs)
             ls_tmptable = sql.Identifier(tbl_ls)
@@ -320,7 +300,7 @@ class Destinations(DBUtils):
         return case
 
 
-    def _category_scores(self,conn,node,subs,dry=False):
+    def _category_scores(self,conn,node,subs,dry=None):
         """
         Iteratively calculates category scores from all component subcategories
         using the weights defined in the config file.
@@ -330,7 +310,7 @@ class Destinations(DBUtils):
         conn -- psycopg2 connection object from the parent method
         node -- current node in the destination tree
         subs -- list of SQL substitutions from the parent method
-        dry -- outputs all SQL commands to stdout instead of executing in the DB
+        dry -- a path to save SQL statements to instead of executing in DB
         """
         if "subcats" in node:
             for subcat in node["subcats"]:
@@ -383,12 +363,7 @@ class Destinations(DBUtils):
                             end \
             ").format(**subs)
 
-            if dry:
-                print(q.as_string(conn))
-            else:
-                cur = conn.cursor()
-                cur.execute(q)
-                cur.close()
+            self._run_sql(q,dry=dry,conn=conn)
 
 
     def _get_maxpoints(self,node):
@@ -408,7 +383,7 @@ class Destinations(DBUtils):
             return node["weight"]
 
 
-    def _copy_block_geoms(self,conn,subs,dry=False):
+    def _copy_block_geoms(self,conn,subs,dry=None):
         """
         Copies the geometries from the block table to the output table of destination
         scores.
@@ -427,15 +402,4 @@ class Destinations(DBUtils):
         )
         subs["sidx_name"] = sql.Identifier("sidx_")+subs["scores_table"]
 
-        f = open(os.path.join(self.module_dir,"sql","destinations","add_geoms.sql"))
-        raw = f.read()
-        f.close()
-
-        q = sql.SQL(raw).format(**subs)
-
-        if dry:
-            print(q.as_string(conn))
-        else:
-            cur = conn.cursor()
-            cur.execute(q)
-            cur.close()
+        self._run_sql_script("add_geoms.sql",subs,["sql","destinations"],dry=dry,conn=conn)
