@@ -7,13 +7,16 @@ import geopandas as gpd
 import pandas as pd
 from psycopg2 import sql
 import overpass
+import osmium
 import osmnx as ox
 import random
 import string
-from shapely.geometry import shape
+from shapely.geometry import shape, box
+from geojson import FeatureCollection
 
 from conf import Conf
 from dbutils import DBUtils
+from destinationosmhandler import DestinationOSMHandler
 
 
 class Importer(DBUtils,Conf):
@@ -599,8 +602,8 @@ class Importer(DBUtils,Conf):
         return gdfs[1], gdfs[0]
 
 
-    def import_osm_destinations(self,schema=None,boundary_file=None,srid=None,
-                                destination_tags=None,overwrite=False,
+    def import_osm_destinations(self,osm_file=None,schema=None,boundary_file=None,
+                                srid=None,destination_tags=None,overwrite=False,
                                 keep_intermediates=False):
         """
         Processes OSM destinations and copies the data into the database.
@@ -608,6 +611,7 @@ class Importer(DBUtils,Conf):
         Maybe look at https://github.com/dezhin/osmread/ for file-based import?
 
         args
+        osm_file -- an OSM XML file to use instead of downloading data from the network
         schema -- the schema to create the tables in (if not given, uses the DB default)
         boundary_file -- a boundary file path. if not given uses the boundary specified in the config
         srid -- projection to use
@@ -691,7 +695,10 @@ class Importer(DBUtils,Conf):
                 raise ValueError("Table %s.%s already exists" % (schema,table))
             tags = d["tags_query"]
             print("Copying {} to database".format(table))
-            ways, nodes = self._osm_destinations_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
+            if osm_file is None:
+                ways, nodes = self._osm_destinations_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
+            else:
+                ways, nodes = self._osm_destinations_from_file(min_lon,min_lat,max_lon,max_lat,osm_file,tags)
 
             # set attributes
             attributes = set()
@@ -816,7 +823,7 @@ class Importer(DBUtils,Conf):
 
     def _osm_destinations_from_overpass(self,min_lon,min_lat,max_lon,max_lat,tags):
         """
-        Submits an Overpass API query and returns a geodataframe of results
+        Submits an Overpass API query and returns a geojson of results
 
         args
         min_lon -- Minimum longitude
@@ -832,9 +839,33 @@ class Importer(DBUtils,Conf):
         way_query = "way" + ";way".join(query_root) + ";"
         node_query = "node" + ";node".join(query_root) + ";"
 
-        api = overpass.API()
+        api = overpass.API(timeout=600)
         ways = api.get(way_query,verbosity="geom")
         nodes = api.get(node_query,verbosity="geom")
+
+        return ways, nodes
+
+
+    def _osm_destinations_from_file(self,min_lon,min_lat,max_lon,max_lat,osm_file,tags):
+        """
+        Extracts destinations from and OSM file and returns a geojson of results
+
+        args
+        min_lon -- Minimum longitude
+        min_lat -- Minimum latitude
+        max_lon -- Maximum longitude
+        max_lat -- Maximum latitude
+        osm_file -- an OSM XML file to use instead of downloading data from the network
+        tags -- list of osm tags to use for filtering this destination type
+
+        returns
+        geojson of ways, geojson of nodes
+        """
+        bbox = box(min_lon,min_lat,max_lon,max_lat)
+        handler = DestinationOSMHandler(tags,bbox)
+        handler.apply_file(osm_file)
+        nodes = FeatureCollection(handler.nodes_json)
+        ways = FeatureCollection(handler.ways_json)
 
         return ways, nodes
 
