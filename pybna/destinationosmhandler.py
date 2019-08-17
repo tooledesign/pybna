@@ -10,13 +10,11 @@ wkbfab = osmium.geom.WKBFactory()
 
 class DestinationOSMHandler(osmium.SimpleHandler):
 
-    def __init__(self,tag_list,bbox=None):
+    def __init__(self,tag_list):
         """
         args
         tag_list -- list of tags to compare features against
-        bbox -- bounding box to filter features
         """
-        self.bbox = bbox
         self.nodes_json = list()
         self.ways_json = list()
         self.tag_list = list()
@@ -43,38 +41,35 @@ class DestinationOSMHandler(osmium.SimpleHandler):
         if self._tag_matches(n.tags):
             wkb = wkbfab.create_point(n)
             pt = wkblib.loads(wkb,hex=True)
-            if self.bbox is not None:
-                if not pt.intersects(self.bbox):
-                    return
             gj = mapping(pt)
             properties = dict()
-            for k,v in n.tags.items():
-                if k == "id":
+            for pair in n.tags:
+                if pair.k == "id":
                     pass
                 else:
-                    properties[k] = v
-            gj["id"] = n.tags["osmid"]
+                    properties[pair.k] = pair.v
+            gj["id"] = n.id
             gj["properties"] = properties
-            nodes_json.append(gj)
+            self.nodes_json.append(gj)
 
 
     def way(self,w):
         if self._tag_matches(w.tags):
-            wkb = wkbfab.create_linestring(n)
-            ln = wkblib.loads(wkb,hex=True)
-            if self.bbox is not None:
-                if not ln.intersects(self.bbox):
-                    return
+            try:
+                wkb = wkbfab.create_linestring(w)
+                ln = wkblib.loads(wkb,hex=True)
+            except:
+                return
             gj = mapping(ln)
             properties = dict()
-            for k,v in n.tags.items():
-                if k == "id":
+            for pair in w.tags:
+                if pair.k == "id":
                     pass
                 else:
-                    properties[k] = v
-            gj["id"] = n.tags["osmid"]
+                    properties[pair.k] = pair.v
+            gj["id"] = w.id
             gj["properties"] = properties
-            ways_json.append(gj)
+            self.ways_json.append(gj)
 
 
     def _tag_matches(self,tags):

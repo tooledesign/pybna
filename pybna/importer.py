@@ -848,7 +848,7 @@ class Importer(DBUtils,Conf):
 
     def _osm_destinations_from_file(self,min_lon,min_lat,max_lon,max_lat,osm_file,tags):
         """
-        Extracts destinations from and OSM file and returns a geojson of results
+        Extracts destinations from an OSM file and returns a geojson of results
 
         args
         min_lon -- Minimum longitude
@@ -861,8 +861,7 @@ class Importer(DBUtils,Conf):
         returns
         geojson of ways, geojson of nodes
         """
-        bbox = box(min_lon,min_lat,max_lon,max_lat)
-        handler = DestinationOSMHandler(tags,bbox)
+        handler = DestinationOSMHandler(tags)
         handler.apply_file(osm_file)
         nodes = FeatureCollection(handler.nodes_json)
         ways = FeatureCollection(handler.ways_json)
