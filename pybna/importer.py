@@ -15,7 +15,6 @@ from geojson import FeatureCollection
 
 from conf import Conf
 from dbutils import DBUtils
-from destinationosmhandler import DestinationOSMHandler
 
 
 class Importer(DBUtils,Conf):
@@ -616,6 +615,9 @@ class Importer(DBUtils,Conf):
         overwrite -- whether to overwrite any existing tables
         keep_intermediates -- saves the intermediate tables used to generate the final tables
         """
+        if osm_file:
+            from destinationosmhandler import DestinationOSMHandler
+            
         if schema is None:
             schema = self.get_default_schema()
 
