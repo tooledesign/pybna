@@ -7,7 +7,6 @@ import geopandas as gpd
 import pandas as pd
 from psycopg2 import sql
 import overpass
-import osmium
 import osmnx as ox
 import random
 import string
