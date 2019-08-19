@@ -17,10 +17,11 @@ pyBNA is tested with Python 2.7. The following libraries are required:
 - munch
 - overpass
 - omsnx
+- osmium
 
 You can install these via pip:
 ```
-pip install psycopg2 tqdm pyyaml geopandas munch overpass osmnx
+pip install psycopg2 tqdm pyyaml geopandas munch overpass osmnx osmium
 ```
 
 ## tl;dr (Simple run)
