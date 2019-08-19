@@ -17,12 +17,15 @@ pyBNA is tested with Python 2.7. The following libraries are required:
 - munch
 - overpass
 - omsnx
-- osmium
 
 You can install these via pip:
 ```
-pip install psycopg2 tqdm pyyaml geopandas munch overpass osmnx osmium
+pip install psycopg2 tqdm pyyaml geopandas munch overpass osmnx
 ```
+
+The `osmium` package is also required for parsing OSM destinations from an .osm
+extract, but if you're downloading destinations directly from OSM you can
+safely skip this dependency.
 
 ## tl;dr (Simple run)
 
