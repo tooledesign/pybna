@@ -143,10 +143,10 @@ class Destinations(DBUtils):
             col_name = sql.Identifier(node["name"] + "_score")
             columns += sql.SQL(",NULL::float as {}").format(col_name)
 
-        if "blocks" in node:
+        if "table" in node:
 
             # set up destination object
-            destination = DestinationCategory(self, node, os.path.join(self.module_dir,"sql","destinations"), self.verbose, self.debug)
+            destination = DestinationCategory(node, os.path.join(self.module_dir,"sql","destinations"), self.sql_subs, self.db_connection_string)
 
             # set up temporary tables for results
             tbl = ''.join(random.choice(string.ascii_lowercase) for _ in range(7))
@@ -211,9 +211,9 @@ class Destinations(DBUtils):
                 columns += subcolumn
             col_name = sql.Identifier(node["name"] + "_score")
 
-        if "blocks" in node:
+        if "table" in node:
             # set up destination object
-            destination = DestinationCategory(self, node, os.path.join(self.module_dir,"sql","destinations"), self.verbose, self.debug)
+            destination = DestinationCategory(node, os.path.join(self.module_dir,"sql","destinations"), self.sql_subs, self.db_connection_string)
             if self.verbose:
                 print("   ... "+node["name"])
             if "breaks" not in node:

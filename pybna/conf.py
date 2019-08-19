@@ -73,6 +73,7 @@ class Conf(DBUtils):
             blocks_id_col = blocks.uid
         else:
             blocks_id_col = self.get_pkid_col(blocks.table,blocks_schema)
+        blocks_id_type = self.get_column_type(blocks.table,blocks_id_col,schema=blocks_schema)
         if "geom" in blocks:
             blocks_geom_col = blocks.geom
         else:
@@ -169,6 +170,7 @@ class Conf(DBUtils):
             "blocks_table": sql.Identifier(blocks.table),
             "blocks_schema": sql.Identifier(blocks_schema),
             "blocks_id_col": sql.Identifier(blocks_id_col),
+            "blocks_id_type": sql.SQL(blocks_id_type),
             "blocks_geom_col": sql.Identifier(blocks_geom_col),
             "blocks_population_col": sql.Identifier(blocks.population),
             "blocks_roads_tolerance": sql.Literal(blocks.roads_tolerance),

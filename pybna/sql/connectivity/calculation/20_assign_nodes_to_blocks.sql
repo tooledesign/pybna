@@ -2,7 +2,7 @@
 DROP TABLE IF EXISTS tmp_blocks;
 CREATE TEMP TABLE tmp_blocks AS (
     SELECT
-        blocks.{blocks_id_col} AS id,
+        blocks.{blocks_id_col}::{blocks_id_type} AS id,
         ST_Buffer(blocks.{blocks_geom_col},{blocks_roads_tolerance}) AS geom
     FROM
         {blocks_schema}.{blocks_table} blocks,
@@ -17,7 +17,7 @@ ANALYZE tmp_blocks;
 DROP TABLE IF EXISTS tmp_blocks_roads;
 CREATE TEMP TABLE tmp_blocks_roads AS (
     SELECT
-        blocks.id,
+        blocks.id::{blocks_id_type},
         roads.{roads_id_col} AS road_id
     FROM
         tmp_blocks blocks,
@@ -33,7 +33,7 @@ CREATE TEMP TABLE tmp_blocks_roads AS (
 DROP TABLE IF EXISTS tmp_blocks_nodes;
 CREATE TEMP TABLE tmp_blocks_nodes AS (
     SELECT
-        tmp_blocks_roads.id,
+        tmp_blocks_roads.id::{blocks_id_type},
         nodes.{nodes_id_col} AS node_id
     FROM
         tmp_blocks_roads,

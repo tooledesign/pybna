@@ -1,16 +1,27 @@
 --
 -- calculates access to a destination type from each census block
 --
-SELECT
-    connections.{source_block} AS block_id,
-    SUM(target_block.{val}) AS total
-INTO TEMP TABLE pg_temp.{tmp_table}
-FROM
-    {block_connections} connections,
-    {schema}.{table} target_block
-WHERE
-    {connection_true}
-    AND connections.{target_block} = target_block.{block_id_col}
-GROUP BY connections.{source_block};
+DROP TABLE IF EXISTS pg_temp.tmp_dests;
+CREATE TEMP TABLE pg_temp.tmp_dests AS (
+    SELECT
+        {destinations_id_col} AS id,
+        {val} AS val
+    FROM {destinations_schema}.{destinations_table} destinations
+    WHERE {destinations_filter}
+);
+
+
+CREATE TEMP TABLE pg_temp.{tmp_table} AS (
+    SELECT
+        connections.{connectivity_source_col} AS block_id,
+        SUM(target_block.val) AS total
+    FROM
+        {connectivity_schema}.{connectivity_table} connections,
+        pg_temp.tmp_dests target_block
+    WHERE
+        {connection_true}
+        AND connections.{connectivity_target_col} = target_block.id
+    GROUP BY connections.{connectivity_source_col}
+);
 
 CREATE INDEX {index} ON pg_temp.{tmp_table} (block_id); ANALYZE pg_temp.{tmp_table};

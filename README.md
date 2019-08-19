@@ -48,7 +48,7 @@ s.crossing_stress()
 # connectivity
 bna = pybna.pyBNA()
 bna.calculate_connectivity()
-bna.score_destinations()
+bna.score_destinations("myschema.mytable")
 ```
 
 ## Importing data
