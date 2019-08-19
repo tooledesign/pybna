@@ -13,7 +13,7 @@ units: mi # units for speed limit, either km (metric) or mi (imperial), default 
 db:
     user: "gis"
     password: "gis"
-    host: "192.168.60.220" #"localhost"
+    host: "localhost"
     dbname: "bna"
 
 bna:
