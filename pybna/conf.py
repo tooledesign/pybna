@@ -73,7 +73,10 @@ class Conf(DBUtils):
             blocks_id_col = blocks.uid
         else:
             blocks_id_col = self.get_pkid_col(blocks.table,blocks_schema)
-        blocks_id_type = self.get_column_type(blocks.table,blocks_id_col,schema=blocks_schema)
+        if self.table_exists(blocks.table,blocks_schema):
+            blocks_id_type = self.get_column_type(blocks.table,blocks_id_col,schema=blocks_schema)
+        else:
+            blocks_id_type = "text"
         if "geom" in blocks:
             blocks_geom_col = blocks.geom
         else:
