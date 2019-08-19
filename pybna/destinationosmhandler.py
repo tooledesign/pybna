@@ -16,7 +16,7 @@ class DestinationOSMHandler(osmium.SimpleHandler):
         tag_list -- list of tags to compare features against
         """
         self.nodes_json = list()
-        self.ways_json = list()
+        self.areas_json = list()
         self.tag_list = list()
         # parse the tag list and save into tuples
         p = re.compile(r"""
@@ -48,28 +48,32 @@ class DestinationOSMHandler(osmium.SimpleHandler):
                     pass
                 else:
                     properties[pair.k] = pair.v
-            gj["id"] = n.id
-            gj["properties"] = properties
-            self.nodes_json.append(gj)
+            feature = dict()
+            feature["id"] = n.id
+            feature["properties"] = properties
+            feature["geometry"] = gj
+            self.nodes_json.append(feature)
 
 
-    def way(self,w):
-        if self._tag_matches(w.tags):
+    def area(self,a):
+        if self._tag_matches(a.tags):
             try:
-                wkb = wkbfab.create_linestring(w)
-                ln = wkblib.loads(wkb,hex=True)
+                wkb = wkbfab.create_multipolygon(a)
+                ar = wkblib.loads(wkb,hex=True)
             except:
                 return
-            gj = mapping(ln)
+            gj = mapping(ar)
             properties = dict()
-            for pair in w.tags:
+            for pair in a.tags:
                 if pair.k == "id":
                     pass
                 else:
                     properties[pair.k] = pair.v
-            gj["id"] = w.id
-            gj["properties"] = properties
-            self.ways_json.append(gj)
+            feature = dict()
+            feature["id"] = a.id
+            feature["properties"] = properties
+            feature["geometry"] = gj
+            self.areas_json.append(feature)
 
 
     def _tag_matches(self,tags):

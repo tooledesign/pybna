@@ -608,8 +608,6 @@ class Importer(DBUtils,Conf):
         """
         Processes OSM destinations and copies the data into the database.
 
-        Maybe look at https://github.com/dezhin/osmread/ for file-based import?
-
         args
         osm_file -- an OSM XML file to use instead of downloading data from the network
         schema -- the schema to create the tables in (if not given, uses the DB default)
@@ -697,11 +695,17 @@ class Importer(DBUtils,Conf):
             print("Copying {} to database".format(table))
             if osm_file is None:
                 ways, nodes = self._osm_destinations_from_overpass(min_lon,min_lat,max_lon,max_lat,tags)
+                areas = dict()
+                areas["features"] = list()
             else:
-                ways, nodes = self._osm_destinations_from_file(min_lon,min_lat,max_lon,max_lat,osm_file,tags)
+                areas, nodes = self._osm_destinations_from_file(min_lon,min_lat,max_lon,max_lat,osm_file,tags)
+                ways = dict()
+                ways["features"] = list()
 
             # set attributes
             attributes = set()
+            for feature in areas["features"]:
+                attributes = attributes.union(set(feature["properties"].keys()))
             for feature in ways["features"]:
                 attributes = attributes.union(set(feature["properties"].keys()))
             for feature in nodes["features"]:
@@ -714,6 +718,13 @@ class Importer(DBUtils,Conf):
                 query_attributes = sql.SQL(",") + query_attributes + sql.SQL(" text")
 
             # make tables
+            query_make_table_areas = sql.SQL(
+                "create table {}.{} (geom text,osmid bigint{})"
+            ).format(
+                sql.Identifier(schema),
+                sql.Identifier(table_prefix+"_"+table+"_areas"),
+                query_attributes
+            )
             query_make_table_ways = sql.SQL(
                 "create table {}.{} (geom text,osmid bigint{})"
             ).format(
@@ -730,6 +741,7 @@ class Importer(DBUtils,Conf):
             )
             try:
                 cur = conn.cursor()
+                cur.execute(query_make_table_areas)
                 cur.execute(query_make_table_ways)
                 cur.execute(query_make_table_nodes)
                 cur.close()
@@ -739,6 +751,15 @@ class Importer(DBUtils,Conf):
                 raise e
 
             # insert data
+            ids_already_processed = set()
+            for feature in areas["features"]:
+                if feature["id"] in ids_already_processed:
+                    # short circuit insertion if we've already seen this feature.
+                    # for some reason duplicates are imported from osm
+                    continue
+                else:
+                    ids_already_processed.add(feature["id"])
+                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_areas")
             ids_already_processed = set()
             for feature in ways["features"]:
                 if feature["id"] in ids_already_processed:
@@ -762,6 +783,7 @@ class Importer(DBUtils,Conf):
             subs = {
                 "schema": sql.Identifier(schema),
                 "final_table": sql.Identifier(table),
+                "areas_table": sql.Identifier(table_prefix+"_"+table+"_areas"),
                 "ways_table": sql.Identifier(table_prefix+"_"+table+"_ways"),
                 "nodes_table": sql.Identifier(table_prefix+"_"+table+"_nodes"),
                 "srid": sql.Literal(srid),
@@ -784,6 +806,7 @@ class Importer(DBUtils,Conf):
                 raise e
 
             if not keep_intermediates:
+                self.drop_table(table_prefix+"_"+table+"_areas",schema=schema,conn=conn)
                 self.drop_table(table_prefix+"_"+table+"_ways",schema=schema,conn=conn)
                 self.drop_table(table_prefix+"_"+table+"_nodes",schema=schema,conn=conn)
 
@@ -859,14 +882,14 @@ class Importer(DBUtils,Conf):
         tags -- list of osm tags to use for filtering this destination type
 
         returns
-        geojson of ways, geojson of nodes
+        geojson of areas, geojson of nodes
         """
         handler = DestinationOSMHandler(tags)
         handler.apply_file(osm_file)
         nodes = FeatureCollection(handler.nodes_json)
-        ways = FeatureCollection(handler.ways_json)
+        areas = FeatureCollection(handler.areas_json)
 
-        return ways, nodes
+        return areas, nodes
 
 
     def _load_boundary_as_dataframe(self,boundary_file=None,srid=None):
