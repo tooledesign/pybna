@@ -185,7 +185,7 @@ class Stress(DBUtils,Conf):
         f.close()
 
 
-    def segment_stress(self,table,table_filter=None,dry=None):
+    def segment_stress(self,table=None,table_filter=None,dry=None):
         """
         Creates a new table of LTS scores for each direction (forward/backward).
         The new table also includes the attributes (actual or assumed) that were
@@ -196,13 +196,17 @@ class Stress(DBUtils,Conf):
         args
         table -- the table root (optionally schema-qualified) to use for outputting
             LTS scores. Final table name will have forward/backward appended to
-            indicate the direction the score applies to.
+            indicate the direction the score applies to. Defaults to "bna_stress_seg"
         table_filter -- SQL filter to limit rows that should be updated
         dry -- a path to save SQL statements to instead of executing in DB
         """
-        schema, table = self.parse_table_name(table)
-        if schema is None:
+        if table is None:
             schema = self.schema
+            table = "bna_stress_seg"
+        else:
+            schema, table = self.parse_table_name(table)
+            if schema is None:
+                schema = self.schema
 
         if table_filter:
             table_filter = sql.SQL(table_filter)
@@ -353,22 +357,26 @@ class Stress(DBUtils,Conf):
         self._run_sql_script("path.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
 
 
-    def crossing_stress(self,table,angle=20,table_filter=None,dry=None):
+    def crossing_stress(self,table=None,angle=20,table_filter=None,dry=None):
         """
         Calculates stress for crossings
 
         args
         table -- the table root (optionally schema-qualified) to use for outputting
             LTS scores. Final table name will have forward/backward appended to
-            indicate the direction the score applies to.
+            indicate the direction the score applies to. Defaults to "bna_stress_cross".
         angle -- the angle that determines whether a connection from
                     one road to another constitutes a crossing
         table_filter -- filter to limit rows that should be updated
         dry -- a path to save SQL statements to instead of executing in DB
         """
-        schema, table = self.parse_table_name(table)
-        if schema is None:
+        if table is None:
             schema = self.schema
+            table = "bna_stress_cross"
+        else:
+            schema, table = self.parse_table_name(table)
+            if schema is None:
+                schema = self.schema
 
         conn = self.get_db_connection()
         try:
