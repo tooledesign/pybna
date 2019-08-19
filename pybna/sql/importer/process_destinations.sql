@@ -1,4 +1,6 @@
 CREATE TABLE {schema}.{final_table} AS (
+    SELECT *, 'areas' AS osm_type FROM {schema}.{areas_table}
+    UNION
     SELECT *, 'ways' AS osm_type FROM {schema}.{ways_table}
     UNION
     SELECT *, 'nodes' FROM {schema}.{nodes_table}
@@ -7,6 +9,17 @@ CREATE TABLE {schema}.{final_table} AS (
 ALTER TABLE {schema}.{final_table} ADD COLUMN {pkey} SERIAL PRIMARY KEY;
 ALTER TABLE {schema}.{final_table} ADD COLUMN geom_pt geometry(point,{srid});
 ALTER TABLE {schema}.{final_table} ADD COLUMN geom_poly geometry(multipolygon,{srid});
+
+UPDATE {schema}.{final_table}
+SET geom_poly = ST_Transform(
+        ST_SetSRID(
+            ST_Multi(ST_GeomFromEWKT(geom)),
+            4326
+        ),
+        {srid}
+    )
+WHERE osm_type = 'areas'
+;
 
 UPDATE {schema}.{final_table}
 SET geom_poly = ST_Transform(
@@ -32,7 +45,7 @@ WHERE osm_type = 'nodes'
 
 UPDATE {schema}.{final_table}
 SET geom_pt = ST_Centroid(geom_poly)
-WHERE osm_type = 'ways'
+WHERE osm_type IN ('areas','ways')
 ;
 
 ALTER TABLE {schema}.{final_table} DROP COLUMN osm_type;
