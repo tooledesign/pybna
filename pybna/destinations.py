@@ -39,10 +39,9 @@ class Destinations(DBUtils):
         schema, output_table = self.parse_table_name(output_table)
 
         subs["scores_table"] = sql.Identifier(output_table)
-        if schema is not None:
-            subs["scores_schema"] = sql.Identifier(schema)
-        else:
-            subs["scores_schema"] = subs["blocks_schema"]
+        if schema is None:
+            schema = self.get_default_schema()
+        subs["scores_schema"] = sql.Identifier(schema)
 
         conn = self.get_db_connection()
         cur = conn.cursor()
@@ -50,8 +49,8 @@ class Destinations(DBUtils):
         if dry is None:
             if overwrite:
                 self.drop_table(
-                    table=subs["scores_table"],
-                    schema=subs["scores_schema"],
+                    table=output_table,
+                    schema=schema,
                     conn=conn
                 )
             elif self.table_exists(output_table,subs["scores_schema"].as_string(conn)):
@@ -87,7 +86,7 @@ class Destinations(DBUtils):
         ").format(**subs)
 
         print("Compiling destination data for all sources into output table")
-        self._run_sql(q,dry=dry,conn=conn)
+        self._run_sql(q.as_string(conn),dry=dry,conn=conn)
 
         # now use the results to calculate scores
         print("Calculating destination scores")
@@ -103,7 +102,7 @@ class Destinations(DBUtils):
             SET {cases} \
         ").format(**subs)
 
-        self._run_sql(q,dry=dry,conn=conn)
+        self._run_sql(q.as_string(conn),dry=dry,conn=conn)
 
         # finally set any category scores
         print("Calculating category scores")
@@ -168,8 +167,8 @@ class Destinations(DBUtils):
             hs_query = destination.query.format(**hs_subs)
             ls_query = destination.query.format(**ls_subs)
 
-            self._run_sql(hs_query,dry=dry,conn=conn)
-            self._run_sql(ls_query,dry=dry,conn=conn)
+            self._run_sql(hs_query.as_string(conn),dry=dry,conn=conn)
+            self._run_sql(ls_query.as_string(conn),dry=dry,conn=conn)
 
             hs_tmptable = sql.Identifier(tbl_hs)
             ls_tmptable = sql.Identifier(tbl_ls)
@@ -363,7 +362,7 @@ class Destinations(DBUtils):
                             end \
             ").format(**subs)
 
-            self._run_sql(q,dry=dry,conn=conn)
+            self._run_sql(q.as_string(conn),dry=dry,conn=conn)
 
 
     def _get_maxpoints(self,node):
