@@ -60,6 +60,14 @@ uses Census Blocks as defined in the 2010 US Census. When blocks are imported
 they are automatically clipped to the study area. Blocks can be obtained in one
 of three ways: path to a file, URL, or US state FIPS code.
 
+It is entirely possible to use blocks that are totally unrelated to the US
+Census. This is necessary for e.g. running BNA outside of the United States. The
+only items necessary to the BNA are:
+
+* Geographic boundaries
+* A unique identifier
+* Population data
+
 Blocks will be uploaded to your database at the location specified in your
 config file, unless you provide an alternate table name. If you started the
 Importer without a config file and don't explicitly specify a table, they will
@@ -78,6 +86,13 @@ with:
 i.import_census_blocks(fpath="/path/to/my/blocks/file")
 ```
 
+We have found that the default import from the Census can take some time as it
+is necessary to download the entire state's dataset, load it in memory, and then
+filter to a smaller area. If you prefer not to wait, it is usually faster to
+download the state dataset yourself, delete census blocks outside of the
+vicinity of your study area, and then point the Importer to the saved shapefile
+with this `fpath` option.
+
 _URL option:_
 
 You can point the BNA to a URL to download a file with:
@@ -88,16 +103,41 @@ i.import_census_blocks(url="https://valid/url/to/blocks/file")
 
 _FIPS option:_
 
-If you supply the FIPS code for the state you're working in the BNA will
+If you supply the FIPS code for the state you're working in pyBNA will
 download the blocks automatically for you:
 
 ```
-i.import_census_blocks(fips=16)  # for working in Idaho (FIPS 16)
+i.import_census_blocks(fips=16)  # e.g. for working in Idaho (FIPS 16)
 ```
 
 # Census Jobs
 
-This is under construction.
+By default, jobs data come from the Longitudinal Employer-Household Dynamics
+(LEHD) dataset produced by the US Census. As with Census Blocks, the jobs
+dataset does not have to be related to US Census data. Supplying your own jobs
+data is easy. pyBNA has the following requirements for user-supplied jobs data:
+
+* A unique identifier that corresponds to the ID associated with a block
+* A number of jobs specific to that block
+
+Jobs importing is easily done by specifying the table to create and the US state
+to pull jobs data for:
+
+```
+i.import_census_jobs("myschema.myjobstable",state="ID")
+```
+
+The state argument should be a two-letter abbreviation of the state as used by
+the US Census. If you have already downloaded the LEHD datasets you can point to
+the "main" and "aux" files with the `fpath_main` and `fpath_aux` arguments.
+
+The table created by this statement should correspond to the jobs table
+identified in your config file as a destination type. By default, this is the
+"employment" category in the config file and the table is named
+`neighborhood_census_block_jobs`.
+
+If you're supplying your own file for jobs data, you should load it into the
+database manually (ensuring to update your config file accordingly).
 
 # OSM Road Network
 
@@ -133,5 +173,10 @@ Importing destinations can be done with:
 i.import_osm_destinations()
 ```
 
-At present, OSM's Overpass API is used for obtaining destinations. In other
-words, you cannot use a downloaded OSM extract.
+If you downloaded an OSM extract you can point to this with the `osm_file`
+option. Please note pyBNA will look for destination matches on the entire OSM
+file without filtering to your study area boundary. This won't affect your
+analysis, but it could take an extremely long time if you downloaded an OSM
+extract that is significantly larger than your study area. We suggest clipping
+your extract before using it. There are many excellent tools available to do
+this.
