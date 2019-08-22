@@ -13,6 +13,12 @@ import string
 from shapely.geometry import shape, box
 from geojson import FeatureCollection
 
+try:
+    with_osmium = True
+    from destinationosmhandler import DestinationOSMHandler
+except:
+    with_osmium = False
+
 from conf import Conf
 from dbutils import DBUtils
 
@@ -615,9 +621,9 @@ class Importer(DBUtils,Conf):
         overwrite -- whether to overwrite any existing tables
         keep_intermediates -- saves the intermediate tables used to generate the final tables
         """
-        if osm_file:
-            from destinationosmhandler import DestinationOSMHandler
-            
+        if osm_file and not with_osmium:
+            raise ValueError("Importing destinations from an OSM extract requires the osmium library")
+
         if schema is None:
             schema = self.get_default_schema()
 
