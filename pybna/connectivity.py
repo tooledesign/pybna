@@ -174,17 +174,20 @@ class Connectivity(DBUtils):
         cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
-    def calculate_connectivity(self,blocks=None,network_filter=None,append=False,dry=None):
+    def calculate_connectivity(self,scenario="base",blocks=None,network_filter=None,append=False,dry=None):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
         args
+        scenario -- the name of this scenario. If empty assume "base", which is
+            the base scenario (i.e. existing conditions)
         blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
         append -- append to existing db table instead of creating a new one
         dry -- a path to save SQL statements to instead of executing in DB
         """
         subs = dict(self.sql_subs)
+        subs["scenario"] = sql.Literal(scenario)
 
         if network_filter is None:
             network_filter = "TRUE"
@@ -196,12 +199,13 @@ class Connectivity(DBUtils):
         elif not type(blocks) == list and not type(blocks) == tuple:
             raise ValueError("Block IDs must be given as an iterable")
 
-        # create db table or check existence if append mode set
+        # create db table or check existence if append mode set, drop index if append
         if not append and dry is None:
             self._connectivity_table_create(overwrite=False)
         if append and dry is None:
             if not self.table_exists(self.db_connectivity_table):
                 raise ValueError("table %s not found" % self.db_connectivity_table)
+            self._connectivity_table_drop_index()
 
         # get raw queries
         q_this_block_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","35_this_block_nodes.sql"))
