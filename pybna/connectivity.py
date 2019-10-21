@@ -1,17 +1,6 @@
-###################################################################
-# The Scenario class stores a BNA scenario for use in pyBNA.
-# A scenario includes two graphs: one for high stress, one for low stress
-###################################################################
-import sys, os, StringIO, random, string
-# import collections
-# from graph_tool.all import *
+import os, string
 import psycopg2
 from psycopg2 import sql
-# from tempfile import mkstemp
-# import numpy as np
-# from scipy.sparse import coo_matrix
-# import pandas as pd
-# import geopandas as gpd
 from tqdm import tqdm
 import time
 
@@ -32,9 +21,6 @@ class Connectivity(DBUtils):
         self.module_dir = None
         self.db_connectivity_table = None
         self.db_connection_string = None
-
-        # register pandas apply with tqdm for progress bar
-        # tqdm.pandas(desc="Evaluating connectivity")
 
 
     def build_network(self,dry=None):
@@ -174,20 +160,22 @@ class Connectivity(DBUtils):
         cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
-    def calculate_connectivity(self,scenario="base",blocks=None,network_filter=None,append=False,dry=None):
+    def calculate_connectivity(self,project_id=None,blocks=None,
+                               network_filter=None,append=False,dry=None):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
         args
-        scenario -- the name of this scenario. If empty assume "base", which is
-            the base scenario (i.e. existing conditions)
+        project_id -- the id of the project for which connectivity is calculated
+            (none means the scores represent the base condition)
         blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
         append -- append to existing db table instead of creating a new one
         dry -- a path to save SQL statements to instead of executing in DB
         """
         subs = dict(self.sql_subs)
-        subs["scenario"] = sql.Literal(scenario)
+        subs["project"] = sql.Literal(project_id)
+        subs["project_subtract"] = sql.Literal(project_id)
 
         if network_filter is None:
             network_filter = "TRUE"
