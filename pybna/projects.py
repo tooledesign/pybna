@@ -53,7 +53,7 @@ class Projects(DBUtils):
         _calculate_project(project_id,road_ids)
 
 
-    def _calculate_project(self,project_id,road_ids):
+    def _calculate_project(self,project_id,road_ids,subtract=False):
         """
         Calculates connectivity for a single project (or lack of a single
         project)
@@ -64,7 +64,8 @@ class Projects(DBUtils):
         road_ids -- a list of road_ids in the base network that should be
             flipped to low stress as part of this project
         """
-        pass
+        # get list of affected blocks
+        # call calculate_connectivity with project_id and blocks
 
 
     def get_road_ids(self,projects_table,project_id,projects_column="project_id",subtract=False):
@@ -89,7 +90,7 @@ class Projects(DBUtils):
         subs["project_id"] = sql.Literal(project_id)
 
         conn = self.get_db_connection()
-        
+
         if subtract:
             result = self._run_sql_script("get_road_ids_subtract.sql",subs,["sql","projects"],ret=True,conn=conn)
         else:

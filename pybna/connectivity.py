@@ -160,8 +160,9 @@ class Connectivity(DBUtils):
         cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
-    def calculate_connectivity(self,project_id=None,blocks=None,
-                               network_filter=None,append=False,dry=None):
+    def _calculate_connectivity(self,project_id=None,blocks=None,
+                               network_filter=None,road_ids=None,append=False,
+                               subtract=False,dry=None):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
@@ -170,12 +171,19 @@ class Connectivity(DBUtils):
             (none means the scores represent the base condition)
         blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
+        road_ids -- (requires project_id)
         append -- append to existing db table instead of creating a new one
+        subtract -- (requires project_id) if true the calculated scores for
+            the project represent a subtraction of that project from the
+            finished network
         dry -- a path to save SQL statements to instead of executing in DB
         """
         subs = dict(self.sql_subs)
-        subs["project"] = sql.Literal(project_id)
-        subs["project_subtract"] = sql.Literal(project_id)
+        subs["project_id"] = sql.Literal(project_id)
+        if subtract:
+            subs["project_subtract"] = sql.Literal(subtract)
+        else:
+            subs["project_subtract"] = sql.SQL("NULL")
 
         if network_filter is None:
             network_filter = "TRUE"
@@ -328,3 +336,46 @@ class Connectivity(DBUtils):
 
         if dry is None and not append:
             self._connectivity_table_create_index();
+
+
+    def calculate_project_connectivity(self,project_id=None,blocks=None,
+                               network_filter=None,road_ids=None,append=False,
+                               subtract=False,dry=None):
+        """
+        Wrapper for connectivity calculations on a given project, only to be
+        used once the base scenario has been run.
+
+        args
+        project_id -- the id of the project for which connectivity is calculated
+            (none means the scores represent the base condition)
+        blocks -- list of block IDs to use as origins. if empty use all blocks.
+        network_filter -- filter to be applied to the road network when routing
+        road_ids -- (requires project_id)
+        append -- append to existing db table instead of creating a new one
+        subtract -- (requires project_id) if true the calculated scores for
+            the project represent a subtraction of that project from the
+            finished network
+        dry -- a path to save SQL statements to instead of executing in DB
+        """
+        if not self.table_exists(self.db_connectivity_table):
+            raise ValueError("Connectivity table {} for the base scenario not found".format(self.db_connectivity_table))
+        # copy network with project
+
+
+    def calculate_connectivity(self,blocks=None,network_filter=None,
+                               append=False,dry=None):
+        """
+        Wrapper for connectivity calculations on the base scenario
+
+        args
+        blocks -- list of block IDs to use as origins. if empty use all blocks.
+        network_filter -- filter to be applied to the road network when routing
+        append -- append to existing db table instead of creating a new one
+        dry -- a path to save SQL statements to instead of executing in DB
+        """
+        self._calculate_connectivity(
+            blocks=blocks,
+            network_filter=network_filter,
+            append=append,
+            dry=dry
+        )
