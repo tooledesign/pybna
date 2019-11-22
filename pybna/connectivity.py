@@ -90,15 +90,9 @@ class Connectivity(DBUtils):
         conn = self.get_db_connection()
         cur = conn.cursor()
         if overwrite:
-            cur.execute(
-                sql.SQL(
-                    'DROP TABLE IF EXISTS {connectivity_schema}.{connectivity_table}'
-                ).format(**self.sql_subs)
-            )
+            self.drop_table(self.db_connectivity_table,conn=conn)
         try:
-            raw = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","create_table.sql"))
-            q = sql.SQL(raw).format(**self.sql_subs)
-            cur.execute(q)
+            self._run_sql_script("create_table.sql",self.sql_subs,["connectivity"],conn=conn)
         except psycopg2.ProgrammingError:
             conn.rollback()
             conn.close()
@@ -171,7 +165,7 @@ class Connectivity(DBUtils):
             (none means the scores represent the base condition)
         blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
-        road_ids -- (requires project_id)
+        road_ids -- list of road_ids to be flipped to low stress (requires project_id)
         append -- append to existing db table instead of creating a new one
         subtract -- (requires project_id) if true the calculated scores for
             the project represent a subtraction of that project from the
@@ -179,7 +173,11 @@ class Connectivity(DBUtils):
         dry -- a path to save SQL statements to instead of executing in DB
         """
         subs = dict(self.sql_subs)
-        subs["project_id"] = sql.Literal(project_id)
+        if project_id:
+            subs["project_id"] = sql.Literal(project_id)
+        else:
+            subs["project_id"] = sql.SQL("NULL")
+
         if subtract:
             subs["project_subtract"] = sql.Literal(subtract)
         else:
@@ -339,8 +337,7 @@ class Connectivity(DBUtils):
 
 
     def calculate_project_connectivity(self,project_id=None,blocks=None,
-                               network_filter=None,road_ids=None,append=False,
-                               subtract=False,dry=None):
+                                       network_filter=None,subtract=False,dry=None):
         """
         Wrapper for connectivity calculations on a given project, only to be
         used once the base scenario has been run.
@@ -350,16 +347,20 @@ class Connectivity(DBUtils):
             (none means the scores represent the base condition)
         blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
-        road_ids -- (requires project_id)
-        append -- append to existing db table instead of creating a new one
-        subtract -- (requires project_id) if true the calculated scores for
-            the project represent a subtraction of that project from the
-            finished network
+        subtract -- if true the calculated scores for the project represent
+            a subtraction of that project from the finished network
         dry -- a path to save SQL statements to instead of executing in DB
         """
         if not self.table_exists(self.db_connectivity_table):
             raise ValueError("Connectivity table {} for the base scenario not found".format(self.db_connectivity_table))
-        # copy network with project
+
+        # how to handle creating new column? what type?
+        type = self.get_column_type
+        self._add_column(self.db_connectivity_table,"scenario",subs["blocks_id_type"])
+
+        # get list of affected blocks
+        # get list of road_ids that should be flipped to low stress
+        # pass to main _calculate_connectivity
 
 
     def calculate_connectivity(self,blocks=None,network_filter=None,
