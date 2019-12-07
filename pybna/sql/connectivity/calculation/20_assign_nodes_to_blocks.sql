@@ -7,7 +7,9 @@ CREATE TEMP TABLE tmp_blocks AS (
     FROM
         {blocks_schema}.{blocks_table} blocks,
         tmp_this_block
-    WHERE ST_DWithin(blocks.{blocks_geom_col},tmp_this_block.geom,{connectivity_max_distance})
+    WHERE
+        ST_DWithin(blocks.{blocks_geom_col},tmp_this_block.geom,{connectivity_max_distance})
+        AND {destination_blocks_filter}
 );
 CREATE INDEX tsidx_b ON tmp_blocks USING GIST (geom);
 ALTER TABLE tmp_blocks ADD PRIMARY KEY (id);

@@ -154,29 +154,34 @@ class Connectivity(DBUtils):
         cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
-    def _calculate_connectivity(self,project_id=None,blocks=None,
+    def _calculate_connectivity(self,scenario_id=None,blocks=None,restrict_block_destinations=False,
                                network_filter=None,road_ids=None,append=False,
                                subtract=False,dry=None):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
         args
-        project_id -- the id of the project for which connectivity is calculated
+        scenario_id -- the id of the scenario for which connectivity is calculated
             (none means the scores represent the base condition)
         blocks -- list of block IDs to use as origins. if empty use all blocks.
+        restrict_block_destinations -- if true, limit the destinations to the same
+            list of blocks given in the blocks arg (i.e. blocks represents total
+            universe of origins and destinations)
         network_filter -- filter to be applied to the road network when routing
-        road_ids -- list of road_ids to be flipped to low stress (requires project_id)
+        road_ids -- list of road_ids to be flipped to low stress (requires scenario_id)
         append -- append to existing db table instead of creating a new one
-        subtract -- (requires project_id) if true the calculated scores for
+        subtract -- (requires scenario_id) if true the calculated scores for
             the project represent a subtraction of that project from the
             finished network
         dry -- a path to save SQL statements to instead of executing in DB
         """
+        if blocks is None and restrict_block_destinations:
+            raise ValueError("List of blocks is required for restrict_block_destinations")
         subs = dict(self.sql_subs)
-        if project_id:
-            subs["project_id"] = sql.Literal(project_id)
+        if scenario_id:
+            subs["scenario_id"] = sql.Literal(scenario_id)
         else:
-            subs["project_id"] = sql.SQL("NULL")
+            subs["scenario_id"] = sql.SQL("NULL")
 
         if subtract:
             subs["project_subtract"] = sql.Literal(subtract)
@@ -190,8 +195,16 @@ class Connectivity(DBUtils):
         # check blocks
         if blocks is None:
             blocks = self._get_block_ids()
+            subs["destination_blocks_filter"] = sql.SQL("TRUE")
         elif not type(blocks) == list and not type(blocks) == tuple:
             raise ValueError("Block IDs must be given as an iterable")
+        else:
+            if restrict_block_destinations:
+                subs["destination_block_ids"] = sql.Literal(blocks)
+                destination_id_filter = sql.SQL("blocks.{blocks_id_col} = ANY({destination_block_ids})")
+                subs["destination_blocks_filter"] = destination_id_filter.format(**subs)
+            else:
+                subs["destination_blocks_filter"] = sql.SQL("TRUE")
 
         # create db table or check existence if append mode set, drop index if append
         if not append and dry is None:
@@ -336,15 +349,17 @@ class Connectivity(DBUtils):
             self._connectivity_table_create_index();
 
 
-    def calculate_project_connectivity(self,project_id=None,blocks=None,
+    def calculate_project_connectivity(self,scenario_column,scenario_ids=None,
+                                       datatype=None,blocks=None,
                                        network_filter=None,subtract=False,dry=None):
         """
         Wrapper for connectivity calculations on a given project, only to be
         used once the base scenario has been run.
 
         args
-        project_id -- the id of the project for which connectivity is calculated
-            (none means the scores represent the base condition)
+        scenario_ids -- list of projects for which connectivity is calculated
+            (if none calculate for all projects)
+        datatype -- the column type to use for creating the scenario column in the db
         blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
         subtract -- if true the calculated scores for the project represent
@@ -353,14 +368,49 @@ class Connectivity(DBUtils):
         """
         if not self.table_exists(self.db_connectivity_table):
             raise ValueError("Connectivity table {} for the base scenario not found".format(self.db_connectivity_table))
+        subs = dict(self.sql_subs)
 
-        # how to handle creating new column? what type?
-        type = self.get_column_type
-        self._add_column(self.db_connectivity_table,"scenario",subs["blocks_id_type"])
+        # add column
+        if datatype is None:
+            datatype = self.get_column_type(self.db_connectivity_table,scenario_column)
+        self._add_column(self.db_connectivity_table,"scenario",datatype)
 
-        # get list of affected blocks
-        # get list of road_ids that should be flipped to low stress
-        # pass to main _calculate_connectivity
+        # add subs
+        subs["roads_scenario_col"] = sql.Identifier(scenario_column)
+
+        # iterate projects
+        if scenario_ids is None:
+            ret = self._run_sql(
+                " \
+                    select distinct {roads_scenario_col} \
+                    from {roads_schema}.{roads_table} \
+                    where {roads_scenario_col} is not null \
+                ",
+                subs=subs,
+                ret=True
+            )
+            scenario_ids = [row[0] for row in ret]
+
+        for scenario_id in scenario_ids:
+            subs["scenario_id"] = sql.Literal(scenario_id)
+            # get list of affected blocks
+            if blocks is None:
+                ret = self._run_sql_script("get_affected_block_ids",subs,["connectivity","scenarios"],ret=True)
+                blocks = [row[0] for row in ret]
+
+            # get list of road_ids that should be flipped to low stress
+            ret = self._run_sql_script("get_affected_block_ids",subs,["connectivity","scenarios"],ret=True)
+            road_ids = [row[0] for row in ret]
+
+            # pass on to main _calculate_connectivity
+            self._calculate_connectivity(
+                scenario_id=scenario_id,
+                blocks=blocks,
+                restrict_block_destinations=True,
+                network_filter=network_filter,
+                road_ids=road_ids,
+                append=True
+            )
 
 
     def calculate_connectivity(self,blocks=None,network_filter=None,
