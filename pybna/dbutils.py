@@ -609,13 +609,13 @@ class DBUtils:
             "name": sql.Identifier(name),
         }
         # handle possible SQL object as type
-        if type(type) == sql.SQL:
+        if type(type) is sql.SQL:
             subs["type"] = type
         else:
             subs["type"] = sql.SQL(type)
 
         self._run_sql(
-            "alter table {schema}.{table} add column {name} {type}",
+            "alter table {schema}.{table} add column if not exists {name} {type}",
             subs=subs,
             conn=conn
         )
