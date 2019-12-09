@@ -192,6 +192,11 @@ class Connectivity(DBUtils):
             network_filter = "TRUE"
         subs["network_filter"] = sql.SQL(network_filter)
 
+        if road_ids is None:
+            subs["low_stress_road_ids"] = sql.SQL("NULL")
+        else:
+            subs["low_stress_road_ids"] = sql.Literal(road_ids)
+
         # check blocks
         if blocks is None:
             blocks = self._get_block_ids()
@@ -230,19 +235,35 @@ class Connectivity(DBUtils):
 
             # filter blocks
             self._run_sql_script("10_filter_this_block.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            self._run_sql_script("15_filter_other_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            if scenario_id is not None:
+                self._run_sql_script("17_remove_ls_connections_for_project.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            if road_ids is not None:
+                self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+
+
+            #
+            # We can skip the entire high-stress routine but i need to figure
+            # out how to make that work with minimal change to existing method.
+            # Maybe we need two version of 70_combine_cost_matrices?
+            #
+
 
             # subset hs network
             subs["max_stress"] = sql.Literal(99)
             subs["net_table"] = sql.Identifier("tmp_hs_net")
-            self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            if scenario_id is None:
+                self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
 
-            # get hs nodes
-            ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,dry=dry,conn=conn)
-            if dry is None:
-                hs_nodes = set(n[0] for n in ret)
+                # get hs nodes
+                ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,dry=dry,conn=conn)
+                if dry is None:
+                    hs_nodes = set(n[0] for n in ret)
+                else:
+                    hs_nodes = {-1}
             else:
-                hs_nodes = {-1}
+                hs_nodes = set()
 
             # subset ls network
             subs["max_stress"] = sql.Literal(self.config.bna.connectivity.max_stress)
@@ -278,7 +299,7 @@ class Connectivity(DBUtils):
             subs["distance_table"] = sql.Identifier("tmp_hs_distance")
             subs["cost_to_blocks"] = sql.Identifier("tmp_hs_cost_to_blocks")
 
-            if len(hs_node_ids) == 0:
+            if len(hs_node_ids) == 0 or scenario_id is not None:
                 cur2 = conn.cursor()
                 cur2.execute("create temp table tmp_hs_cost_to_blocks (id int, agg_cost float)")
                 cur2.close()
@@ -329,6 +350,10 @@ class Connectivity(DBUtils):
             # build combined cost table and write to connectivity table
             try:
                 self._run_sql_script("70_combine_cost_matrices.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                if scenario_id is None:
+                    self._run_sql_script("80_insert.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                else:
+                    self._run_sql_script("80_insert_with_project.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             except:
                 failure = True
                 failed_blocks.append(block_id)
