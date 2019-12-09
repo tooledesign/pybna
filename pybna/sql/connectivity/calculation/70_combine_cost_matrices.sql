@@ -45,9 +45,3 @@ WHERE source = target
 
 DROP TABLE tmp_blocks;
 DROP TABLE tmp_combined;
-
-INSERT INTO {connectivity_schema}.{connectivity_table}
-SELECT * FROM tmp_connectivity
-;
-
-DROP TABLE tmp_connectivity;
