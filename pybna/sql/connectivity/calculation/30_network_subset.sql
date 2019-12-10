@@ -14,6 +14,6 @@ FROM
 WHERE
     block.{blocks_id_col}={block_id}
     AND ST_DWithin(block.{blocks_geom_col},link.{edges_geom_col},{connectivity_max_distance})
-    AND COALESCE(tmp_flip_stress.stress,{edges_stress_col}) <= {connectivity_max_stress}
+    AND COALESCE(tmp_flip_stress.stress,{edges_stress_col}) <= {max_stress}
     AND {network_filter}
 ;

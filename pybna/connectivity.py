@@ -174,12 +174,14 @@ class Connectivity(DBUtils):
         road_ids -- list of road_ids to be flipped to low stress (requires scenario_id)
         append -- append to existing db table instead of creating a new one
         subtract -- (requires scenario_id) if true the calculated scores for
-            the project represent a subtraction of that project from the
+            the project are flagged as a subtraction of that project from the
             finished network
         dry -- a path to save SQL statements to instead of executing in DB
         """
         if blocks is None and restrict_block_destinations:
             raise ValueError("List of blocks is required for restrict_block_destinations")
+        if scenario_id is None and subtract:
+            raise ValueError("Subtract flag can only be used with a scenario")
         subs = dict(self.sql_subs)
         if scenario_id:
             subs["scenario_id"] = sql.Literal(scenario_id)
@@ -187,9 +189,9 @@ class Connectivity(DBUtils):
             subs["scenario_id"] = sql.SQL("NULL")
 
         if subtract:
-            subs["project_subtract"] = sql.Literal(subtract)
+            subs["scenario_subtract"] = sql.Literal(subtract)
         else:
-            subs["project_subtract"] = sql.SQL("NULL")
+            subs["scenario_subtract"] = sql.SQL("NULL")
 
         if network_filter is None:
             network_filter = "TRUE"
@@ -222,9 +224,6 @@ class Connectivity(DBUtils):
                 raise ValueError("table %s not found" % self.db_connectivity_table)
             self._connectivity_table_drop_index()
 
-        # get raw queries
-        q_this_block_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","35_this_block_nodes.sql"))
-
         block_progress = tqdm(blocks,smoothing=0.1)
         failed_blocks = list()
 
@@ -243,14 +242,6 @@ class Connectivity(DBUtils):
                 self._run_sql_script("17_remove_ls_connections_for_project.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-
-
-            #
-            # We can skip the entire high-stress routine but i need to figure
-            # out how to make that work with minimal change to existing method.
-            # Maybe we need two version of 70_combine_cost_matrices?
-            #
-
 
             # subset hs network
             subs["max_stress"] = sql.Literal(99)
@@ -401,6 +392,7 @@ class Connectivity(DBUtils):
         if datatype is None:
             datatype = self.get_column_type(self.db_connectivity_table,scenario_column)
         self._add_column(self.db_connectivity_table,"scenario",datatype)
+        self._add_column(self.db_connectivity_table,"subtract","boolean")
 
         # add subs
         subs["roads_scenario_col"] = sql.Identifier(scenario_column)
@@ -422,11 +414,14 @@ class Connectivity(DBUtils):
             subs["scenario_id"] = sql.Literal(scenario_id)
             # get list of affected blocks
             if blocks is None:
-                ret = self._run_sql_script("get_affected_block_ids",subs,["connectivity","scenarios"],ret=True)
+                ret = self._run_sql_script("get_affected_block_ids.sql",subs,["connectivity","scenarios"],ret=True)
                 blocks = [row[0] for row in ret]
 
             # get list of road_ids that should be flipped to low stress
-            ret = self._run_sql_script("get_affected_block_ids",subs,["connectivity","scenarios"],ret=True)
+            if subtract:
+                ret = self._run_sql_script("get_affected_road_ids_subtract.sql",subs,["connectivity","scenarios"],ret=True)
+            else:
+                ret = self._run_sql_script("get_affected_road_ids.sql",subs,["connectivity","scenarios"],ret=True)
             road_ids = [row[0] for row in ret]
 
             # pass on to main _calculate_connectivity
