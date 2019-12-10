@@ -174,7 +174,7 @@ class Connectivity(DBUtils):
         road_ids -- list of road_ids to be flipped to low stress (requires scenario_id)
         append -- append to existing db table instead of creating a new one
         subtract -- (requires scenario_id) if true the calculated scores for
-            the project are flagged as a subtraction of that project from the
+            the scenario are flagged as a subtraction of that scenario from the
             finished network
         dry -- a path to save SQL statements to instead of executing in DB
         """
@@ -239,7 +239,7 @@ class Connectivity(DBUtils):
             self._run_sql_script("10_filter_this_block.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             self._run_sql_script("15_filter_other_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             if scenario_id is not None:
-                self._run_sql_script("17_remove_ls_connections_for_project.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                self._run_sql_script("17_remove_ls_connections_for_scenario.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
 
@@ -346,7 +346,7 @@ class Connectivity(DBUtils):
                 if scenario_id is None:
                     self._run_sql_script("80_insert.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
                 else:
-                    self._run_sql_script("80_insert_with_project.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("80_insert_with_scenario.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             except:
                 failure = True
                 failed_blocks.append(block_id)
@@ -367,21 +367,21 @@ class Connectivity(DBUtils):
             self._connectivity_table_create_index();
 
 
-    def calculate_project_connectivity(self,scenario_column,scenario_ids=None,
-                                       datatype=None,blocks=None,
-                                       network_filter=None,subtract=False,dry=None):
+    def calculate_scenario_connectivity(self,scenario_column,scenario_ids=None,
+                                        datatype=None,blocks=None,
+                                        network_filter=None,subtract=False,dry=None):
         """
-        Wrapper for connectivity calculations on a given project, only to be
+        Wrapper for connectivity calculations on a given scenario, only to be
         used once the base scenario has been run.
 
         args
-        scenario_ids -- list of projects for which connectivity is calculated
-            (if none calculate for all projects)
+        scenario_ids -- list of scenario for which connectivity is calculated
+            (if none calculate for all scenarios)
         datatype -- the column type to use for creating the scenario column in the db
         blocks -- list of block IDs to use as origins. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
-        subtract -- if true the calculated scores for the project represent
-            a subtraction of that project from the finished network
+        subtract -- if true the calculated scores for the scenario represent
+            a subtraction of that scenario from all other scenarios
         dry -- a path to save SQL statements to instead of executing in DB
         """
         if not self.table_exists(self.db_connectivity_table):
@@ -397,7 +397,7 @@ class Connectivity(DBUtils):
         # add subs
         subs["roads_scenario_col"] = sql.Identifier(scenario_column)
 
-        # iterate projects
+        # iterate scenarios
         if scenario_ids is None:
             ret = self._run_sql(
                 " \
