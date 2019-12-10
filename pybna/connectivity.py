@@ -92,14 +92,17 @@ class Connectivity(DBUtils):
         if overwrite:
             self.drop_table(self.db_connectivity_table,conn=conn)
         try:
-            self._run_sql_script("create_table.sql",self.sql_subs,["connectivity"],conn=conn)
+            self._run_sql_script("create_table.sql",self.sql_subs,["sql","connectivity"],conn=conn)
         except psycopg2.ProgrammingError:
-            conn.rollback()
-            conn.close()
+            if conn.closed == 0:
+                conn.rollback()
+                conn.close()
             raise ValueError("Table %s already exists" % self.config.bna.connectivity.table)
-        cur.close()
-        conn.commit()
-        conn.close()
+        if conn.closed == 0:
+            if not cur.closed:
+                cur.close()
+            conn.commit()
+            conn.close()
 
 
     def _connectivity_table_drop_index(self):
@@ -222,7 +225,7 @@ class Connectivity(DBUtils):
         # get raw queries
         q_this_block_nodes = self.read_sql_from_file(os.path.join(self.module_dir,"sql","connectivity","calculation","35_this_block_nodes.sql"))
 
-        block_progress = tqdm(blocks)
+        block_progress = tqdm(blocks,smoothing=0.1)
         failed_blocks = list()
 
         for block_id in block_progress:
@@ -239,8 +242,7 @@ class Connectivity(DBUtils):
             if scenario_id is not None:
                 self._run_sql_script("17_remove_ls_connections_for_project.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
             self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-            if road_ids is not None:
-                self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
 
 
             #

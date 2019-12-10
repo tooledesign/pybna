@@ -8,11 +8,12 @@ INTO TEMP TABLE {net_table}
 FROM
     {edges_schema}.{edges_table} link
     JOIN {blocks_schema}.{blocks_table} block
-    LEFT JOIN tmp_flip_stress src
+        ON TRUE
+    LEFT JOIN tmp_flip_stress
         ON link.{edges_id_col} = tmp_flip_stress.id
 WHERE
     block.{blocks_id_col}={block_id}
     AND ST_DWithin(block.{blocks_geom_col},link.{edges_geom_col},{connectivity_max_distance})
-    AND COALESCE(tmp_flip_stress.stress,{edges_stress_col}) <= {max_stress}
+    AND COALESCE(tmp_flip_stress.stress,{edges_stress_col}) <= {connectivity_max_stress}
     AND {network_filter}
 ;
