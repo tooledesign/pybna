@@ -591,7 +591,7 @@ class DBUtils:
             conn.close()
 
 
-    def _add_column(self,table,name,type,schema=None,conn=None):
+    def _add_column(self,table,name,datatype,schema=None,conn=None):
         """
         Adds a column to the given table
         """
@@ -609,10 +609,10 @@ class DBUtils:
             "name": sql.Identifier(name),
         }
         # handle possible SQL object as type
-        if type(type) is sql.SQL:
-            subs["type"] = type
+        if type(datatype) is sql.SQL:
+            subs["type"] = datatype
         else:
-            subs["type"] = sql.SQL(type)
+            subs["type"] = sql.SQL(datatype)
 
         self._run_sql(
             "alter table {schema}.{table} add column if not exists {name} {type}",

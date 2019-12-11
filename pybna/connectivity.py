@@ -112,14 +112,14 @@ class Connectivity(DBUtils):
         """
         conn = self.get_db_connection()
         cur = conn.cursor()
-        cur.execute("\
+        cur.execute(sql.SQL("\
             SELECT indexrelid::regclass::text \
             FROM   pg_index  i \
                 LEFT   JOIN pg_depend d ON d.objid = i.indexrelid \
                 AND d.deptype = 'i' \
             WHERE  i.indrelid = {}::regclass \
             AND    d.objid IS NULL \
-        ").format(sql.Literal(self.config.bna.connectivity.table))
+        ").format(sql.Literal(self.config.bna.connectivity.table)))
         for row in cur:
             if row[0] is None:
                 pass
@@ -390,9 +390,12 @@ class Connectivity(DBUtils):
 
         # add column
         if datatype is None:
-            datatype = self.get_column_type(self.db_connectivity_table,scenario_column)
+            datatype = self.get_column_type(self.config.bna.network.roads.table,scenario_column)
         self._add_column(self.db_connectivity_table,"scenario",datatype)
         self._add_column(self.db_connectivity_table,"subtract","boolean")
+
+        # check if scenario already exists in table
+
 
         # add subs
         subs["roads_scenario_col"] = sql.Identifier(scenario_column)
@@ -412,17 +415,21 @@ class Connectivity(DBUtils):
 
         for scenario_id in scenario_ids:
             subs["scenario_id"] = sql.Literal(scenario_id)
+            conn = self.get_db_connection()
+
             # get list of affected blocks
             if blocks is None:
-                ret = self._run_sql_script("get_affected_block_ids.sql",subs,["connectivity","scenarios"],ret=True)
+                ret = self._run_sql_script("get_affected_block_ids.sql",subs,["sql","connectivity","scenarios"],ret=True,conn=conn)
                 blocks = [row[0] for row in ret]
 
             # get list of road_ids that should be flipped to low stress
             if subtract:
-                ret = self._run_sql_script("get_affected_road_ids_subtract.sql",subs,["connectivity","scenarios"],ret=True)
+                ret = self._run_sql_script("get_affected_road_ids_subtract.sql",subs,["sql","connectivity","scenarios"],ret=True,conn=conn)
             else:
-                ret = self._run_sql_script("get_affected_road_ids.sql",subs,["connectivity","scenarios"],ret=True)
+                ret = self._run_sql_script("get_affected_road_ids.sql",subs,["sql","connectivity","scenarios"],ret=True,conn=conn)
             road_ids = [row[0] for row in ret]
+
+            conn.close()
 
             # pass on to main _calculate_connectivity
             self._calculate_connectivity(
