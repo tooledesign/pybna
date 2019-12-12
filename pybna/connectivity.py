@@ -278,7 +278,7 @@ class Connectivity(DBUtils):
 
             # retrieve nodes for this block and loop through
             ret = self._run_sql_script("35_this_block_nodes.sql",subs,["sql","connectivity","calculation"],ret=True,dry=dry,conn=conn)
-            if dry:
+            if dry is not None:
                 ret = set()
 
             if len(ret) <= 0:
