@@ -14,7 +14,7 @@
 --         c.scenario IS NULL
 --         AND tmp_this_block.id = c.{connectivity_source_col}
 --         AND tmp_blocks.id = c.{connectivity_target_col}
---         AND ls
+--         AND low_stress
 -- );
 --
 -- DELETE FROM tmp_blocks
@@ -31,5 +31,5 @@ WHERE EXISTS (
         c.scenario IS NULL
         AND tmp_this_block.id = c.{connectivity_source_col}
         AND tmp_blocks.id = c.{connectivity_target_col}
-        AND ls
+        AND low_stress
 );

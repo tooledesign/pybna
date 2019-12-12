@@ -412,6 +412,8 @@ class Connectivity(DBUtils):
                 ret=True
             )
             scenario_ids = [row[0] for row in ret]
+        if not hasattr(scenario_ids,"__iter__"):
+            scenario_ids = [scenario_ids]
 
         for scenario_id in scenario_ids:
             subs["scenario_id"] = sql.Literal(scenario_id)
