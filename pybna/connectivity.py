@@ -75,7 +75,13 @@ class Connectivity(DBUtils):
         conn = self.get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            sql.SQL("select {blocks_id_col} from {blocks_schema}.{blocks_table}").format(**self.sql_subs)
+            sql.SQL(" \
+                select {blocks_id_col} from {blocks_schema}.{blocks_table} blocks \
+                where exists ( \
+                    select 1 from {boundary_schema}.{boundary_table} bound \
+                    where st_dwithin(bound.{boundary_geom_col},blocks.{blocks_geom_col},{connectivity_max_distance}) \
+                ) \
+            ").format(**self.sql_subs)
         )
         blocks = []
         for row in cur:
