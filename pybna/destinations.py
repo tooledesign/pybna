@@ -27,12 +27,14 @@ class Destinations(DBUtils):
     #
     #  need to add in scenario logic.
     #
-    def score_destinations(self,output_table,with_geoms=False,overwrite=False,dry=None):
+    def score_destinations(self,output_table,scenario_id=None,with_geoms=False,overwrite=False,dry=None):
         """
         Creates a new db table of scores for each block
 
         args:
         output_table -- table to create (optionally schema-qualified)
+        scenario_id -- the id of the scenario for which scores are calculated
+            (none means the scores represent the base condition)
         overwrite -- overwrite a pre-existing table
         dry -- a path to save SQL statements to instead of executing in DB
         """
@@ -57,7 +59,7 @@ class Destinations(DBUtils):
                     conn=conn
                 )
             elif self.table_exists(output_table,subs["scores_schema"].as_string(conn)):
-                raise psycopg2.ProgrammingError("Table %s.%s already exists" % (subs["scores_schema"].as_string(conn),output_table))
+                raise psycopg2.ProgrammingError("Table {}.{} already exists".format(subs["scores_schema"].as_string(conn),output_table))
 
         # combine all the temporary tables into the final output
         columns = sql.SQL("")
@@ -71,25 +73,8 @@ class Destinations(DBUtils):
         subs["columns"] = columns
         subs["tables"] = tables
 
-        q = sql.SQL(" \
-            SELECT \
-                blocks.{blocks_id_col} \
-                {columns}, \
-                NULL::FLOAT AS overall_score \
-            INTO {scores_schema}.{scores_table} \
-            FROM \
-                {blocks_schema}.{blocks_table} blocks \
-                {tables} \
-            WHERE EXISTS ( \
-                select 1 \
-                from {boundary_schema}.{boundary_table} bound \
-                where st_intersects(blocks.{blocks_geom_col},bound.{boundary_geom_col}) \
-            ); \
-            ALTER TABLE {scores_schema}.{scores_table} ADD PRIMARY KEY ({blocks_id_col}); \
-        ").format(**subs)
-
         print("Compiling destination data for all sources into output table")
-        self._run_sql(q.as_string(conn),dry=dry,conn=conn)
+        self._run_sql_script("03_all_combined.sql",subs,["sql","destinations"],dry=dry,conn=conn)
 
         # now use the results to calculate scores
         print("Calculating destination scores")
@@ -404,4 +389,4 @@ class Destinations(DBUtils):
         )
         subs["sidx_name"] = sql.Identifier("sidx_")+subs["scores_table"]
 
-        self._run_sql_script("03_add_geoms.sql",subs,["sql","destinations"],dry=dry,conn=conn)
+        self._run_sql_script("04_add_geoms.sql",subs,["sql","destinations"],dry=dry,conn=conn)
