@@ -83,9 +83,9 @@ class DestinationCategory(DBUtils):
         sql_subs["index"] = sql.SQL("{index}")
         if config["method"] == "count":
             sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
-            sql_file = os.path.join(self.query_path,"count_based_score.sql")
+            sql_file = os.path.join(self.query_path,"02_count_based_score.sql")
         elif config["method"] == "percentage":
-            sql_file = os.path.join(self.query_path,"percentage_based_score.sql")
+            sql_file = os.path.join(self.query_path,"02_percentage_based_score.sql")
             sql_subs["val"] = sql.Identifier(config["datafield"])
         else:
             raise ValueError("Unknown scoring method given for %s" % config["name"])

@@ -24,6 +24,9 @@ class Destinations(DBUtils):
         self.srid = None
 
 
+    #
+    #  need to add in scenario logic.
+    #
     def score_destinations(self,output_table,with_geoms=False,overwrite=False,dry=None):
         """
         Creates a new db table of scores for each block
@@ -401,4 +404,4 @@ class Destinations(DBUtils):
         )
         subs["sidx_name"] = sql.Identifier("sidx_")+subs["scores_table"]
 
-        self._run_sql_script("add_geoms.sql",subs,["sql","destinations"],dry=dry,conn=conn)
+        self._run_sql_script("03_add_geoms.sql",subs,["sql","destinations"],dry=dry,conn=conn)
