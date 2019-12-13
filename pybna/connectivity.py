@@ -163,19 +163,18 @@ class Connectivity(DBUtils):
         cur.execute(sql.SQL("analyze {connectivity_schema}.{connectivity_table}").format(**subs));
 
 
-    def _calculate_connectivity(self,scenario_id=None,blocks=None,restrict_block_destinations=False,
-                               network_filter=None,road_ids=None,append=False,
-                               subtract=False,dry=None):
+    def _calculate_connectivity(self,scenario_id=None,origin_blocks=None,
+                                destination_blocks=None,network_filter=None,
+                                road_ids=None,append=False,subtract=False,
+                                dry=None):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
         args
         scenario_id -- the id of the scenario for which connectivity is calculated
             (none means the scores represent the base condition)
-        blocks -- list of block IDs to use as origins. if empty use all blocks.
-        restrict_block_destinations -- if true, limit the destinations to the same
-            list of blocks given in the blocks arg (i.e. blocks represents total
-            universe of origins and destinations)
+        origin_blocks -- list of block IDs to use as origins. if empty use all blocks.
+        destination_blocks -- list of block IDs to use as destinations. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
         road_ids -- list of road_ids to be flipped to low stress (requires scenario_id)
         append -- append to existing db table instead of creating a new one
@@ -184,8 +183,6 @@ class Connectivity(DBUtils):
             finished network
         dry -- a path to save SQL statements to instead of executing in DB
         """
-        if blocks is None and restrict_block_destinations:
-            raise ValueError("List of blocks is required for restrict_block_destinations")
         if scenario_id is None and subtract:
             raise ValueError("Subtract flag can only be used with a scenario")
         subs = dict(self.sql_subs)
@@ -209,18 +206,18 @@ class Connectivity(DBUtils):
             subs["low_stress_road_ids"] = sql.Literal(road_ids)
 
         # check blocks
-        if blocks is None:
-            blocks = self._get_block_ids()
+        if origin_blocks is None:
+            origin_blocks = self._get_block_ids()
+        elif not hasattr(origin_blocks,"__iter__"):
+            raise ValueError("Origin block IDs must be given as an iterable")
+        if destination_blocks is None:
             subs["destination_blocks_filter"] = sql.SQL("TRUE")
-        elif not type(blocks) == list and not type(blocks) == tuple:
-            raise ValueError("Block IDs must be given as an iterable")
+        elif not hasattr(destination_blocks,"__iter__"):
+            raise ValueError("Destination block IDs must be given as an iterable")
         else:
-            if restrict_block_destinations:
-                subs["destination_block_ids"] = sql.Literal(blocks)
-                destination_id_filter = sql.SQL("blocks.{blocks_id_col} = ANY({destination_block_ids})")
-                subs["destination_blocks_filter"] = destination_id_filter.format(**subs)
-            else:
-                subs["destination_blocks_filter"] = sql.SQL("TRUE")
+            subs["destination_block_ids"] = sql.Literal(destination_blocks)
+            destination_id_filter = sql.SQL("blocks.{blocks_id_col} = ANY({destination_block_ids})")
+            subs["destination_blocks_filter"] = destination_id_filter.format(**subs)
 
         # create db table or check existence if append mode set, drop index if append
         if not append and dry is None:
@@ -230,7 +227,7 @@ class Connectivity(DBUtils):
                 raise ValueError("table %s not found" % self.db_connectivity_table)
             self._connectivity_table_drop_index()
 
-        block_progress = tqdm(blocks,smoothing=0.1)
+        block_progress = tqdm(origin_blocks,smoothing=0.1)
         failed_blocks = list()
 
         for block_id in block_progress:
@@ -374,8 +371,9 @@ class Connectivity(DBUtils):
 
 
     def calculate_scenario_connectivity(self,scenario_column,scenario_ids=None,
-                                        datatype=None,blocks=None,
-                                        network_filter=None,subtract=False,dry=None):
+                                        datatype=None,origin_blocks=None,
+                                        destination_blocks=None,network_filter=None,
+                                        subtract=False,dry=None):
         """
         Wrapper for connectivity calculations on a given scenario, only to be
         used once the base scenario has been run.
@@ -384,7 +382,8 @@ class Connectivity(DBUtils):
         scenario_ids -- list of scenario for which connectivity is calculated
             (if none calculate for all scenarios)
         datatype -- the column type to use for creating the scenario column in the db
-        blocks -- list of block IDs to use as origins. if empty use all blocks.
+        origin_blocks -- list of block IDs to use as origins. if empty use all blocks.
+        destination_blocks -- list of block IDs to use as destinations. if empty use all blocks.
         network_filter -- filter to be applied to the road network when routing
         subtract -- if true the calculated scores for the scenario represent
             a subtraction of that scenario from all other scenarios
@@ -426,9 +425,13 @@ class Connectivity(DBUtils):
             conn = self.get_db_connection()
 
             # get list of affected blocks
-            if blocks is None:
+            if origin_blocks is None or destination_blocks is None:
                 ret = self._run_sql_script("get_affected_block_ids.sql",subs,["sql","connectivity","scenarios"],ret=True,conn=conn)
-                blocks = [row[0] for row in ret]
+                affected_blocks = [row[0] for row in ret]
+                if origin_blocks is None:
+                    origin_blocks = affected_blocks
+                if destination_blocks is None:
+                    destination_blocks = affected_blocks
 
             # get list of road_ids that should be flipped to low stress
             if subtract:
@@ -442,8 +445,8 @@ class Connectivity(DBUtils):
             # pass on to main _calculate_connectivity
             self._calculate_connectivity(
                 scenario_id=scenario_id,
-                blocks=blocks,
-                restrict_block_destinations=True,
+                origin_blocks=origin_blocks,
+                destination_blocks=destination_blocks,
                 network_filter=network_filter,
                 road_ids=road_ids,
                 append=True
