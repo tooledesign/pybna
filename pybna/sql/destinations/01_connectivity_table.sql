@@ -6,7 +6,7 @@ CREATE TEMP TABLE pg_temp.tmp_connectivity AS (
         high_stress,
         low_stress
     FROM {connectivity_schema}.{connectivity_table}
-    WHERE scenario IS NULL
+    {scenario_where}
 );
 
 CREATE INDEX tidx_conn ON pg_temp.tmp_connectivity (source,target) WHERE low_stress;

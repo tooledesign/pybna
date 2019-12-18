@@ -22,12 +22,13 @@ class Destinations(DBUtils):
         self.verbose = None
         self.debug = None
         self.srid = None
+        self.db_connectivity_table = None
 
 
     #
     #  need to add in scenario logic.
     #
-    def score_destinations(self,output_table,scenario_id=None,with_geoms=False,overwrite=False,dry=None):
+    def score_destinations(self,output_table,scenario_id=None,subtract=False,with_geoms=False,overwrite=False,dry=None):
         """
         Creates a new db table of scores for each block
 
@@ -35,11 +36,23 @@ class Destinations(DBUtils):
         output_table -- table to create (optionally schema-qualified)
         scenario_id -- the id of the scenario for which scores are calculated
             (none means the scores represent the base condition)
+        subtract -- if true the calculated scores for the scenario represent
+            a subtraction of that scenario from all other scenarios
         overwrite -- overwrite a pre-existing table
         dry -- a path to save SQL statements to instead of executing in DB
         """
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
+
+        # check if a scenarios column exists
+        if scenario_id is None:
+            try:
+                self.get_column_type(self.db_connectivity_table,"scenario")
+                subs["scenario_where"] = sql.SQL("WHERE scenario IS NULL")
+            except:
+                subs["scenario_where"] = sql.SQL("")
+        else:
+            subs["scenario_id"] = sql.Literal(scenario_id)
 
         schema, output_table = self.parse_table_name(output_table)
 
@@ -60,6 +73,14 @@ class Destinations(DBUtils):
                 )
             elif self.table_exists(output_table,subs["scores_schema"].as_string(conn)):
                 raise psycopg2.ProgrammingError("Table {}.{} already exists".format(subs["scores_schema"].as_string(conn),output_table))
+
+        # create temporary filtered connectivity table
+        if scenario_id is None:
+            self._run_sql_script("01_connectivity_table.sql",subs,["sql","destinations"],conn=conn)
+        elif subtract:
+            self._run_sql_script("01_connectivity_table_scenario_subtract.sql",subs,["sql","destinations"],conn=conn)
+        else:
+            self._run_sql_script("01_connectivity_table_scenario.sql",subs,["sql","destinations"],conn=conn)
 
         # combine all the temporary tables into the final output
         columns = sql.SQL("")
