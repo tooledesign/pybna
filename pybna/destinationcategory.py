@@ -4,6 +4,7 @@
 import os
 import psycopg2
 from psycopg2 import sql
+import numpy as np
 import warnings
 
 from dbutils import DBUtils
@@ -23,52 +24,61 @@ class DestinationCategory(DBUtils):
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
         DBUtils.__init__(self,db_connection_string)
         self.config = config
+        self.has_subcats = False
+        self.has_count = False
 
-        if not self.table_exists(config.table):
-            warnings.warn("No table found for {}".format(config.name))
-        else:
-            schema, table = self.parse_table_name(config.table)
-            if schema is None:
-                schema = self.get_schema(table)
+        if "subcats" in config:
+            self.has_subcats = True
+            self.config.maxpoints = self._get_maxpoints()
 
-            if "uid" in config:
-                id_column = config.uid
+        if "table" in config:
+            self.has_count = True
+            if not self.table_exists(config.table):
+                warnings.warn("No table found for {}".format(config.name))
             else:
-                id_column = self.get_pkid_col(table,schema=schema)
+                schema, table = self.parse_table_name(config.table)
+                if schema is None:
+                    schema = self.get_schema(table)
 
-            if "geom" in config:
-                geom_col = config.geom
-            else:
-                geom_col = "geom"
+                if "uid" in config:
+                    id_column = config.uid
+                else:
+                    id_column = self.get_pkid_col(table,schema=schema)
 
-            if "filter" in config:
-                filter = sql.SQL(config.filter)
-            else:
-                filter = sql.Literal(True)
+                if "geom" in config:
+                    geom_col = config.geom
+                else:
+                    geom_col = "geom"
 
-            if workspace_schema is None:
-                self.workspace_schema = "pg_temp"
-                self.persist = False
-            else:
-                self.workspace_schema = workspace_schema
-                self.persist = True
-            self.high_stress_name = config.name + "_hs"
-            self.low_stress_name = config.name + "_ls"
+                if "filter" in config:
+                    filter = sql.SQL(config.filter)
+                else:
+                    filter = sql.Literal(True)
 
-            self.sql_subs = {
-                "destinations_schema": sql.Identifier(schema),
-                "destinations_table": sql.Identifier(table),
-                "destinations_id_col": sql.Identifier(id_column),
-                "workspace_schema": sql.Identifier(self.workspace_schema),
-                "destinations_filter": filter
-            }
+                if workspace_schema is None:
+                    self.workspace_schema = "pg_temp"
+                    self.persist = False
+                else:
+                    self.workspace_schema = workspace_schema
+                    self.persist = True
+                self.workspace_table = "scores_" + config.name
 
-            if config["method"] == "count":
-                self.sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
-            elif config["method"] == "percentage":
-                self.sql_subs["val"] = sql.Identifier(config["datafield"])
-            else:
-                raise ValueError("Unknown scoring method given for {}".format(config.name))
+                self.sql_subs = {
+                    "destinations_schema": sql.Identifier(schema),
+                    "destinations_table": sql.Identifier(table),
+                    "destinations_id_col": sql.Identifier(id_column),
+                    "index": sql.Identifier("idx_{}_blocks".format(config.name)),
+                    "workspace_schema": sql.Identifier(self.workspace_schema),
+                    "workspace_table": sql.Identifier(self.workspace_table),
+                    "destinations_filter": filter
+                }
+
+                if config["method"] == "count":
+                    self.sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
+                elif config["method"] == "percentage":
+                    self.sql_subs["val"] = sql.Identifier(config["datafield"])
+                else:
+                    raise ValueError("Unknown scoring method given for {}".format(config.name))
 
 
     def __repr__(self):
@@ -102,31 +112,32 @@ class DestinationCategory(DBUtils):
         conn -- a DB connection object. If none start a new connection and close it
             when complete
         """
+        if not self.has_count:
+            return
+
         if conn is None:
             close_conn = True
             conn = self.get_db_connection()
         else:
             close_conn = False
 
+        subs.update(self.sql_subs)
 
         hs_subs = {
-            "workspace_table": sql.Identifier(self.high_stress_name),
-            "index": sql.Identifier("tidx_"+self.high_stress_name+"_block_id"),
+            "tbl": sql.Identifier("high_stress"),
             "connection_true": sql.Literal(True)
         }
         hs_subs.update(subs)
-        hs_subs.update(self.sql_subs)
 
         ls_subs = {
-            "workspace_table": sql.Identifier(self.low_stress_name),
-            "index": sql.Identifier("tidx_"+self.low_stress_name+"_block_id"),
+            "tbl": sql.Identifier("low_stress"),
             "connection_true": sql.SQL("low_stress")
         }
         ls_subs.update(subs)
-        ls_subs.update(self.sql_subs)
 
         self._run_sql(self.query,hs_subs,conn=conn)
         self._run_sql(self.query,ls_subs,conn=conn)
+        self._run_sql_script("03_combine_counts.sql",subs,["sql","destinations"],conn=conn)
 
         if close_conn:
             conn.close()
@@ -142,8 +153,127 @@ class DestinationCategory(DBUtils):
         conn -- a DB connection object. If none start a new connection and close it
             when complete
         """
+        if not self.has_count:
+            return
+
         if conn is None:
             close_conn = True
             conn = self.get_db_connection()
         else:
             close_conn = False
+
+        subs.update(self.sql_subs)
+        subs["case"] = self._concat_case("hs","ls")
+
+        self._run_sql("""
+            UPDATE {workspace_schema}.{workspace_table}
+            SET score = {case}
+        """,subs,conn=conn)
+
+
+    def _concat_case(self,hs_column,ls_column):
+        """
+        Builds a case statement for comparing high stress and low stress destination
+        counts using defined break points
+
+        args
+        hs_column -- the name of the column with high stress destination counts
+        ls_column -- the name of the column with low stress destination counts
+
+        returns
+        a composed psycopg2 SQL object representing a full CASE ... END statement
+        """
+        # add zero
+        breaks = dict(self.config.breaks)
+        breaks[0] = 0
+
+        subs = {
+            "hs_column": sql.Identifier(hs_column),
+            "ls_column": sql.Identifier(ls_column),
+            "maxpoints": sql.Literal(self.config.maxpoints)
+        }
+
+        case = sql.SQL("""
+            CASE
+            WHEN COALESCE({hs_column},0) = 0 AND COALESCE({ls_column},0) = 0 THEN NULL
+            WHEN COALESCE({ls_column},0) >= COALESCE({hs_column},0) THEN {maxpoints}
+            WHEN COALESCE({hs_column},0) = COALESCE({ls_column},0) THEN {maxpoints}
+        """).format(**subs)
+
+        # assign scores at the boundaries
+        cumul_score = 0
+        for brk, score in sorted(breaks.items()):
+            subs["break"] = sql.Literal(brk)
+            subs["score"] = sql.Literal(score)
+            subs["cumul_score"] = sql.Literal(cumul_score)
+            if self.config.method == "count":
+                case += sql.SQL("""
+                    WHEN COALESCE({ls_column},0) = {break} THEN {score} + {cumul_score}
+                """).format(**subs)
+                cumul_score += score
+            if self.config.method == "percentage":
+                case += sql.SQL("""
+                    WHEN COALESCE({ls_column},0) = {break} THEN {score}
+                """).format(**subs)
+                cumul_score = score
+
+        # assign scores within the boundaries
+        del breaks[0]
+        cumul_score = 0
+        prev_break = 0
+        for brk, score in sorted(breaks.items()):
+            subs["break"] = sql.Literal(brk)
+            subs["score"] = sql.Literal(score)
+            subs["cumul_score"] = sql.Literal(cumul_score)
+            subs["prev_break"] = sql.Literal(prev_break)
+            if self.config.method == "count":
+                subs["val"] = sql.SQL("COALESCE({ls_column},0)").format(**subs)
+                case += sql.SQL("""
+                    WHEN {val} < {break}
+                        THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score})
+                """).format(**subs)
+                cumul_score += score
+            if self.config.method == "percentage":
+                subs["val"] = sql.SQL("(COALESCE({ls_column},0)::FLOAT/{hs_column})").format(**subs)
+                case += sql.SQL("""
+                    WHEN {val} < {break}
+                        THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score})
+                """).format(**subs)
+                cumul_score = score
+            prev_break = brk
+
+        # assign scores for top (if not already assigned in breaks)
+        brk, score = sorted(breaks.items())[-1]
+        subs["break"] = sql.Literal(brk)
+        subs["cumul_score"] = sql.Literal(cumul_score)
+        if np.isclose(self.config.maxpoints,cumul_score):
+            case += sql.SQL("""
+                WHEN {val} > {break} THEN {maxpoints}
+            """).format(**subs)
+        elif maxpoints > cumul_score:
+            if method == "count":
+                case += sql.SQL("""
+                    ELSE {cumul_score} + ((COALESCE({ls_column},0) - {break})::FLOAT/({hs_column} - {break})) * ({maxpoints} - {cumul_score})
+                """).format(**subs)
+            elif method == "percentage":
+                case += sql.SQL("""
+                    ELSE {cumul_score} + ((COALESCE({ls_column},0)::FLOAT/{hs_column}) - {break})::FLOAT * ({maxpoints} - {cumul_score})
+                """).format(**subs)
+        case += sql.SQL(" END")
+
+        return case
+
+
+    def _get_maxpoints(self):
+        """
+        calculates a maximum score for main categories composed of subcategories
+        using the weights assigned to the subcategories.
+        """
+        if "maxpoints" in self.config:
+            return self.config.maxpoints
+        elif "subcats" in self.config:
+            maxpoints = 0
+            for subcat in self.config.subcats:
+                maxpoints += self._get_maxpoints(subcat)
+        else:
+            return self.config.weight

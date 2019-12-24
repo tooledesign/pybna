@@ -1,7 +1,6 @@
 SELECT
     blocks.{blocks_id_col}
-    {columns},
-    NULL::FLOAT AS overall_score
+    {columns}
 INTO {scores_schema}.{scores_table}
 FROM
     {blocks_schema}.{blocks_table} blocks

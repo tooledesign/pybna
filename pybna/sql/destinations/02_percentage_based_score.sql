@@ -11,8 +11,8 @@ CREATE TEMP TABLE pg_temp.tmp_dests AS (
 );
 
 
-DROP TABLE IF EXISTS {workspace_schema}.{workspace_table};
-CREATE TABLE {workspace_schema}.{workspace_table} AS (
+DROP TABLE IF EXISTS pg_temp.{tbl};
+CREATE TEMP TABLE pg_temp.{tbl} AS (
     SELECT
         connections.source AS block_id,
         SUM(target_block.val) AS total
@@ -24,6 +24,3 @@ CREATE TABLE {workspace_schema}.{workspace_table} AS (
         AND connections.target = target_block.id
     GROUP BY connections.source
 );
-
-CREATE INDEX {index} ON {workspace_schema}.{workspace_table} (block_id);
-ANALYZE {workspace_schema}.{workspace_table};
