@@ -99,12 +99,7 @@ class pyBNA(DBUtils,Conf,Destinations,Connectivity,Projects,Core):
         elif not self.debug:
             self.srid = self.get_srid(self.config.bna.blocks.table)
 
-        # destinations
-        self.destinations = dict()
-        self.destination_blocks = set()
-        if not self.debug:
-            pass
-            # self.set_destinations()
+        self.register_destinations()
 
         self.sql_subs = self.make_bna_substitutions(self.config)
 

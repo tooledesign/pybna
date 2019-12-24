@@ -23,11 +23,44 @@ class Destinations(DBUtils):
         self.debug = None
         self.srid = None
         self.db_connectivity_table = None
+        self.destinations = None
 
 
-    #
-    #  need to add in scenario logic.
-    #
+    def register_destinations(self,category=None,workspace_schema=None,destinations=None):
+        """
+        Retrieve the destinations identified in the config file and register them.
+
+        args
+        category -- a destination category to register. None -> re-register all destinations
+        workspace_schema -- schema to save interim working tables to
+        destinations -- a list of destinations (if none, use the config file)
+        """
+        if category is None and destinations is None:
+            if self.verbose:
+                print('Adding destinations')
+            self.destinations = dict()
+
+        if destinations is None:
+            destinations = self.config.bna.destinations
+
+        for v in destinations:
+            config = self.parse_config(v)
+            if "table" in config:
+                if category is None or config.name == category:
+                    self.destinations[config.name] = DestinationCategory(
+                        config,
+                        self.db_connection_string,
+                        workspace_schema=workspace_schema
+                    )
+
+            if "subcats" in config:
+                self.register_destinations(
+                    category=category,
+                    workspace_schema=workspace_schema,
+                    destinations=config.subcats
+                )
+
+
     def score_destinations(self,output_table,scenario_id=None,subtract=False,with_geoms=False,overwrite=False,dry=None):
         """
         Creates a new db table of scores for each block
@@ -82,14 +115,37 @@ class Destinations(DBUtils):
         else:
             self._run_sql_script("01_connectivity_table_scenario.sql",subs,["sql","destinations"],conn=conn)
 
+        # generate high and low stress counts for all categories
+        for name, destination in self.destinations.iteritems():
+            destination.count_connections(subs,conn=conn)
+
         # combine all the temporary tables into the final output
         columns = sql.SQL("")
         tables = sql.SQL("")
-        print("Calculating high and low stress destination access")
-        for cat in self.config["bna"]["destinations"]:
-            cat_cols, tab_cols = self._concat_dests(conn,cat,dry)
-            columns += cat_cols
-            tables += tab_cols
+        for name, destination in self.destinations.iteritems():
+            columns += sql.SQL(",coalesce({}.total,0)::int as {}").format(
+                sql.Identifier(destination.high_stress_name),
+                sql.Identifier(destination.high_stress_name)
+            )
+            columns += sql.SQL(",coalesce({}.total,0)::int as {}").format(
+                sql.Identifier(destination.low_stress_name),
+                sql.Identifier(destination.low_stress_name)
+            )
+            columns += sql.SQL(",NULL::float as {}").format(
+                sql.Identifier(destination.config.name + "_score")
+            )
+            tables += sql.SQL(" LEFT JOIN {}.{} ON blocks.{} = {}.block_id ").format(
+                sql.Identifier(destination.workspace_schema),
+                sql.Identifier(destination.high_stress_name),
+                self.sql_subs["blocks_id_col"],
+                sql.Identifier(destination.high_stress_name)
+            )
+            tables += sql.SQL(" LEFT JOIN {}.{} ON blocks.{} = {}.block_id ").format(
+                sql.Identifier(destination.workspace_schema),
+                sql.Identifier(destination.low_stress_name),
+                self.sql_subs["blocks_id_col"],
+                sql.Identifier(destination.low_stress_name)
+            )
 
         subs["columns"] = columns
         subs["tables"] = tables
@@ -129,78 +185,78 @@ class Destinations(DBUtils):
         conn.close()
 
 
-    def _concat_dests(self,conn,node,dry=None):
-        """
-        Concatenates the various temporary destination result columns and tables
-        together to plug into the query that creates the final score table. Operates
-        recursively through the destinations listed in the config file.
-
-        args
-        conn -- psycopg2 connection object from the parent method
-        node -- current node in the config file
-        dry -- a path to save SQL statements to instead of executing in DB
-        """
-        columns = sql.SQL("")
-        tables = sql.SQL("")
-
-        if "subcats" in node:
-            for subcat in node["subcats"]:
-                subcolumn, subtable = self._concat_dests(conn,subcat,dry)
-                columns += subcolumn
-                tables += subtable
-            col_name = sql.Identifier(node["name"] + "_score")
-            columns += sql.SQL(",NULL::float as {}").format(col_name)
-
-        if "table" in node:
-
-            # set up destination object
-            destination = DestinationCategory(node, os.path.join(self.module_dir,"sql","destinations"), self.sql_subs, self.db_connection_string)
-
-            # set up temporary tables for results
-            tbl = ''.join(random.choice(string.ascii_lowercase) for _ in range(7))
-            if self.verbose:
-                print("   ... "+node["name"])
-            tbl_hs = tbl + "_hs"
-            tbl_ls = tbl + "_ls"
-
-            hs_subs = {
-                "tmp_table": sql.Identifier(tbl_hs),
-                "index": sql.Identifier("tidx_"+tbl_hs+"_block_id"),
-                "connection_true": sql.Literal(True)
-            }
-            ls_subs = {
-                "tmp_table": sql.Identifier(tbl_ls),
-                "index": sql.Identifier("tidx_"+tbl_ls+"_block_id"),
-                "connection_true": sql.SQL("low_stress")
-            }
-            hs_query = destination.query.format(**hs_subs)
-            ls_query = destination.query.format(**ls_subs)
-
-            self._run_sql(hs_query.as_string(conn),dry=dry,conn=conn)
-            self._run_sql(ls_query.as_string(conn),dry=dry,conn=conn)
-
-            hs_tmptable = sql.Identifier(tbl_hs)
-            ls_tmptable = sql.Identifier(tbl_ls)
-            hs_col_name = sql.Identifier(node["name"] + "_hs")
-            ls_col_name = sql.Identifier(node["name"] + "_ls")
-            score_col_name = sql.Identifier(node["name"] + "_score")
-
-            columns += sql.SQL(",coalesce({}.total,0)::int as {}").format(hs_tmptable,hs_col_name)
-            columns += sql.SQL(",coalesce({}.total,0)::int as {}").format(ls_tmptable,ls_col_name)
-            columns += sql.SQL(",NULL::float as {}").format(score_col_name)
-
-            tables += sql.SQL(" LEFT JOIN pg_temp.{} ON blocks.{} = {}.block_id ").format(
-                hs_tmptable,
-                self.sql_subs["blocks_id_col"],
-                hs_tmptable
-            )
-            tables += sql.SQL(" LEFT JOIN pg_temp.{} ON blocks.{} = {}.block_id ").format(
-                ls_tmptable,
-                self.sql_subs["blocks_id_col"],
-                ls_tmptable
-            )
-
-        return columns, tables
+    # def _concat_dests(self,conn,node,dry=None):
+    #     """
+    #     Concatenates the various temporary destination result columns and tables
+    #     together to plug into the query that creates the final score table. Operates
+    #     recursively through the destinations listed in the config file.
+    #
+    #     args
+    #     conn -- psycopg2 connection object from the parent method
+    #     node -- current node in the config file
+    #     dry -- a path to save SQL statements to instead of executing in DB
+    #     """
+    #     columns = sql.SQL("")
+    #     tables = sql.SQL("")
+    #
+    #     if "subcats" in node:
+    #         for subcat in node["subcats"]:
+    #             subcolumn, subtable = self._concat_dests(conn,subcat,dry)
+    #             columns += subcolumn
+    #             tables += subtable
+    #         col_name = sql.Identifier(node["name"] + "_score")
+    #         columns += sql.SQL(",NULL::float as {}").format(col_name)
+    #
+    #     if "table" in node:
+    #
+    #         # set up destination object
+    #         destination = DestinationCategory(node, os.path.join(self.module_dir,"sql","destinations"), self.sql_subs, self.db_connection_string)
+    #
+    #         # set up temporary tables for results
+    #         tbl = ''.join(random.choice(string.ascii_lowercase) for _ in range(7))
+    #         if self.verbose:
+    #             print("   ... "+node["name"])
+    #         tbl_hs = tbl + "_hs"
+    #         tbl_ls = tbl + "_ls"
+    #
+    #         hs_subs = {
+    #             "tmp_table": sql.Identifier(tbl_hs),
+    #             "index": sql.Identifier("tidx_"+tbl_hs+"_block_id"),
+    #             "connection_true": sql.Literal(True)
+    #         }
+    #         ls_subs = {
+    #             "tmp_table": sql.Identifier(tbl_ls),
+    #             "index": sql.Identifier("tidx_"+tbl_ls+"_block_id"),
+    #             "connection_true": sql.SQL("low_stress")
+    #         }
+    #         hs_query = destination.query.format(**hs_subs)
+    #         ls_query = destination.query.format(**ls_subs)
+    #
+    #         self._run_sql(hs_query.as_string(conn),dry=dry,conn=conn)
+    #         self._run_sql(ls_query.as_string(conn),dry=dry,conn=conn)
+    #
+    #         hs_tmptable = sql.Identifier(tbl_hs)
+    #         ls_tmptable = sql.Identifier(tbl_ls)
+    #         hs_col_name = sql.Identifier(node["name"] + "_hs")
+    #         ls_col_name = sql.Identifier(node["name"] + "_ls")
+    #         score_col_name = sql.Identifier(node["name"] + "_score")
+    #
+    #         columns += sql.SQL(",coalesce({}.total,0)::int as {}").format(hs_tmptable,hs_col_name)
+    #         columns += sql.SQL(",coalesce({}.total,0)::int as {}").format(ls_tmptable,ls_col_name)
+    #         columns += sql.SQL(",NULL::float as {}").format(score_col_name)
+    #
+    #         tables += sql.SQL(" LEFT JOIN pg_temp.{} ON blocks.{} = {}.block_id ").format(
+    #             hs_tmptable,
+    #             self.sql_subs["blocks_id_col"],
+    #             hs_tmptable
+    #         )
+    #         tables += sql.SQL(" LEFT JOIN pg_temp.{} ON blocks.{} = {}.block_id ").format(
+    #             ls_tmptable,
+    #             self.sql_subs["blocks_id_col"],
+    #             ls_tmptable
+    #         )
+    #
+    #     return columns, tables
 
 
     def _concat_scores(self,conn,node):

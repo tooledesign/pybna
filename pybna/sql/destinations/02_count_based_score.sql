@@ -27,7 +27,8 @@ CREATE INDEX tidx_tmp_dest_blocks ON pg_temp.tmp_dest_blocks (block_id);
 ANALYZE pg_temp.tmp_dest_blocks;
 
 
-CREATE TEMP TABLE pg_temp.{tmp_table} AS (
+DROP TABLE IF EXISTS {workspace_schema}.{workspace_table};
+CREATE TABLE {workspace_schema}.{workspace_table} AS (
     SELECT
         connections.source AS block_id,
         COUNT(DISTINCT tmp_dest_blocks.dest_id) AS total
@@ -40,4 +41,5 @@ CREATE TEMP TABLE pg_temp.{tmp_table} AS (
     GROUP BY connections.source
 );
 
-CREATE INDEX {index} ON pg_temp.{tmp_table} (block_id); ANALYZE pg_temp.{tmp_table};
+CREATE INDEX {index} ON {workspace_schema}.{workspace_table} (block_id);
+ANALYZE {workspace_schema}.{workspace_table};
