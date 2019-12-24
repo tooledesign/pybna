@@ -27,7 +27,7 @@ class Destinations(DBUtils):
 
     def register_destinations(self,category=None,workspace_schema=None,destinations=None):
         """
-        Retrieve the destinations identified in the config file and register them.
+        Wrapper function that registers destinations and then assigns maxscore
 
         args
         category -- a destination category to register. None -> re-register all destinations
@@ -40,11 +40,34 @@ class Destinations(DBUtils):
             self.destinations = dict()
 
         if destinations is None:
-            destinations = {
+            destinations = [{
                 "name": "overall",
                 "subcats": self.config.bna.destinations
-            }
+            }]
 
+        self._register(destinations=destinations,category=category,workspace_schema=workspace_schema)
+
+        # assign maxpoints
+        for name, destination in self.destinations.iteritems():
+            if (
+                (
+                    category is None or
+                    category == name
+                ) and
+                destination.has_subcats
+                ):
+                destination.config.maxpoints = self._get_maxpoints(destination)
+
+
+    def _register(self,destinations,category=None,workspace_schema=None):
+        """
+        Retrieve the destinations identified in the config file and register them.
+
+        args
+        destinations -- a list of destinations
+        category -- a destination category to register. None -> re-register all destinations
+        workspace_schema -- schema to save interim working tables to
+        """
         for v in destinations:
             config = self.parse_config(v)
             if category is None or config.name == category:
@@ -54,7 +77,7 @@ class Destinations(DBUtils):
                     workspace_schema=workspace_schema
                 )
             if "subcats" in config:
-                self.register_destinations(
+                self._register(
                     category=category,
                     workspace_schema=workspace_schema,
                     destinations=config.subcats
@@ -151,11 +174,13 @@ class Destinations(DBUtils):
                 })
 
         print("Compiling destination data for all sources into output table")
+        subs["columns"] = columns
+        subs["tables"] = tables
         self._run_sql_script("04_all_combined.sql",subs,["sql","destinations"],dry=dry,conn=conn)
 
         # finally set any category scores
         print("Calculating category scores")
-        aggregate_subcategories(self.destinations["overall"],subs,conn=conn)
+        self.aggregate_subcategories(self.destinations["overall"],subs,conn=conn)
 
         if with_geoms:
             self._copy_block_geoms(conn,subs,dry)
@@ -177,7 +202,7 @@ class Destinations(DBUtils):
         """
         if "subcats" in destination.config:
             for subcat in destination.config.subcats:
-                self.aggregate_subcategories(conn,subcat,subs,conn)
+                self.aggregate_subcategories(self.destinations[subcat["name"]],subs,conn)
 
             if self.verbose:
                 print("   ... {}".format(destination.config.name))
@@ -187,20 +212,21 @@ class Destinations(DBUtils):
             check_zero = []
             check_null = []
             for subcat in destination.config.subcats:
+                d = self.destinations[subcat["name"]]
                 num.append(sql.SQL("{}*coalesce({},0)::float/{}").format(
-                    sql.Literal(subcat.config.weight),
-                    sql.Identifier(subcat.config.name + "_score"),
-                    sql.Literal(subcat.config.maxpoints)
+                    sql.Literal(d.config.weight),
+                    sql.Identifier(d.config.name + "_score"),
+                    sql.Literal(d.config.maxpoints)
                 ))
                 den.append(sql.SQL("case when {} is null then 0 else {} end").format(
-                    sql.Identifier(subcat.config.name + "_score"),
-                    sql.Literal(subcat.config.weight)
+                    sql.Identifier(d.config.name + "_score"),
+                    sql.Literal(d.config.weight)
                 ))
                 check_zero.append(sql.SQL("coalesce({},0) = 0").format(
-                    sql.Identifier(subcat.config.name + "_score")
+                    sql.Identifier(d.config.name + "_score")
                 ))
                 check_null.append(sql.SQL("{} is null").format(
-                    sql.Identifier(subcat.config.name + "_score")
+                    sql.Identifier(d.config.name + "_score")
                 ))
 
             subs["this_column"] = sql.Identifier(destination.config.name + "_score")
@@ -221,6 +247,22 @@ class Destinations(DBUtils):
             """).format(**subs)
 
             self._run_sql(q.as_string(conn),conn=conn)
+
+
+    def _get_maxpoints(self,destination):
+        """
+        calculates a maximum score for main categories composed of subcategories
+        using the weights assigned to the subcategories.
+        """
+        if "maxpoints" in destination.config:
+            return destination.config.maxpoints
+        elif "subcats" in destination.config:
+            maxpoints = 0
+            for subcat in destination.config.subcats:
+                maxpoints += self._get_maxpoints(self.destinations[subcat["name"]])
+            return maxpoints
+        else:
+            return destination.config.weight
 
 
     def _copy_block_geoms(self,conn,subs,dry=None):

@@ -1,9 +1,9 @@
 DROP TABLE IF EXISTS {workspace_schema}.{workspace_table};
 CREATE TABLE {workspace_schema}.{workspace_table} AS (
     SELECT
-        COALESCE(hs.block_id,ls.block_id) AS block_id,
-        hs.total AS hs,
-        ls.total AS ls,
+        COALESCE(high_stress.block_id,low_stress.block_id) AS block_id,
+        high_stress.total AS hs,
+        low_stress.total AS ls,
         NULL::FLOAT AS score
     FROM
         pg_temp.high_stress

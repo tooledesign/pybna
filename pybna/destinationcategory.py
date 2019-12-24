@@ -29,7 +29,6 @@ class DestinationCategory(DBUtils):
 
         if "subcats" in config:
             self.has_subcats = True
-            self.config.maxpoints = self._get_maxpoints()
 
         if "table" in config:
             self.has_count = True
@@ -250,30 +249,15 @@ class DestinationCategory(DBUtils):
             case += sql.SQL("""
                 WHEN {val} > {break} THEN {maxpoints}
             """).format(**subs)
-        elif maxpoints > cumul_score:
-            if method == "count":
+        elif self.config.maxpoints > cumul_score:
+            if self.config.method == "count":
                 case += sql.SQL("""
                     ELSE {cumul_score} + ((COALESCE({ls_column},0) - {break})::FLOAT/({hs_column} - {break})) * ({maxpoints} - {cumul_score})
                 """).format(**subs)
-            elif method == "percentage":
+            elif self.config.method == "percentage":
                 case += sql.SQL("""
                     ELSE {cumul_score} + ((COALESCE({ls_column},0)::FLOAT/{hs_column}) - {break})::FLOAT * ({maxpoints} - {cumul_score})
                 """).format(**subs)
         case += sql.SQL(" END")
 
         return case
-
-
-    def _get_maxpoints(self):
-        """
-        calculates a maximum score for main categories composed of subcategories
-        using the weights assigned to the subcategories.
-        """
-        if "maxpoints" in self.config:
-            return self.config.maxpoints
-        elif "subcats" in self.config:
-            maxpoints = 0
-            for subcat in self.config.subcats:
-                maxpoints += self._get_maxpoints(subcat)
-        else:
-            return self.config.weight
