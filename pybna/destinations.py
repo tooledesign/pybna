@@ -56,7 +56,7 @@ class Destinations(DBUtils):
                 ) and
                 destination.has_subcats
                 ):
-                destination.config.maxpoints = self._get_maxpoints(destination)
+                destination.maxpoints = self._get_maxpoints(destination)
 
 
     def _register(self,destinations,category=None,workspace_schema=None):
@@ -216,7 +216,7 @@ class Destinations(DBUtils):
                 num.append(sql.SQL("{}*coalesce({},0)::float/{}").format(
                     sql.Literal(d.config.weight),
                     sql.Identifier(d.config.name + "_score"),
-                    sql.Literal(d.config.maxpoints)
+                    sql.Literal(d.maxpoints)
                 ))
                 den.append(sql.SQL("case when {} is null then 0 else {} end").format(
                     sql.Identifier(d.config.name + "_score"),
@@ -234,7 +234,7 @@ class Destinations(DBUtils):
             subs["check_zero"] = sql.SQL(" and ").join(check_zero)
             subs["numerator"] = sql.SQL(" + ").join(num)
             subs["denominator"] = sql.SQL(" + ").join(den)
-            subs["maxpoints"] = sql.Literal(destination.config.maxpoints)
+            subs["maxpoints"] = sql.Literal(destination.maxpoints)
             q = sql.SQL("""
                 update {scores_schema}.{scores_table}
                 set
@@ -254,9 +254,10 @@ class Destinations(DBUtils):
         calculates a maximum score for main categories composed of subcategories
         using the weights assigned to the subcategories.
         """
-        if "maxpoints" in destination.config:
-            return destination.config.maxpoints
-        elif "subcats" in destination.config:
+        raise ValueError("Need to be using weights instead of maxpoints first?")
+        if destination.maxpoints is not None:
+            return destination.maxpoints
+        elif destination.has_subcats:
             maxpoints = 0
             for subcat in destination.config.subcats:
                 maxpoints += self._get_maxpoints(self.destinations[subcat["name"]])

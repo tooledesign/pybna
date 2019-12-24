@@ -27,6 +27,11 @@ class DestinationCategory(DBUtils):
         self.has_subcats = False
         self.has_count = False
 
+        if "maxpoints" in config:
+            self.maxpoints = self.config.maxpoints
+        else:
+            self.maxpoints = None
+
         if "subcats" in config:
             self.has_subcats = True
 
@@ -189,7 +194,7 @@ class DestinationCategory(DBUtils):
         subs = {
             "hs_column": sql.Identifier(hs_column),
             "ls_column": sql.Identifier(ls_column),
-            "maxpoints": sql.Literal(self.config.maxpoints)
+            "maxpoints": sql.Literal(self.maxpoints)
         }
 
         case = sql.SQL("""
@@ -245,18 +250,18 @@ class DestinationCategory(DBUtils):
         brk, score = sorted(breaks.items())[-1]
         subs["break"] = sql.Literal(brk)
         subs["cumul_score"] = sql.Literal(cumul_score)
-        if np.isclose(self.config.maxpoints,cumul_score):
+        if np.isclose(self.maxpoints,cumul_score):
             case += sql.SQL("""
                 WHEN {val} > {break} THEN {maxpoints}
             """).format(**subs)
-        elif self.config.maxpoints > cumul_score:
+        elif self.maxpoints > cumul_score:
             if self.config.method == "count":
                 case += sql.SQL("""
                     ELSE {cumul_score} + ((COALESCE({ls_column},0) - {break})::FLOAT/({hs_column} - {break})) * ({maxpoints} - {cumul_score})
                 """).format(**subs)
             elif self.config.method == "percentage":
                 case += sql.SQL("""
-                    ELSE {cumul_score} + ((COALESCE({ls_column},0)::FLOAT/{hs_column}) - {break})::FLOAT * ({maxpoints} - {cumul_score})
+                    ELSE {cumul_score} + ((COALESCE({ls_column},0)::FLOAT/{hs_column}) - {break})::FLOAT/(1 - {break}) * ({maxpoints} - {cumul_score})
                 """).format(**subs)
         case += sql.SQL(" END")
 
