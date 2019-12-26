@@ -249,21 +249,33 @@ class Destinations(DBUtils):
             self._run_sql(q.as_string(conn),conn=conn)
 
 
-    def _get_maxpoints(self,destination):
+    def _get_maxpoints(self,destination,subcategory=False):
         """
         calculates a maximum score for main categories composed of subcategories
         using the weights assigned to the subcategories.
         """
-        raise ValueError("Need to be using weights instead of maxpoints first?")
-        if destination.maxpoints is not None:
-            return destination.maxpoints
-        elif destination.has_subcats:
-            maxpoints = 0
-            for subcat in destination.config.subcats:
-                maxpoints += self._get_maxpoints(self.destinations[subcat["name"]])
-            return maxpoints
+        if subcategory:
+            if "weight" in destination.config:
+                return destination.config.weight
+            elif destination.maxpoints is not None:
+                return destination.maxpoints
+            elif destination.has_subcats:
+                maxpoints = 0
+                for subcat in destination.config.subcats:
+                    maxpoints += self._get_maxpoints(self.destinations[subcat["name"]],subcategory=True)
+                return maxpoints
+            else:
+                raise ValueError("Unable to get maxpoints for category {}".format(destination.config.name))
         else:
-            return destination.config.weight
+            if destination.maxpoints is not None:
+                return destination.maxpoints
+            elif destination.has_subcats:
+                maxpoints = 0
+                for subcat in destination.config.subcats:
+                    maxpoints += self._get_maxpoints(self.destinations[subcat["name"]],subcategory=True)
+                return maxpoints
+            else:
+                raise ValueError("Unable to get maxpoints for category {}".format(destination.config.name))
 
 
     def _copy_block_geoms(self,conn,subs,dry=None):

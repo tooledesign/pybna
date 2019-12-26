@@ -86,7 +86,7 @@ class DestinationCategory(DBUtils):
 
 
     def __repr__(self):
-        return u"{} destinations".format(self.config.name)
+        return u"{} destinations\nmaxpoints: {}\nhas subcats? {}".format(self.config.name,self.maxpoints,self.has_subcats)
 
 
     @property
