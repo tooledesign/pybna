@@ -370,6 +370,52 @@ class Connectivity(DBUtils):
             self._connectivity_table_create_index();
 
 
+    def drop_scenario(self,scenario_ids=None,conn=None):
+        """
+        Removes the scenario(s) from the connectivity table. If no scenario_id
+        is given, remove all scenarios.
+
+        args
+        scenario_ids -- list of scenarios to delete
+            (if none calculate for all scenarios)
+        conn -- a DB connection
+        """
+        close_conn = False
+        if conn is None:
+            close_conn = True
+            conn = self.get_db_connection()
+
+        subs = dict(self.sql_subs)
+        if scenario_ids is None:
+            self._run_sql(
+                """
+                    delete from {connectivity_schema}.{connectivity_table}
+                    where scenario is not null
+                """,
+                subs=subs,
+                conn=conn
+            )
+        else:
+            if not hasattr(scenario_ids,"__iter__"):
+                scenario_ids = [scenario_ids]
+
+            # iterate scenarios
+            for scenario_id in scenario_ids:
+                subs["scenario_id"] = sql.Literal(scenario_id)
+                self._run_sql(
+                    """
+                        delete from {connectivity_schema}.{connectivity_table}
+                        where scenario = {scenario_id}
+                    """,
+                    subs=subs,
+                    conn=conn
+                )
+
+        if close_conn:
+            conn.commit()
+            conn.close()
+
+
     def calculate_scenario_connectivity(self,scenario_column,scenario_ids=None,
                                         datatype=None,origin_blocks=None,
                                         destination_blocks=None,network_filter=None,
@@ -379,6 +425,7 @@ class Connectivity(DBUtils):
         used once the base scenario has been run.
 
         args
+        scenario_column -- the column in the roads table indicating a scenario
         scenario_ids -- list of scenario for which connectivity is calculated
             (if none calculate for all scenarios)
         datatype -- the column type to use for creating the scenario column in the db
