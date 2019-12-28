@@ -2,14 +2,16 @@
 
 ## Introduction
 
-Bicycle Network Analysis (BNA) is a way to measure how effectively people
-can connect to destinations via bike on comfortable, "low-stress" routes.
-More info on the methodology at the [What is the BNA?](what_is_bna.md) page.
-
 Python module to implement BNA logic on a PostGIS database. Uses a configuration
 file for customizability. The current implementation requires a user to run the
 old-style BNA on the command line to import datasets. This library can build the
 routeable network, process the connectivity routing, and calculate scores.
+
+Bicycle Network Analysis (BNA) is a way to measure how effectively people
+can connect to destinations via bike on comfortable, "low-stress" routes.
+More info on the methodology at the [What is the BNA?](what_is_bna.md) page.
+
+![Example of BNA results](bna.gif)
 
 ## Requirements
 
