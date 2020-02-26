@@ -5,9 +5,9 @@ import os
 import collections
 from psycopg2 import sql
 from munch import Munch
-from dbutils import DBUtils
-from core import FORWARD_DIRECTION
-from core import BACKWARD_DIRECTION
+from .dbutils import DBUtils
+from .core import FORWARD_DIRECTION
+from .core import BACKWARD_DIRECTION
 
 
 class Conf(DBUtils):
@@ -30,7 +30,7 @@ class Conf(DBUtils):
         Munch
         """
         if isinstance(config, collections.Mapping):
-            for key, value in config.iteritems():
+            for key, value in config.items():
                 config[key] = self.parse_config(value)
             return Munch(config)
         return config

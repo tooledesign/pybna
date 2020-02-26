@@ -1,5 +1,5 @@
 import yaml
-from urllib import urlretrieve
+from urllib.request import urlretrieve
 import tempfile
 import os
 from shutil import copy
@@ -15,12 +15,12 @@ from geojson import FeatureCollection
 
 try:
     with_osmium = True
-    from destinationosmhandler import DestinationOSMHandler
+    from .destinationosmhandler import DestinationOSMHandler
 except:
     with_osmium = False
 
-from conf import Conf
-from dbutils import DBUtils
+from .conf import Conf
+from .dbutils import DBUtils
 
 
 class Importer(DBUtils,Conf):
@@ -63,7 +63,7 @@ class Importer(DBUtils,Conf):
             "password=" + password
         ])
         if self.debug:
-            print("DB connection: %s" % db_connection_string)
+            print("DB connection: {}".format(db_connection_string))
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
         self.sql_subs = self.make_bna_substitutions(self.config)
 
@@ -152,7 +152,7 @@ class Importer(DBUtils,Conf):
         if fpath is not None and url is not None:
             raise ValueError("Can't accept a file name _and_ a URL")
         if fips is not None:
-            if isinstance(fips, (int, long)):
+            if isinstance(fips, int):
                 fips = '{0:02d}'.format(fips)
         if fpath is not None:
             if not os.path.isfile(fpath):
@@ -201,7 +201,7 @@ class Importer(DBUtils,Conf):
             src = url
         if not fips is None:
             src = "http://www2.census.gov/geo/tiger/TIGER2010BLKPOPHU/tabblock2010_" + fips + "_pophu.zip"
-        print("Loading data from %s" % src)
+        print("Loading data from {}".format(src))
         blocks = gpd.read_file(src)
         epsg = "epsg:%i" % srid
         blocks = blocks.to_crs({'init': epsg})
@@ -293,9 +293,9 @@ class Importer(DBUtils,Conf):
             if not url_main is None:
                 src_main = url_main
                 src_aux = url_aux
-            print("Loading main data from %s" % src_main)
+            print("Loading main data from {}".format(src_main))
             jobs_main = pd.read_csv(src_main)
-            print("Loading aux data from %s" % src_aux)
+            print("Loading aux data from {}".format(src_aux))
             jobs_aux = pd.read_csv(src_aux)
 
         # copy data to db
@@ -831,7 +831,7 @@ class Importer(DBUtils,Conf):
         values.append(sql.Literal(geom))
         values.append(sql.Literal(feature["id"]))
         for a in attributes:
-            if a in feature["properties"].keys():
+            if a in list(feature["properties"].keys()):
                 values.append(sql.Literal(feature["properties"][a]))
             else:
                 values.append(sql.SQL("NULL"))

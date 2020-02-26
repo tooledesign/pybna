@@ -69,7 +69,7 @@ class DBUtils:
 
         row = cur.fetchone()
         if self.verbose:
-            print("   Table %s  ID: %s" % (table,row[0]))
+            print("   Table {}  ID: {}".format(table,row[0]))
         cur.close()
         conn.close()
         return row[0]
@@ -135,7 +135,7 @@ class DBUtils:
         srid = cur.next()[0]
 
         if self.verbose:
-            print("SRID: %i" % srid)
+            print("SRID: {}".format(srid))
 
         return srid
 

@@ -2,17 +2,17 @@
 
 # Module for conducting level of traffic stress analysis on roadway datasets.
 # Allows for flexible naming of columns via a config file.
-import os, StringIO
+import os, io
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import DictCursor
 import yaml
 import pandas as pd
 
-from conf import Conf
-from dbutils import DBUtils
-from core import FORWARD_DIRECTION
-from core import BACKWARD_DIRECTION
+from .conf import Conf
+from .dbutils import DBUtils
+from .core import FORWARD_DIRECTION
+from .core import BACKWARD_DIRECTION
 
 
 class Stress(DBUtils,Conf):
@@ -89,12 +89,12 @@ class Stress(DBUtils,Conf):
         list
         """
         missing = []
-        for k, v in self.config.stress.lookup_tables.iteritems():
+        for k, v in self.config.stress.lookup_tables.items():
             schema, table = self.parse_table_name(v)
             if not self.table_exists(table,schema):
                 missing.append((k,table,schema))
                 if self.verbose:
-                    print("Table %s not identified, will create" % v)
+                    print("Table {} not identified, will create".format(v))
         return missing
 
 
@@ -171,11 +171,11 @@ class Stress(DBUtils,Conf):
         try:
             cur.execute(q)
         except Exception as e:
-            print("Error creating table %s" % table)
+            print("Error creating table {}".format(table))
             raise e
 
         if self.verbose:
-            print("Copying default stress thresholds into %s" % table)
+            print("Copying default stress thresholds into {}".format(table))
         # f = StringIO.StringIO(in_file)
         f = open(in_file)
         cur.copy_from(f,table,columns=[c[0] for c in columns],sep=";",null="")
