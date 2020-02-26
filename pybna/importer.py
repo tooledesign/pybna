@@ -1,5 +1,5 @@
 import yaml
-from urllib import urlretrieve
+from urllib.request import urlretrieve
 import tempfile
 import os
 from shutil import copy
@@ -15,15 +15,15 @@ from geojson import FeatureCollection
 
 try:
     with_osmium = True
-    from destinationosmhandler import DestinationOSMHandler
+    from .destinationosmhandler import DestinationOSMHandler
 except:
     with_osmium = False
 
-from conf import Conf
-from dbutils import DBUtils
+from .conf import Conf
+from .dbutils import DBUtils
 
 
-class Importer(DBUtils,Conf):
+class Importer(Conf):
     """Standalone class to import pyBNA datasets"""
 
     def __init__(self, config=None, verbose=False, debug=False,
@@ -63,7 +63,7 @@ class Importer(DBUtils,Conf):
             "password=" + password
         ])
         if self.debug:
-            print("DB connection: %s" % db_connection_string)
+            print("DB connection: {}".format(db_connection_string))
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
         self.sql_subs = self.make_bna_substitutions(self.config)
 
@@ -152,7 +152,7 @@ class Importer(DBUtils,Conf):
         if fpath is not None and url is not None:
             raise ValueError("Can't accept a file name _and_ a URL")
         if fips is not None:
-            if isinstance(fips, (int, long)):
+            if isinstance(fips, int):
                 fips = '{0:02d}'.format(fips)
         if fpath is not None:
             if not os.path.isfile(fpath):
@@ -201,10 +201,9 @@ class Importer(DBUtils,Conf):
             src = url
         if not fips is None:
             src = "http://www2.census.gov/geo/tiger/TIGER2010BLKPOPHU/tabblock2010_" + fips + "_pophu.zip"
-        print("Loading data from %s" % src)
+        print("Loading data from {}".format(src))
         blocks = gpd.read_file(src)
-        epsg = "epsg:%i" % srid
-        blocks = blocks.to_crs({'init': epsg})
+        blocks = blocks.to_crs("epsg:{:d}".format(srid))
         blocks.columns = [c.lower() for c in blocks.columns]
 
         # filter to blocks within the boundary
@@ -293,9 +292,9 @@ class Importer(DBUtils,Conf):
             if not url_main is None:
                 src_main = url_main
                 src_aux = url_aux
-            print("Loading main data from %s" % src_main)
+            print("Loading main data from {}".format(src_main))
             jobs_main = pd.read_csv(src_main)
-            print("Loading aux data from %s" % src_aux)
+            print("Loading aux data from {}".format(src_aux))
             jobs_aux = pd.read_csv(src_aux)
 
         # copy data to db
@@ -359,7 +358,7 @@ class Importer(DBUtils,Conf):
                 srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
-        crs = {"init": "epsg:%i" % srid}
+        crs = "epsg:{:d}".format(srid)
 
         # generate table names for holding tables
         osm_ways_table = "osm_ways_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
@@ -376,7 +375,7 @@ class Importer(DBUtils,Conf):
         # load the boundary and process
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
         boundary = boundary.buffer(boundary_buffer)
-        boundary = boundary.to_crs({"init": "epsg:4326"})
+        boundary = boundary.to_crs("epsg:4326")
         boundary = boundary.unary_union
 
         # load OSM
@@ -634,7 +633,7 @@ class Importer(DBUtils,Conf):
                 raise ValueError("SRID must be specified as an arg or in the config file")
 
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
-        boundary = boundary.to_crs({"init": "epsg:4326"})
+        boundary = boundary.to_crs("epsg:4326")
         min_lon,min_lat,max_lon,max_lat = boundary.total_bounds
 
         table_prefix = ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
@@ -831,7 +830,7 @@ class Importer(DBUtils,Conf):
         values.append(sql.Literal(geom))
         values.append(sql.Literal(feature["id"]))
         for a in attributes:
-            if a in feature["properties"].keys():
+            if a in list(feature["properties"].keys()):
                 values.append(sql.Literal(feature["properties"][a]))
             else:
                 values.append(sql.SQL("NULL"))
@@ -912,8 +911,6 @@ class Importer(DBUtils,Conf):
         returns
         geodataframe object
         """
-        if not srid is None:
-            epsg = "epsg:%i" % srid
         if boundary_file is None:
             if "geom" in self.config.bna.boundary:
                 boundary_geom = self.config.bna.boundary.geom
@@ -937,5 +934,5 @@ class Importer(DBUtils,Conf):
         else:
             boundary = gpd.read_file(boundary_file)
         if not srid is None:
-            boundary = boundary.to_crs({'init': epsg})
+            boundary = boundary.to_crs("epsg:{:d}".format(srid))
         return boundary

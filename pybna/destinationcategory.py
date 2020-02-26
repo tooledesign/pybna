@@ -7,7 +7,7 @@ from psycopg2 import sql
 import numpy as np
 import warnings
 
-from dbutils import DBUtils
+from .dbutils import DBUtils
 
 
 class DestinationCategory(DBUtils):
@@ -86,7 +86,7 @@ class DestinationCategory(DBUtils):
 
 
     def __repr__(self):
-        return u"{} destinations\nmaxpoints: {}\nhas subcats? {}".format(self.config.name,self.maxpoints,self.has_subcats)
+        return "{} destinations\nmaxpoints: {}\nhas subcats? {}".format(self.config.name,self.maxpoints,self.has_subcats)
 
 
     @property

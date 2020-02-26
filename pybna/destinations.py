@@ -8,8 +8,8 @@ from psycopg2 import sql
 from tqdm import tqdm
 import random, string
 
-from dbutils import DBUtils
-from destinationcategory import DestinationCategory
+from .dbutils import DBUtils
+from .destinationcategory import DestinationCategory
 
 
 class Destinations(DBUtils):
@@ -48,7 +48,7 @@ class Destinations(DBUtils):
         self._register(destinations=destinations,category=category,workspace_schema=workspace_schema)
 
         # assign maxpoints
-        for name, destination in self.destinations.iteritems():
+        for name, destination in self.destinations.items():
             if (
                 (
                     category is None or
@@ -142,9 +142,9 @@ class Destinations(DBUtils):
         print("Counting destinations for each block")
         columns = sql.SQL("")
         tables = sql.SQL("")
-        for name, destination in self.destinations.iteritems():
+        for name, destination in self.destinations.items():
             if destination.has_count:
-                print("   ...{}".format(name))
+                print(("   ...{}".format(name)))
                 destination.count_connections(subs,conn=conn)
                 destination.calculate_score(subs,conn=conn)
                 columns += sql.SQL("""
@@ -165,7 +165,7 @@ class Destinations(DBUtils):
                     "blocks_id_col": self.sql_subs["blocks_id_col"]
                 })
 
-        for name, destination in self.destinations.iteritems():
+        for name, destination in self.destinations.items():
             if destination.has_subcats:
                 columns += sql.SQL("""
                     ,NULL::FLOAT AS {score}

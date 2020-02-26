@@ -2,7 +2,7 @@ import sys, string
 import psycopg2
 from psycopg2 import sql
 
-from dbutils import DBUtils
+from .dbutils import DBUtils
 
 
 class Projects(DBUtils):

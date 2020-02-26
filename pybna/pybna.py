@@ -13,15 +13,15 @@ from munch import Munch
 from psycopg2 import sql
 from tqdm import tqdm
 
-from core import Core
-from projects import Projects
-from connectivity import Connectivity
-from destinations import Destinations
-from conf import Conf
-from dbutils import DBUtils
+from .core import Core
+from .projects import Projects
+from .connectivity import Connectivity
+from .destinations import Destinations
+from .conf import Conf
+from .dbutils import DBUtils
 
 
-class pyBNA(DBUtils,Conf,Destinations,Connectivity,Projects,Core):
+class pyBNA(Conf,Destinations,Connectivity,Projects,Core):
     """Parent BNA class that glues together the subclasses"""
 
     def __init__(self, config=None, force_net_build=False,
@@ -90,7 +90,7 @@ class pyBNA(DBUtils,Conf,Destinations,Connectivity,Projects,Core):
             "password=" + password
         ])
         if self.debug:
-            print("DB connection: %s" % db_connection_string)
+            print("DB connection: {}".format(db_connection_string))
         DBUtils.__init__(self,db_connection_string,self.verbose,self.debug)
 
         # srid

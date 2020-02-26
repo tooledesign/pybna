@@ -4,7 +4,7 @@ from psycopg2 import sql
 from tqdm import tqdm
 import time
 
-from dbutils import DBUtils
+from .dbutils import DBUtils
 
 
 class Connectivity(DBUtils):
@@ -62,7 +62,7 @@ class Connectivity(DBUtils):
         conn = self.get_db_connection()
         for table in [self.net_config["edges"]["table"],self.net_config["nodes"]["table"]]:
             if self.verbose:
-                print("Checking for %s in database" % table)
+                print("Checking for {} in database".format(table))
             if not self.table_exists(table):
                 return False
         return True
@@ -512,7 +512,7 @@ class Connectivity(DBUtils):
         dry -- a path to save SQL statements to instead of executing in DB
         """
         self._calculate_connectivity(
-            blocks=blocks,
+            origin_blocks=blocks,
             network_filter=network_filter,
             append=append,
             dry=dry
