@@ -193,12 +193,17 @@ class DBUtils:
         returns
         boolean -- true if exists, false if not
         """
-        if schema is None:
-            full_table = table
-        else:
-            full_table = schema + "." + table
         conn = self.get_db_connection()
         cur = conn.cursor()
+
+        if schema is None:
+            schema, table = self.parse_table_name(table)
+
+        if schema is None:
+            full_table = sql.Identifier(table).as_string(conn)
+        else:
+            full_table = sql.Identifier(schema).as_string(conn) + "." + sql.Identifier(table).as_string(conn)
+
         try:
             cur.execute(sql.SQL("select {}::regclass").format(sql.Literal(full_table)))
             cur.close()
@@ -584,3 +589,33 @@ class DBUtils:
         if close_conn:
             conn.commit()
             conn.close()
+
+
+    def _add_column(self,table,name,datatype,schema=None,conn=None):
+        """
+        Adds a column to the given table
+        """
+        if schema is None:
+            schema, table = self.parse_table_name(table)
+        if schema is None:
+            schema = self.get_schema(table)
+
+        if not self.table_exists(table,schema):
+            raise ValueError("Table {}.{} does not exist".format(schema,table))
+
+        subs = {
+            "schema": sql.Identifier(schema),
+            "table": sql.Identifier(table),
+            "name": sql.Identifier(name),
+        }
+        # handle possible SQL object as type
+        if type(datatype) is sql.SQL:
+            subs["type"] = datatype
+        else:
+            subs["type"] = sql.SQL(datatype)
+
+        self._run_sql(
+            "alter table {schema}.{table} add column if not exists {name} {type}",
+            subs=subs,
+            conn=conn
+        )

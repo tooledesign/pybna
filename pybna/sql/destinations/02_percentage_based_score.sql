@@ -11,17 +11,16 @@ CREATE TEMP TABLE pg_temp.tmp_dests AS (
 );
 
 
-CREATE TEMP TABLE pg_temp.{tmp_table} AS (
+DROP TABLE IF EXISTS pg_temp.{tbl};
+CREATE TEMP TABLE pg_temp.{tbl} AS (
     SELECT
-        connections.{connectivity_source_col} AS block_id,
+        connections.source AS block_id,
         SUM(target_block.val) AS total
     FROM
-        {connectivity_schema}.{connectivity_table} connections,
+        pg_temp.tmp_connectivity connections,
         pg_temp.tmp_dests target_block
     WHERE
         {connection_true}
-        AND connections.{connectivity_target_col} = target_block.id
-    GROUP BY connections.{connectivity_source_col}
+        AND connections.target = target_block.id
+    GROUP BY connections.source
 );
-
-CREATE INDEX {index} ON pg_temp.{tmp_table} (block_id); ANALYZE pg_temp.{tmp_table};

@@ -1,97 +1,268 @@
 ###################################################################
-# The Destination class stores a BNA destination for use in pyBNA.
+# The Destination class stores a BNA destination category for use in pyBNA.
 ###################################################################
 import os
 import psycopg2
 from psycopg2 import sql
-import pandas as pd
-import geopandas as gpd
+import numpy as np
 import warnings
 
 from dbutils import DBUtils
 
 
 class DestinationCategory(DBUtils):
-    def __init__(self,config,query_path,sql_subs,db_connection_string):
+    def __init__(self,config,db_connection_string,workspace_schema=None):
         """Sets up a new category of BNA destinations and retrieves data from
         the given db table
 
         config -- dictionary of config settings (usually from yaml passed to parent BNA object)
-        query_path -- path to the SQL file for destination calculations
-        sql_subs -- dictionary of SQL substitutes from the main BNA
+        db_connection_string -- string to connect to the database
+        workspace_schema -- schema to save interim working tables to
 
         return: None
         """
+        self.module_dir = os.path.dirname(os.path.abspath(__file__))
         DBUtils.__init__(self,db_connection_string)
         self.config = config
-        self.query_path = query_path
-        self.category = self.config["name"]
-        self.schema, self.table = self.parse_table_name(self.config["table"])
-        if self.schema is None:
-            self.schema = self.get_schema(self.table)
+        self.has_subcats = False
+        self.has_count = False
 
-        self.method = self.config["method"]
+        if "maxpoints" in config:
+            self.maxpoints = self.config.maxpoints
+        else:
+            self.maxpoints = None
 
-        self.hs_column_name = self.category + "_hs"
-        self.ls_column_name = self.category + "_ls"
-        self.score_column_name = self.category + "_score"
+        if "subcats" in config:
+            self.has_subcats = True
 
-        # self.set_destinations()
-        self.query  = self._choose_query(config,sql_subs)
+        if "table" in config:
+            self.has_count = True
+            if not self.table_exists(config.table):
+                warnings.warn("No table found for {}".format(config.name))
+            else:
+                schema, table = self.parse_table_name(config.table)
+                if schema is None:
+                    schema = self.get_schema(table)
 
+                if "uid" in config:
+                    id_column = config.uid
+                else:
+                    id_column = self.get_pkid_col(table,schema=schema)
 
-    def __unicode__(self):
-        return u'%s destinations' % self.category
+                if "geom" in config:
+                    geom_col = config.geom
+                else:
+                    geom_col = "geom"
+
+                if "filter" in config:
+                    filter = sql.SQL(config.filter)
+                else:
+                    filter = sql.Literal(True)
+
+                if workspace_schema is None:
+                    self.workspace_schema = "pg_temp"
+                    self.persist = False
+                else:
+                    self.workspace_schema = workspace_schema
+                    self.persist = True
+                self.workspace_table = "scores_" + config.name
+
+                self.sql_subs = {
+                    "destinations_schema": sql.Identifier(schema),
+                    "destinations_table": sql.Identifier(table),
+                    "destinations_id_col": sql.Identifier(id_column),
+                    "index": sql.Identifier("idx_{}_blocks".format(config.name)),
+                    "workspace_schema": sql.Identifier(self.workspace_schema),
+                    "workspace_table": sql.Identifier(self.workspace_table),
+                    "destinations_filter": filter
+                }
+
+                if config["method"] == "count":
+                    self.sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
+                elif config["method"] == "percentage":
+                    self.sql_subs["val"] = sql.Identifier(config["datafield"])
+                else:
+                    raise ValueError("Unknown scoring method given for {}".format(config.name))
 
 
     def __repr__(self):
-        return u'%s destinations' % self.category
+        return u"{} destinations\nmaxpoints: {}\nhas subcats? {}".format(self.config.name,self.maxpoints,self.has_subcats)
 
 
-    def _choose_query(self,config,sql_subs):
+    @property
+    def query(self):
         """
-        Selects an appropriate scoring algorithm based on the inputs in
-        the config file.
-
-        Returns psycopg2 SQL composable stubbed out for subbing in a few remaining
-        variables like output table name
+        Returns the raw query language appropriate to this category
         """
-        if "uid" in config:
-            id_column = config["uid"]
+        dirs = [self.module_dir,"sql","destinations"]
+        if self.config.method == "count":
+            dirs.append("02_count_based_score.sql")
+        elif self.config.method == "percentage":
+            dirs.append("02_percentage_based_score.sql")
         else:
-            id_column = self.get_pkid_col(self.table,schema=self.schema)
-        # check for incompatible column name
-        if self.method == "percentage" and sql.Identifier(id_column) != sql_subs["blocks_id_col"]:
-            warnings.warn("Destination ID column doesn't match block ID column for {}".format(self.category))
+            raise ValueError("Unknown scoring method given for {}".format(self.config.name))
 
-        if "geom" in config:
-            geom_col = config["geom"]
+        return self.read_sql_from_file(os.path.join(*dirs))
+
+
+    def count_connections(self,subs,conn=None):
+        """
+        Counts the number of destinations accessible to each block under high
+        and low stress conditions
+
+        args
+        subs -- a list of sql substitutes to complement the substitutes
+            associated with this category (generally from the main BNA object)
+        conn -- a DB connection object. If none start a new connection and close it
+            when complete
+        """
+        if not self.has_count:
+            return
+
+        if conn is None:
+            close_conn = True
+            conn = self.get_db_connection()
         else:
-            geom_col = "geom"
+            close_conn = False
 
-        if "filter" in config:
-            filter = sql.SQL(config["filter"])
+        subs.update(self.sql_subs)
+
+        hs_subs = {
+            "tbl": sql.Identifier("high_stress"),
+            "connection_true": sql.Literal(True)
+        }
+        hs_subs.update(subs)
+
+        ls_subs = {
+            "tbl": sql.Identifier("low_stress"),
+            "connection_true": sql.SQL("low_stress")
+        }
+        ls_subs.update(subs)
+
+        self._run_sql(self.query,hs_subs,conn=conn)
+        self._run_sql(self.query,ls_subs,conn=conn)
+        self._run_sql_script("03_combine_counts.sql",subs,["sql","destinations"],conn=conn)
+
+        if close_conn:
+            conn.close()
+
+
+    def calculate_score(self,subs,conn=None):
+        """
+        Calculates the score for this destination category
+
+        args
+        subs -- a list of sql substitutes to complement the substitutes
+            associated with this category (generally from the main BNA object)
+        conn -- a DB connection object. If none start a new connection and close it
+            when complete
+        """
+        if not self.has_count:
+            return
+
+        if conn is None:
+            close_conn = True
+            conn = self.get_db_connection()
         else:
-            filter = sql.Literal(True)
+            close_conn = False
 
-        sql_subs["destinations_schema"] = sql.Identifier(self.schema)
-        sql_subs["destinations_table"] = sql.Identifier(self.table)
-        sql_subs["destinations_id_col"] = sql.Identifier(id_column)
-        sql_subs["destinations_filter"] = filter
-        sql_subs["tmp_table"] = sql.SQL("{tmp_table}")
-        sql_subs["connection_true"] = sql.SQL("{connection_true}")
-        sql_subs["index"] = sql.SQL("{index}")
-        if config["method"] == "count":
-            sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
-            sql_file = os.path.join(self.query_path,"count_based_score.sql")
-        elif config["method"] == "percentage":
-            sql_file = os.path.join(self.query_path,"percentage_based_score.sql")
-            sql_subs["val"] = sql.Identifier(config["datafield"])
-        else:
-            raise ValueError("Unknown scoring method given for %s" % config["name"])
+        subs.update(self.sql_subs)
+        subs["case"] = self._concat_case("hs","ls")
 
-        raw = self.read_sql_from_file(sql_file)
-        conn = self.get_db_connection()
-        query = sql.SQL(sql.SQL(raw).format(**sql_subs).as_string(conn))
-        conn.close()
-        return query
+        self._run_sql("""
+            UPDATE {workspace_schema}.{workspace_table}
+            SET score = {case}
+        """,subs,conn=conn)
+
+
+    def _concat_case(self,hs_column,ls_column):
+        """
+        Builds a case statement for comparing high stress and low stress destination
+        counts using defined break points
+
+        args
+        hs_column -- the name of the column with high stress destination counts
+        ls_column -- the name of the column with low stress destination counts
+
+        returns
+        a composed psycopg2 SQL object representing a full CASE ... END statement
+        """
+        # add zero
+        breaks = dict(self.config.breaks)
+        breaks[0] = 0
+
+        subs = {
+            "hs_column": sql.Identifier(hs_column),
+            "ls_column": sql.Identifier(ls_column),
+            "maxpoints": sql.Literal(self.maxpoints)
+        }
+
+        case = sql.SQL("""
+            CASE
+            WHEN COALESCE({hs_column},0) = 0 AND COALESCE({ls_column},0) = 0 THEN NULL
+            WHEN COALESCE({ls_column},0) >= COALESCE({hs_column},0) THEN {maxpoints}
+            WHEN COALESCE({hs_column},0) = COALESCE({ls_column},0) THEN {maxpoints}
+        """).format(**subs)
+
+        # assign scores at the boundaries
+        cumul_score = 0
+        for brk, score in sorted(breaks.items()):
+            subs["break"] = sql.Literal(brk)
+            subs["score"] = sql.Literal(score)
+            subs["cumul_score"] = sql.Literal(cumul_score)
+            if self.config.method == "count":
+                case += sql.SQL("""
+                    WHEN COALESCE({ls_column},0) = {break} THEN {score} + {cumul_score}
+                """).format(**subs)
+                cumul_score += score
+            if self.config.method == "percentage":
+                case += sql.SQL("""
+                    WHEN COALESCE({ls_column},0) = {break} THEN {score}
+                """).format(**subs)
+                cumul_score = score
+
+        # assign scores within the boundaries
+        del breaks[0]
+        cumul_score = 0
+        prev_break = 0
+        for brk, score in sorted(breaks.items()):
+            subs["break"] = sql.Literal(brk)
+            subs["score"] = sql.Literal(score)
+            subs["cumul_score"] = sql.Literal(cumul_score)
+            subs["prev_break"] = sql.Literal(prev_break)
+            if self.config.method == "count":
+                subs["val"] = sql.SQL("COALESCE({ls_column},0)").format(**subs)
+                case += sql.SQL("""
+                    WHEN {val} < {break}
+                        THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score})
+                """).format(**subs)
+                cumul_score += score
+            if self.config.method == "percentage":
+                subs["val"] = sql.SQL("(COALESCE({ls_column},0)::FLOAT/{hs_column})").format(**subs)
+                case += sql.SQL("""
+                    WHEN {val} < {break}
+                        THEN {cumul_score} + (({val} - {prev_break})::FLOAT/({break} - {prev_break})) * ({score} - {cumul_score})
+                """).format(**subs)
+                cumul_score = score
+            prev_break = brk
+
+        # assign scores for top (if not already assigned in breaks)
+        brk, score = sorted(breaks.items())[-1]
+        subs["break"] = sql.Literal(brk)
+        subs["cumul_score"] = sql.Literal(cumul_score)
+        if np.isclose(self.maxpoints,cumul_score):
+            case += sql.SQL("""
+                WHEN {val} > {break} THEN {maxpoints}
+            """).format(**subs)
+        elif self.maxpoints > cumul_score:
+            if self.config.method == "count":
+                case += sql.SQL("""
+                    ELSE {cumul_score} + ((COALESCE({ls_column},0) - {break})::FLOAT/({hs_column} - {break})) * ({maxpoints} - {cumul_score})
+                """).format(**subs)
+            elif self.config.method == "percentage":
+                case += sql.SQL("""
+                    ELSE {cumul_score} + ((COALESCE({ls_column},0)::FLOAT/{hs_column}) - {break})::FLOAT/(1 - {break}) * ({maxpoints} - {cumul_score})
+                """).format(**subs)
+        case += sql.SQL(" END")
+
+        return case

@@ -25,41 +25,6 @@ class Core(DBUtils):
         self.sql_subs = None
 
 
-    def set_destinations(self):
-        """Retrieve the destinations identified in the config file and register them."""
-        if self.verbose:
-            print('Adding destinations')
-
-        conn = self.get_db_connection()
-        cur = conn.cursor()
-
-        for v in self.config["bna"]["destinations"]:
-            if "table" in v:
-                self.destinations[v["name"]] = DestinationCategory(
-                    v["name"], conn, v["table"], v["uid"], verbose=self.verbose
-                )
-                # add all the census blocks containing a destination from this category
-                # to the pyBNA index of all blocks containing a destination of any type
-                self.destination_blocks.update(
-                    self.destinations[v["name"]].destination_blocks)
-            if "subcats" in v:
-                for sub in v["subcats"]:
-                    self.destinations[sub["name"]] = Destinations(
-                        sub["name"],
-                        conn,
-                        sub["table"],
-                        sub["uid"],
-                        verbose=self.verbose
-                    )
-                    self.destination_blocks.update(
-                        self.destinations[sub["name"]].destination_blocks)
-
-
-        if self.verbose:
-            print("%i census blocks are part of at least one destination" %
-                  len(self.destination_blocks))
-
-
     def score(self):
         """Calculate network score."""
         pass
