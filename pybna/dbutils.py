@@ -451,7 +451,8 @@ class DBUtils:
 
         # convert geoms to wkt
         if not no_geom:
-            gdf["wkbs"] = gdf.geometry.apply(lambda x: x.wkb).apply(hexlify).apply(upper)
+            gdf["wkbs"] = gdf.geometry.apply(lambda x: x.wkb).apply(hexlify)
+            gdf["wkbs"] = gdf["wkbs"].str.upper()
             gdf = gdf.drop(gdf.geometry.name,axis=1)
             gdf = gdf.rename(columns={"wkbs": geom})
 
