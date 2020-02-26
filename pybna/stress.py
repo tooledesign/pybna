@@ -15,7 +15,7 @@ from .core import FORWARD_DIRECTION
 from .core import BACKWARD_DIRECTION
 
 
-class Stress(DBUtils,Conf):
+class Stress(Conf):
     def __init__(self, config=None, create_lookups=True,
                  verbose=False):
         """

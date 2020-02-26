@@ -23,7 +23,7 @@ from .conf import Conf
 from .dbutils import DBUtils
 
 
-class Importer(DBUtils,Conf):
+class Importer(Conf):
     """Standalone class to import pyBNA datasets"""
 
     def __init__(self, config=None, verbose=False, debug=False,

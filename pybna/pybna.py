@@ -21,7 +21,7 @@ from .conf import Conf
 from .dbutils import DBUtils
 
 
-class pyBNA(DBUtils,Conf,Destinations,Connectivity,Projects,Core):
+class pyBNA(Conf,Destinations,Connectivity,Projects,Core):
     """Parent BNA class that glues together the subclasses"""
 
     def __init__(self, config=None, force_net_build=False,

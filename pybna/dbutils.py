@@ -12,7 +12,6 @@ import geopandas as gpd
 import numpy as np
 from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
 from binascii import hexlify
-from string import upper
 from tqdm import tqdm
 
 

@@ -1,0 +1,7 @@
+psycopg2-binary
+munch
+pyyaml
+tqdm
+geopandas
+osmnx
+overpass
