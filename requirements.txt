@@ -5,4 +5,4 @@ tqdm
 geopandas
 osmnx
 overpass
-osmium
+# osmium not required but recommended

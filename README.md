@@ -15,18 +15,19 @@ More info on the methodology at the [What is the BNA?](what_is_bna.md) page.
 
 ## Requirements
 
-pyBNA is tested with Python 2.7. The following libraries are required:
+pyBNA is tested with Python 3.6. The following libraries are required:
 - psycopg2
 - tqdm
 - pyyaml
 - geopandas
 - munch
 - overpass
-- omsnx (version 0.9 until Python 3 is supported)
+- omsnx
 
-You can install these via pip:
+A requirements.txt file is provided for convenience. You can install these via
+pip:
 ```
-pip install psycopg2 tqdm pyyaml geopandas munch overpass osmnx==0.9
+pip install -r requirements.txt
 ```
 
 _*Special note for Windows users:_ Installing geopandas can be a real pain. If
@@ -37,14 +38,6 @@ from Geoff Boeing.
 The `osmium` package is also required for parsing OSM destinations from an .osm
 extract, but if you're downloading destinations directly from OSM you can
 safely skip this dependency.
-
-_A note on moving to Python 3_
-
-_We are aware that Python 2 will be deprecated soon in favor of Python 3. Our
-intention is to make this change in pyBNA in the near future. We do not expect
-the switch to disrupt the pyBNA API in any way so this change should not be
-overly disruptive for most users, apart from having to run pyBNA with the latest
-Python 3 version._
 
 ## tl;dr (Simple run)
 
@@ -88,7 +81,7 @@ For more guidance on the import process, see our [import instructions](import.md
 First, import pybna and create a pyBNA object by pointing it to the config file.
 ```
 import pybna
-bna = pybna.pyBNA(config="/home/spencer/dev/napa/bna/bna_vine_config.yaml")
+bna = pybna.pyBNA(config="/path/to/my/config.yaml")
 ```
 
 Next, you can calculate the connectivity with
