@@ -203,8 +203,7 @@ class Importer(Conf):
             src = "http://www2.census.gov/geo/tiger/TIGER2010BLKPOPHU/tabblock2010_" + fips + "_pophu.zip"
         print("Loading data from {}".format(src))
         blocks = gpd.read_file(src)
-        epsg = "epsg:%i" % srid
-        blocks = blocks.to_crs({'init': epsg})
+        blocks = blocks.to_crs("epsg:{:d}".format(srid))
         blocks.columns = [c.lower() for c in blocks.columns]
 
         # filter to blocks within the boundary
@@ -359,7 +358,7 @@ class Importer(Conf):
                 srid = self.config.srid
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
-        crs = {"init": "epsg:%i" % srid}
+        crs = "epsg:{:d}".format(srid)
 
         # generate table names for holding tables
         osm_ways_table = "osm_ways_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
@@ -376,7 +375,7 @@ class Importer(Conf):
         # load the boundary and process
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
         boundary = boundary.buffer(boundary_buffer)
-        boundary = boundary.to_crs({"init": "epsg:4326"})
+        boundary = boundary.to_crs("epsg:4326")
         boundary = boundary.unary_union
 
         # load OSM
@@ -634,7 +633,7 @@ class Importer(Conf):
                 raise ValueError("SRID must be specified as an arg or in the config file")
 
         boundary = self._load_boundary_as_dataframe(boundary_file=boundary_file)
-        boundary = boundary.to_crs({"init": "epsg:4326"})
+        boundary = boundary.to_crs("epsg:4326")
         min_lon,min_lat,max_lon,max_lat = boundary.total_bounds
 
         table_prefix = ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
@@ -912,8 +911,6 @@ class Importer(Conf):
         returns
         geodataframe object
         """
-        if not srid is None:
-            epsg = "epsg:%i" % srid
         if boundary_file is None:
             if "geom" in self.config.bna.boundary:
                 boundary_geom = self.config.bna.boundary.geom
@@ -937,5 +934,5 @@ class Importer(Conf):
         else:
             boundary = gpd.read_file(boundary_file)
         if not srid is None:
-            boundary = boundary.to_crs({'init': epsg})
+            boundary = boundary.to_crs("epsg:{:d}".format(srid))
         return boundary
