@@ -5,3 +5,4 @@ tqdm
 geopandas
 osmnx
 overpass
+osmium

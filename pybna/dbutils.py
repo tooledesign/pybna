@@ -83,7 +83,7 @@ class DBUtils:
             where n.oid = c.relnamespace \
             and c.oid = '%s'::regclass \
         " % table)
-        return cur.next()[0]
+        return cur.fetchone()[0]
 
 
     def get_default_schema(self):
@@ -94,7 +94,7 @@ class DBUtils:
         conn = self.get_db_connection()
         cur = conn.cursor()
         cur.execute("show search_path")
-        path = cur.next()[0]
+        path = cur.fetchone()[0]
         schema = path.split(',')[0].strip()
         conn.close()
         return schema
@@ -131,7 +131,7 @@ class DBUtils:
             print(q.as_string(conn))
 
         cur.execute(q)
-        srid = cur.next()[0]
+        srid = cur.fetchone()[0]
 
         if self.verbose:
             print("SRID: {}".format(srid))
@@ -346,24 +346,18 @@ class DBUtils:
                 pass
         else:
             # get geom column type
-            shapely_type = gdf.geometry.apply(lambda x: type(x)).unique()
+            shapely_type = gdf.geom_type.unique()
             if len(shapely_type) > 1:
                 if len(shapely_type) > 2:
                     raise ValueError("Can't process more than one geometry type")
                 elif multi:
                     g1 = shapely_type[0]
                     g2 = shapely_type[1]
-                    if g1 is Point and g2 is MultiPoint:
+                    if g1 in ["Point","MultiPoint"] and g2 in ["Point","MultiPoint"]:
                         pass
-                    elif g1 is MultiPoint and g2 is Point:
+                    elif g1 in ["LineString","MultiLineString"] and g2 in ["LineString","MultiLineString"]:
                         pass
-                    elif g1 is LineString and g2 is MultiLineString:
-                        pass
-                    elif g1 is MultiLineString and g2 is LineString:
-                        pass
-                    elif g1 is Polygon and g2 is MultiPolygon:
-                        pass
-                    elif g1 is MultiPolygon and g2 is Polygon:
+                    elif g1 is ["Polygon","MultiPolygon"] and g2 in ["Polygon","MultiPolygon"]:
                         pass
                     else:
                         raise ValueError("Can't process more than one geometry type")
@@ -373,29 +367,29 @@ class DBUtils:
                 multi = False
 
             shapely_type = shapely_type[0]
-            if shapely_type is Point:
+            if shapely_type == "Point":
                 if multi:
                     geom_type = "multipoint"
                 else:
                     geom_type = "point"
-            elif shapely_type is MultiPoint:
+            elif shapely_type == "MultiPoint":
                 geom_type = "multipoint"
-            elif shapely_type is LineString:
+            elif shapely_type == "LineString":
                 if multi:
                     geom_type = "multilinestring"
                 else:
                     geom_type = "linestring"
-            elif shapely_type is MultiLineString:
+            elif shapely_type == "MultiLineString":
                 geom_type = "multilinestring"
-            elif shapely_type is Polygon:
+            elif shapely_type == "Polygon":
                 if multi:
                     geom_type = "multipolygon"
                 else:
                     geom_type = "polygon"
-            elif shapely_type is MultiPolygon:
+            elif shapely_type == "MultiPolygon":
                 geom_type = "multipolygon"
             else:
-                raise ValueError("Incompatible geometry type %s" % shapely_type)
+                raise ValueError("Incompatible geometry type".format(shapely_type))
 
         # remove geom column and any columns that aren't in the gdf
         tmp_cols = list()
@@ -450,8 +444,7 @@ class DBUtils:
 
         # convert geoms to wkt
         if not no_geom:
-            gdf["wkbs"] = gdf.geometry.apply(lambda x: x.wkb).apply(hexlify)
-            gdf["wkbs"] = gdf["wkbs"].str.upper()
+            gdf["wkbs"] = gdf.geometry.apply(lambda x: x.wkb).apply(hexlify).str.decode("utf-8").str.upper()
             gdf = gdf.drop(gdf.geometry.name,axis=1)
             gdf = gdf.rename(columns={"wkbs": geom})
 

@@ -512,7 +512,7 @@ class Connectivity(DBUtils):
         dry -- a path to save SQL statements to instead of executing in DB
         """
         self._calculate_connectivity(
-            blocks=blocks,
+            origin_blocks=blocks,
             network_filter=network_filter,
             append=append,
             dry=dry
