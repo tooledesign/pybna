@@ -7,7 +7,6 @@ import yaml
 import psycopg2
 from psycopg2 import sql
 from tqdm import tqdm
-from .blocks import Blocks
 from .dbutils import DBUtils
 
 FORWARD_DIRECTION = "forward"
