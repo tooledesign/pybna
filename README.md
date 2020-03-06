@@ -22,7 +22,7 @@ pyBNA is tested with Python 3.6. The following libraries are required:
 - geopandas
 - munch
 - overpass
-- osmnx
+- omsnx
 
 A requirements.txt file is provided for convenience. You can install these via
 pip:
@@ -51,7 +51,7 @@ import pybna
 # imports
 i = pybna.Importer()
 i.import_boundary('/path/to/your/boundary/file')
-i.import_census_blocks(fips="16")
+i.import_census_blocks(fips=16)
 i.import_census_jobs("received.neighborhood_census_block_jobs",state="ID")
 i.import_osm_network()
 i.import_osm_destinations()
