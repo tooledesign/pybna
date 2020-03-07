@@ -21,10 +21,14 @@ class DBUtils:
     def __init__(self, db_connection_string, verbose=False, debug=False):
         """Connects to the BNA database
 
-        kwargs:
-        db_connection_string -- fully formed connection string for connecting to database
-        verbose -- output useful messages
-        debug -- set to debug mode
+        Parameters
+        ----------
+        db_connection_string : str
+            fully formed connection string for connecting to database
+        verbose : bool, optional
+            output useful messages
+        debug : bool, optional
+            set to debug mode
 
         return: DBUtils object
         """
@@ -105,8 +109,10 @@ class DBUtils:
         Separates the given name into a schema and table and returns them as a
         list. If no schema is given, returns None for the schema.
 
-        args
-        name -- the name to parse
+        Parameters
+        ----------
+        name : str
+            the name to parse
         """
         try:
             schema, table = name.split(".")
@@ -143,10 +149,14 @@ class DBUtils:
         """
         Returns the data type of the column
 
-        args
-        table -- the table name
-        column -- the column name
-        schema -- the schema (inferred if not given)
+        Parameters
+        ----------
+        table : str
+            the table name
+        column : str
+            the column name
+        schema : str, optional
+            the schema (inferred if not given)
 
         returns
         string
@@ -185,12 +195,17 @@ class DBUtils:
         """
         Checks whether the given table exists in the db
 
-        args
-        table -- the table name
-        schema -- the schema name
+        Parameters
+        ----------
+        table : str
+            the table name
+        schema : str, optional
+            the schema name
 
-        returns
-        boolean -- true if exists, false if not
+        Returns
+        -------
+        boolean
+            True if exists, false if not.
         """
         conn = self.get_db_connection()
         cur = conn.cursor()
@@ -222,12 +237,16 @@ class DBUtils:
         don't lead off with a comment or the whole statement will be interpreted
         as a progress update)
 
-        args
-        sql -- the raw sql text
+        Parameters
+        ----------
+        sql : str
+            the raw sql text
 
-        returns
-        tqdm object composed of a list of dictionaries where each entry has
-        two values, the query and a progress update
+        Returns
+        -------
+        tqdm object
+            tqdm object composed of a list of dictionaries where each entry has
+            two values, the query and a progress update
         """
         statements = [s for s in sql.split(";") if len(s.strip()) > 1]
 
@@ -254,11 +273,14 @@ class DBUtils:
         """
         Reads the SQL file at the path and returns it as plain text
 
-        args:
-        path -- file path
+        Parameters
+        ----------
+        path : str
+            file path
 
-        returns:
-        string
+        Returns
+        -------
+        str
         """
         f = open(path)
         query = f.read()
@@ -270,10 +292,14 @@ class DBUtils:
         """
         Drops the given table from the database
 
-        args:
-        table -- table name (optionally schema-qualified)
-        schema -- schema name (incompatible with schema-qualified table name)
-        conn -- a psycopg2 connection object (default: create new connection)
+        Parameters
+        ----------
+        table : str
+            table name (optionally schema-qualified)
+        schema : str, optional
+            schema name (incompatible with schema-qualified table name)
+        conn : psycopg2 connection object, optional
+            a psycopg2 connection object (default: create new connection)
         """
         transaction = True
         if conn is None:
@@ -304,19 +330,32 @@ class DBUtils:
         """
         Saves a geopandas geodataframe to Postgis.
 
-        args:
-        gdf -- the GeoDataFrame to save
-        table -- the table name
-        schema -- the schema name (not necessary if schema is qualified in table name)
-        columns -- a list of columns to save (if empty, save all columns)
-        geom -- name to use for the geom column
-        id -- name to use for the id/primary key column (created if it doesn't match anything in columns)
-        multi -- convert single to multi if mixed types are found
-        keep_case -- prevents conversion of column names to lower case
-        srid -- the projection to use (if none inferred from data)
-        conn -- an open psycopg2 connection
-        overwrite -- drops an existing table
-        no_geom -- copies only the table without accompany geometries (or processes a non-geo table)
+        Parameters
+        ----------
+        gdf : geopandas GeoDataFrame object
+            the GeoDataFrame to save
+        table : str
+            the table name
+        schema : str, optional
+            the schema name (not necessary if schema is qualified in table name)
+        columns : list of str, optional
+            a list of columns to save (if empty, save all columns)
+        geom : str, optional
+            name to use for the geom column
+        id : str, optional
+            name to use for the id/primary key column (created if it doesn't match anything in columns)
+        multi : bool, optional
+            convert single to multi if mixed types are found
+        keep_case : bool, optional
+            prevents conversion of column names to lower case
+        srid : int, optional
+            the projection to use (if none inferred from data)
+        conn : psycopg2 connection object, optional
+            an open psycopg2 connection
+        overwrite : bool, optional
+            drops an existing table
+        no_geom : bool, optional
+            copies only the table without accompany geometries (or processes a non-geo table)
         """
         # process inputs
         if schema is None:
@@ -482,13 +521,19 @@ class DBUtils:
     def _run_sql_script(self, fname, subs, dirs, ret=False, dry=None, conn=None):
         """Pass substitutions into a sql script, and execute against server.
 
-        fname -- name of the sql file
-        subs -- dict of substitutions for the SQL
-        dirs -- list of directory tree in the submodule
-        ret -- if true, send cursor back to calling routine for further processing
+        fname : str
+            name of the sql file
+        subs : dict
+            dict of substitutions for the SQL
+        dirs : list
+            list of directory tree in the submodule
+        ret : bool, optional
+            if true, send cursor back to calling routine for further processing
             (requires a pre-existing connection to be passed)
-        dry -- a path to save SQL statements to instead of executing in DB
-        conn -- A connection object to work with. if none, create a new one and close it at the end
+        dry : str
+            a path to save SQL statements to instead of executing in DB
+        conn : psycopg2 connection object, optional
+            A connection object to work with. if none, create a new one and close it at the end
         """
         if conn is None:
             if ret:
@@ -538,12 +583,17 @@ class DBUtils:
     def _run_sql(self, statement, subs=None, ret=False, dry=None, conn=None):
         """Pass substitutions into a sql script, and execute against server.
 
-        statement -- sql to run
-        subs -- dict of substitutions for the SQL
-        ret -- if true, send cursor back to calling routine for further processing
+        statement : str
+            sql to run
+        subs : dict, optional
+            dict of substitutions for the SQL
+        ret : bool, optional
+            if true, send cursor back to calling routine for further processing
             (requires a pre-existing connection to be passed)
-        dry -- a path to save SQL statements to instead of executing in DB
-        conn -- A connection object to work with. if none, create a new one and close it at the end
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
+        conn : psycopg2 connection object, optional
+            A connection object to work with. if none, create a new one and close it at the end
         """
         if conn is None:
             if ret:

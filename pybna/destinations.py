@@ -29,10 +29,14 @@ class Destinations(DBUtils):
         """
         Wrapper function that registers destinations and then assigns maxscore
 
-        args
-        category -- a destination category to register. None -> re-register all destinations
-        workspace_schema -- schema to save interim working tables to
-        destinations -- a list of destinations (if none, use the config file)
+        Parameters
+        ----------
+        category : str, optional
+            a destination category to register. None -> re-register all destinations
+        workspace_schema : str, optional
+            schema to save interim working tables to
+        destinations : list, optional
+            a list of destinations (if none, use the config file)
         """
         if category is None and destinations is None:
             if self.verbose:
@@ -63,10 +67,14 @@ class Destinations(DBUtils):
         """
         Retrieve the destinations identified in the config file and register them.
 
-        args
-        destinations -- a list of destinations
-        category -- a destination category to register. None -> re-register all destinations
-        workspace_schema -- schema to save interim working tables to
+        Parameters
+        ----------
+        destinations : list
+            a list of destinations
+        category : str, optional
+            a destination category to register. None -> re-register all destinations
+        workspace_schema : str, optional
+            schema to save interim working tables to
         """
         for v in destinations:
             config = self.parse_config(v)
@@ -88,14 +96,20 @@ class Destinations(DBUtils):
         """
         Creates a new db table of scores for each block
 
-        args:
-        output_table -- table to create (optionally schema-qualified)
-        scenario_id -- the id of the scenario for which scores are calculated
+        Parameters
+        ----------
+        output_table : str
+            table to create (optionally schema-qualified)
+        scenario_id
+            the id of the scenario for which scores are calculated
             (none means the scores represent the base condition)
-        subtract -- if true the calculated scores for the scenario represent
+        subtract : bool, optional
+            if true the calculated scores for the scenario represent
             a subtraction of that scenario from all other scenarios
-        overwrite -- overwrite a pre-existing table
-        dry -- a path to save SQL statements to instead of executing in DB
+        overwrite : bool, optional
+            overwrite a pre-existing table
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
@@ -195,10 +209,14 @@ class Destinations(DBUtils):
         using the weights defined in the config file.
         Will first calculate any subcategories which themselves have subcategories.
 
-        args
-        destination -- the destination to calculate subcategory scores for
-        subs -- list of SQL substitutions from the parent method
-        conn -- psycopg2 connection object from the parent method
+        Parameters
+        ----------
+        destination : str
+            the destination to calculate subcategory scores for
+        subs : dict
+            list of SQL substitutions from the parent method
+        conn : psycopg2 connection object
+            psycopg2 connection object from the parent method
         """
         if "subcats" in destination.config:
             for subcat in destination.config.subcats:
@@ -283,9 +301,12 @@ class Destinations(DBUtils):
         Copies the geometries from the block table to the output table of destination
         scores.
 
-        args
-        conn -- psycopg2 connection object from the parent method
-        subs -- list of SQL substitutions from the parent method
+        Parameters
+        ----------
+        conn : psycopg2 connection object
+            psycopg2 connection object from the parent method
+        subs : dict
+            list of SQL substitutions from the parent method
         """
         # get geometry type from block table
         subs["type"] = sql.SQL(

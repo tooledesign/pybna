@@ -28,10 +28,14 @@ class Projects(DBUtils):
         """
         Calculates connectivity for a single project.
 
-        args
-        projects_table -- the table holding information about projects
-        project_id -- the project id for the project being measured
-        projects_column -- the name of the column holding project ids
+        Parameters
+        ----------
+        projects_table : str
+            the table holding information about projects
+        project_id : int or str
+            the project id for the project being measured
+        projects_column : str, optional
+            the name of the column holding project ids
         """
         road_ids = get_road_ids(projects_table,project_id,projects_column=projects_column)
         _calculate_project(project_id,road_ids)
@@ -44,10 +48,14 @@ class Projects(DBUtils):
         network (i.e. what does connectivity look like if everything except
         this project gets built)
 
-        args
-        projects_table -- the table holding information about projects
-        project_id -- the project id for the project being measured
-        projects_column -- the name of the column holding project ids
+        Parameters
+        ----------
+        projects_table : str
+            the table holding information about projects
+        project_id : int or str
+            the project id for the project being measured
+        projects_column : str, optional
+            the name of the column holding project ids
         """
         road_ids = get_road_ids(projects_table,project_id,projects_column=projects_column)
         _calculate_project(project_id,road_ids)
@@ -58,11 +66,16 @@ class Projects(DBUtils):
         Calculates connectivity for a single project (or lack of a single
         project)
 
-        args
-        projects_table -- the table holding information about projects
-        project_id -- the project id for the project being measured
-        road_ids -- a list of road_ids in the base network that should be
+        Parameters
+        ----------
+        projects_table : str
+            the table holding information about projects
+        project_id : int or str
+            the project id for the project being measured
+        road_ids : list
+            a list of road_ids in the base network that should be
             flipped to low stress as part of this project
+        subtract : bool, optional
         """
         # get list of affected blocks
         # call calculate_connectivity with project_id and blocks
@@ -73,11 +86,16 @@ class Projects(DBUtils):
         Returns a list of road_ids associated with the given project.
         If subtract, the road_ids represent all projects _except_ the given one.
 
-        args
-        projects_table -- the table holding information about projects
-        project_id -- the project_id
-        projects_column -- the name of the column holding project ids
-        subtract -- if true, return road_ids for all projects except those listed
+        Parameters
+        ----------
+        projects_table : str
+            the table holding information about projects
+        project_id : int or str
+            the project_id
+        projects_column : str, optional
+            the name of the column holding project ids
+        subtract : bool, optional
+            if true, return road_ids for all projects except those listed
         """
         projects_schema, projects_table = self.parse_table_name(projects_table)
         if projects_schema is None:

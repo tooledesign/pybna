@@ -21,10 +21,14 @@ class Stress(Conf):
         """
         Reads the config file, sets up a connection
 
-        args
-        config -- path to the config file, if not given use the default config.yaml
-        create_lookups -- creates lookup tables in the db if none are found
-        verbose -- output useful messages
+        Parameters
+        ----------
+        config : str, optional
+            path to the config file, if not given use the default config.yaml
+        create_lookups : bool, optional
+            creates lookup tables in the db if none are found
+        verbose : bool, optional
+            output useful messages
         """
         Conf.__init__(self)
         self.verbose = verbose
@@ -102,11 +106,16 @@ class Stress(Conf):
         """
         Create a stress lookup table of the given type and name
 
-        args
-        lu_type -- either shared, bike_lane, or crossing
-        table -- name of the table
-        schema -- name of the schema
-        fname -- optional csv file to populate the table with (if empty uses default)
+        Parameters
+        ----------
+        lu_type : {'shared', 'bike_lane', 'crossing'}
+            The type of lookup table to create
+        table : str
+            name of the table
+        schema : str, optional
+            name of the schema
+        fname : str, optional
+            optional csv file to populate the table with (if empty uses default)
         """
         in_file = None
         if fname:
@@ -193,12 +202,16 @@ class Stress(Conf):
         This is basically a pass-through function that calls several helpers to
         calculate the various parts
 
-        args
-        table -- the table root (optionally schema-qualified) to use for outputting
+        Parameters
+        ----------
+        table : str, optional
+            the table root (optionally schema-qualified) to use for outputting
             LTS scores. Final table name will have forward/backward appended to
             indicate the direction the score applies to. Defaults to "bna_stress_seg"
-        table_filter -- SQL filter to limit rows that should be updated
-        dry -- a path to save SQL statements to instead of executing in DB
+        table_filter : str, optional
+            SQL filter to limit rows that should be updated
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         if table is None:
             schema = self.schema
@@ -258,11 +271,16 @@ class Stress(Conf):
         or user interaction. If you don't commit the changes you won't see
         them in the database.
 
-        args
-        conn -- a psycopg2 connection object. if none, procures new one
-        subs -- mappings of column names from the config file
-        table_filter -- filter to limit rows that should be updated
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        conn : psycopg2 connection object
+            a psycopg2 connection object
+        subs : dict
+            mappings of column names from the config file
+        table_filter : str, optional
+            filter to limit rows that should be updated
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on shared streets")
 
@@ -286,11 +304,16 @@ class Stress(Conf):
         or user interaction. If you don't commit the changes you won't see
         them in the database.
 
-        args
-        conn -- a psycopg2 connection object. if none, procures new one
-        subs -- mappings of column names from the config file
-        table_filter -- filter to limit rows that should be updated
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        conn : psycopg2 connection object
+            a psycopg2 connection object
+        subs : dict
+            mappings of column names from the config file
+        table_filter : str, optional
+            filter to limit rows that should be updated
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on streets with bike lanes")
 
@@ -313,11 +336,16 @@ class Stress(Conf):
         or user interaction. If you don't commit the changes you won't see
         them in the database.
 
-        args
-        conn -- a psycopg2 connection object. if none, procures new one
-        subs -- mappings of column names from the config file
-        table_filter -- filter to limit rows that should be updated
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        conn : psycopg2 connection object
+            a psycopg2 connection object
+        subs : dict
+            mappings of column names from the config file
+        table_filter : str, optional
+            filter to limit rows that should be updated
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on streets with cycle tracks")
 
@@ -340,10 +368,14 @@ class Stress(Conf):
         or user interaction. If you don't commit the changes you won't see
         them in the database.
 
-        args
-        subs -- mappings of column names from the config file
-        table_filter -- filter to limit rows that should be updated
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        subs : dict
+            mappings of column names from the config file
+        table_filter : str, optional
+            filter to limit rows that should be updated
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         print("Calculating stress on paths")
 
@@ -361,14 +393,19 @@ class Stress(Conf):
         """
         Calculates stress for crossings
 
-        args
-        table -- the table root (optionally schema-qualified) to use for outputting
+        Parameters
+        ----------
+        table : str, optional
+            the table root (optionally schema-qualified) to use for outputting
             LTS scores. Final table name will have forward/backward appended to
             indicate the direction the score applies to. Defaults to "bna_stress_cross".
-        angle -- the angle that determines whether a connection from
+        angle : int or float
+            the angle that determines whether a connection from
                     one road to another constitutes a crossing
-        table_filter -- filter to limit rows that should be updated
-        dry -- a path to save SQL statements to instead of executing in DB
+        table_filter : str, optional
+            filter to limit rows that should be updated
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         if table is None:
             schema = self.schema
