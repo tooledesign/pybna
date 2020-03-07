@@ -15,9 +15,12 @@ class DestinationCategory(DBUtils):
         """Sets up a new category of BNA destinations and retrieves data from
         the given db table
 
-        config -- dictionary of config settings (usually from yaml passed to parent BNA object)
-        db_connection_string -- string to connect to the database
-        workspace_schema -- schema to save interim working tables to
+        config : dict
+            dictionary of config settings (usually from yaml passed to parent BNA object)
+        db_connection_string : str
+            string to connect to the database
+        workspace_schema : str, optional
+            schema to save interim working tables to
 
         return: None
         """
@@ -110,10 +113,13 @@ class DestinationCategory(DBUtils):
         Counts the number of destinations accessible to each block under high
         and low stress conditions
 
-        args
-        subs -- a list of sql substitutes to complement the substitutes
+        Parameters
+        ----------
+        subs : dict
+            a list of sql substitutes to complement the substitutes
             associated with this category (generally from the main BNA object)
-        conn -- a DB connection object. If none start a new connection and close it
+        conn : psycopg2 connection object, optional
+            a DB connection object. If none start a new connection and close it
             when complete
         """
         if not self.has_count:
@@ -151,10 +157,13 @@ class DestinationCategory(DBUtils):
         """
         Calculates the score for this destination category
 
-        args
-        subs -- a list of sql substitutes to complement the substitutes
+        Parameters
+        ----------
+        subs : dict
+            a list of sql substitutes to complement the substitutes
             associated with this category (generally from the main BNA object)
-        conn -- a DB connection object. If none start a new connection and close it
+        conn : psycopg2 connection object, optional
+            a DB connection object. If none start a new connection and close it
             when complete
         """
         if not self.has_count:
@@ -180,9 +189,12 @@ class DestinationCategory(DBUtils):
         Builds a case statement for comparing high stress and low stress destination
         counts using defined break points
 
-        args
-        hs_column -- the name of the column with high stress destination counts
-        ls_column -- the name of the column with low stress destination counts
+        Parameters
+        ----------
+        hs_column : str
+            the name of the column with high stress destination counts
+        ls_column : str
+            the name of the column with low stress destination counts
 
         returns
         a composed psycopg2 SQL object representing a full CASE ... END statement

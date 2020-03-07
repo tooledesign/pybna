@@ -37,12 +37,18 @@ class Core(DBUtils):
         passed to block_ids the table will have multiple travel sheds that need
         to be filtered by a user.
 
-        args
-        block_ids -- the ids to use building travel sheds
-        out_table -- the table to save travel sheds to
-        composite -- whether to save the output as a composite of all blocks or as individual sheds for each block
-        overwrite -- whether to overwrite an existing table
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        block_ids : list
+            the ids to use building travel sheds
+        out_table : str
+            the table to save travel sheds to
+        composite : bool, optional
+            whether to save the output as a composite of all blocks or as individual sheds for each block
+        overwrite : bool, optional
+            whether to overwrite an existing table
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         conn = self.get_db_connection()
 

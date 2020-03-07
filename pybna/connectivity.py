@@ -27,8 +27,10 @@ class Connectivity(DBUtils):
         """
         Builds the network in the DB using details from the BNA config file.
 
-        args:
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        dry : string
+            a path to save SQL statements to instead of executing in DB
         """
         if self.verbose:
             print("Building network in database")
@@ -170,18 +172,27 @@ class Connectivity(DBUtils):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
-        args
-        scenario_id -- the id of the scenario for which connectivity is calculated
+        Parameters
+        ----------
+        scenario_id
+            the id of the scenario for which connectivity is calculated
             (none means the scores represent the base condition)
-        origin_blocks -- list of block IDs to use as origins. if empty use all blocks.
-        destination_blocks -- list of block IDs to use as destinations. if empty use all blocks.
-        network_filter -- filter to be applied to the road network when routing
-        road_ids -- list of road_ids to be flipped to low stress (requires scenario_id)
-        append -- append to existing db table instead of creating a new one
-        subtract -- (requires scenario_id) if true the calculated scores for
+        origin_blocks : list, optional
+            list of block IDs to use as origins. if empty use all blocks.
+        destination_blocks : list, optional
+            list of block IDs to use as destinations. if empty use all blocks.
+        network_filter : str, optional
+            filter to be applied to the road network when routing
+        road_ids : list, optional
+            list of road_ids to be flipped to low stress (requires scenario_id)
+        append : bool
+            append to existing db table instead of creating a new one
+        subtract : bool
+            (requires scenario_id) if true the calculated scores for
             the scenario are flagged as a subtraction of that scenario from the
             finished network
-        dry -- a path to save SQL statements to instead of executing in DB
+        dry : str
+            a path to save SQL statements to instead of executing in DB
         """
         if scenario_id is None and subtract:
             raise ValueError("Subtract flag can only be used with a scenario")
@@ -375,10 +386,13 @@ class Connectivity(DBUtils):
         Removes the scenario(s) from the connectivity table. If no scenario_id
         is given, remove all scenarios.
 
-        args
-        scenario_ids -- list of scenarios to delete
+        Parameters
+        ----------
+        scenario_ids : list, optional
+            list of scenarios to delete
             (if none calculate for all scenarios)
-        conn -- a DB connection
+        conn : psycopg2 connection object
+            a DB connection
         """
         close_conn = False
         if conn is None:
@@ -424,17 +438,26 @@ class Connectivity(DBUtils):
         Wrapper for connectivity calculations on a given scenario, only to be
         used once the base scenario has been run.
 
-        args
-        scenario_column -- the column in the roads table indicating a scenario
-        scenario_ids -- list of scenario for which connectivity is calculated
+        Parameters
+        ----------
+        scenario_column : str
+            the column in the roads table indicating a scenario
+        scenario_ids : list, optional
+            list of scenario for which connectivity is calculated
             (if none calculate for all scenarios)
-        datatype -- the column type to use for creating the scenario column in the db
-        origin_blocks -- list of block IDs to use as origins. if empty use all blocks.
-        destination_blocks -- list of block IDs to use as destinations. if empty use all blocks.
-        network_filter -- filter to be applied to the road network when routing
-        subtract -- if true the calculated scores for the scenario represent
+        datatype : str, optional
+            the column type to use for creating the scenario column in the db
+        origin_blocks : list, optional
+            list of block IDs to use as origins. if empty use all blocks.
+        destination_blocks : list, optional
+            list of block IDs to use as destinations. if empty use all blocks.
+        network_filter : str, optional
+            filter to be applied to the road network when routing
+        subtract : bool, optional
+            if true the calculated scores for the scenario represent
             a subtraction of that scenario from all other scenarios
-        dry -- a path to save SQL statements to instead of executing in DB
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         if not self.table_exists(self.db_connectivity_table):
             raise ValueError("Connectivity table {} for the base scenario not found".format(self.db_connectivity_table))
@@ -505,11 +528,16 @@ class Connectivity(DBUtils):
         """
         Wrapper for connectivity calculations on the base scenario
 
-        args
-        blocks -- list of block IDs to use as origins. if empty use all blocks.
-        network_filter -- filter to be applied to the road network when routing
-        append -- append to existing db table instead of creating a new one
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        blocks : list, optional
+            list of block IDs to use as origins. if empty use all blocks.
+        network_filter : str, optional
+            filter to be applied to the road network when routing
+        append : bool, optional
+            append to existing db table instead of creating a new one
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         self._calculate_connectivity(
             origin_blocks=blocks,

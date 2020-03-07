@@ -29,17 +29,28 @@ class pyBNA(Conf,Destinations,Connectivity,Projects,Core):
                  host=None, db_name=None, user=None, password=None):
         """Connects to the BNA database
 
-        kwargs:
-        config -- path to the config file, if not given use the default config.yaml
-        force_net_build -- force a rebuild of the network even if an existing one is found
-        verbose -- output useful messages
-        debug -- set to debug mode
-        host -- hostname or address (overrides the config file if given)
-        db -- name of database on server (overrides the config file if given)
-        user -- username to connect to database (overrides the config file if given)
-        password -- password to connect to database (overrides the config file if given)
+        Parameters
+        ----------
+        config : str, optional
+            path to the config file, if not given use the default config.yaml
+        force_net_build : bool, optional
+            force a rebuild of the network even if an existing one is found
+        verbose : bool, optional
+            output useful messages
+        debug : bool, optional
+            set to debug mode
+        host : str, optional
+            hostname or address (overrides the config file if given)
+        db : str, optional
+            name of database on server (overrides the config file if given)
+        user : str, optional
+            username to connect to database (overrides the config file if given)
+        password : str, optional
+            password to connect to database (overrides the config file if given)
 
-        return: pyBNA object
+        Returns
+        -------
+        pyBNA object
         """
         Destinations.__init__(self)
         Connectivity.__init__(self)

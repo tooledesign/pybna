@@ -11,7 +11,7 @@ from .core import BACKWARD_DIRECTION
 
 
 class Conf(DBUtils):
-    """pyBNA Connectivity class"""
+    """pyBNA configuration class"""
 
     def __init__(self):
         DBUtils.__init__(self,"")
@@ -23,8 +23,10 @@ class Conf(DBUtils):
         Reads through the giant dictionary loaded from YAML and converts into
         munches that can be accessed with dot-notation
 
-        args:
-        config -- a dictionary of configuration options
+        Parameters
+        ----------
+        config : dict
+            a dictionary of configuration options
 
         returns:
         Munch
@@ -226,8 +228,10 @@ class Conf(DBUtils):
         Builds commonly-shared segment-oriented SQL substitutions from the
         entries in the config file
 
-        args:
-        direction -- the direction to generate substitutions for
+        Parameters
+        ----------
+        direction : str
+            the direction to generate substitutions for
 
         returns:
         a dictionary holding SQL objects
@@ -428,8 +432,10 @@ class Conf(DBUtils):
         Builds crossing SQL substitutions from the entries in the config
         file
 
-        args:
-        direction -- the direction to generate substitutions for
+        Parameters
+        ----------
+        direction : str
+            the direction to generate substitutions for
 
         returns:
         a dictionary holding SQL objects
