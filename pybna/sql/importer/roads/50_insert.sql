@@ -42,6 +42,7 @@ CREATE TEMP TABLE tmp_combined AS (
             ON osm.id = tmp_park_ft.id
         LEFT JOIN tmp_park_tf
             ON osm.id = tmp_park_tf.id
+    WHERE COALESCE(osm."bicycle",'') != 'no'
 );
 
 INSERT INTO {roads_schema}.{roads_table}
