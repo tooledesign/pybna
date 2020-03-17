@@ -54,7 +54,6 @@ CREATE TEMP TABLE tmp_raw_func AS (
                 osm.highway = 'footway'
                 AND osm.bicycle IN ('designated','yes','permissive')
                 AND COALESCE(osm.access,'yes') NOT IN ('no','private')
-                AND tmp_width.width >= 8
                 THEN 'path'
             WHEN osm.highway='service' AND osm.bicycle IN ('designated','yes','permissive')
                 THEN 'path'
