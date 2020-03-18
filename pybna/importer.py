@@ -714,56 +714,8 @@ class Importer(Conf):
 
         # set up a list of dictionaries with info about each destination
         if destination_tags is None:
-            destination_tags = [
-                {"table":"bna_colleges","tags_query": ["['amenity'='college']"]},
-                {
-                    "table":"bna_community_centers",
-                    "tags_query": [
-                        "['amenity'='community_centre']",
-                        "['amenity'='community_center']"
-                    ]
-                },
-                {"table":"bna_dentists","tags_query": ["['amenity'='dentist']"]},
-                {
-                    "table":"bna_doctors",
-                    "tags_query": [
-                        "['amenity'='doctors']",
-                        "['amenity'='doctor']",
-                        "['amenity'='clinic']"
-                    ]
-                },
-                {
-                    "table":"bna_hospitals",
-                    "tags_query": [
-                        "['amenity'='hospital']",
-                        "['amenity'='hospitals']"
-                    ]
-                },
-                {
-                    "table":"bna_parks",
-                    "tags_query": [
-                        "['amenity'='park']",
-                        "['leisure'='park']",
-                        "['leisure'='nature_reserve']",
-                        "['leisure'='playground']"
-                    ]
-                },
-                {"table":"bna_pharmacies","tags_query": ["['amenity'='pharmacy']"]},
-                {"table":"bna_retail","tags_query": ["['landuse'='retail']"]},
-                {"table":"bna_schools","tags_query": ["['amenity'='school']"]},
-                {"table":"bna_social_services","tags_query": ["['amenity'='social_facility']"]},
-                {"table":"bna_supermarkets","tags_query": ["['shop'='supermarket']"]},
-                {
-                    "table":"bna_transit",
-                    "tags_query": [
-                        "['amenity'='bus_station']",
-                        "['railway'='station']",
-                        "['public_transport'='station']"
-                    ]
-                },
-                {"table":"bna_universities","tags_query": ["['amenity'='university']"]}
-            ]
-
+            destination_tags = self.get_destination_tags()
+            
         conn = self.get_db_connection()
         for d in destination_tags:
             table = d["table"]

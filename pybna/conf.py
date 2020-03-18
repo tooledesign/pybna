@@ -663,3 +663,43 @@ class Conf(DBUtils):
             case += sql.SQL(" ELSE ") + sql.Literal(vals[-1]["else"])
         case += sql.SQL(" END ")
         return case
+
+
+    def get_destination_tags(self):
+        """
+        Compiles a list of dictionaries that describe the tables and OSM tags
+        for destinations in the config file.
+
+        returns:
+        a list of dictionaries
+        """
+        tags = []
+        for destination in self.config.bna.destinations:
+            tags.extend(self._get_destination_tags(destination))
+        return tags
+
+
+    def _get_destination_tags(self,node):
+        """
+        Helper method to be used in recursing destinations for OSM tags.
+        Returns a list of dictionaries with the table and OSM tags for the given
+        node in the destinations. If the node has subcats, appends these to the
+        result.
+
+        Parameters
+        ----------
+        node : dict
+            A destination type in the config file
+
+        returns:
+        a list of dictionaries
+        """
+        tags = []
+        if "subcats" in node:
+            for destination in node["subcats"]:
+                tags.extend(self._get_destination_tags(destination))
+
+        if "table" in node and "osm_tags_query" in node:
+            tags.append({"table":node["table"],"tags_query":node["osm_tags_query"]})
+
+        return tags
