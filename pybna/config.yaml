@@ -98,6 +98,8 @@ bna:
             breaks: {1: 30, 2: 20, 3: 20}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='school']"
           - name: colleges
             weight: 10
             table: bna_colleges
@@ -106,6 +108,8 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='college']"
           - name: universities
             weight: 20
             table: bna_universities
@@ -114,6 +118,8 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='university']"
       - name: core_services
         weight: 20
         subcats:
@@ -125,6 +131,10 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='doctors']"
+                - "['amenity'='doctor']"
+                - "['amenity'='clinic']"
           - name: dentists
             weight: 10
             table: bna_dentists
@@ -133,6 +143,8 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='dentist']"
           - name: hospitals
             weight: 20
             table: bna_hospitals
@@ -141,6 +153,9 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='hospital']"
+                - "['amenity'='hospitals']"
           - name: pharmacies
             weight: 10
             table: bna_pharmacies
@@ -149,6 +164,8 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='pharmacy']"
           - name: supermarkets
             weight: 25
             table: bna_supermarkets
@@ -157,6 +174,8 @@ bna:
             breaks: {1: 60, 2: 20}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['shop'='supermarket']"
           - name: social_services
             weight: 15
             table: bna_social_services
@@ -165,6 +184,8 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='social_facility']"
       - name: recreation
         weight: 15
         subcats:
@@ -176,6 +197,11 @@ bna:
             breaks: {1: 30, 2: 20, 3: 20}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='park']"
+                - "['leisure'='park']"
+                - "['leisure'='nature_reserve']"
+                - "['leisure'='playground']"
         #   - name: trails
         #     weight: 35
         #     table: bna_paths
@@ -191,6 +217,9 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='community_centre']"
+                - "['amenity'='community_center']"
       - name: retail
         weight: 15
         table: bna_retail
@@ -199,6 +228,8 @@ bna:
         breaks: {1: 40, 2: 20, 3: 10}
         uid: id
         geom: geom_pt
+        osm_tags_query:
+            - "['landuse'='retail']"
       - name: transit
         weight: 15
         table: bna_transit
@@ -207,6 +238,10 @@ bna:
         breaks: {1: 60}
         uid: id
         geom: geom_pt
+        osm_tags_query:
+            - "['amenity'='bus_station']"
+            - "['railway'='station']"
+            - "['public_transport'='station']"
 
 stress:
     lookup_tables:
