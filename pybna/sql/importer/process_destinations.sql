@@ -72,10 +72,3 @@ CREATE TEMP TABLE tmp_d AS (
 DELETE FROM {schema}.{final_table}
 WHERE {pkey} IN (SELECT {pkey} FROM pg_temp.tmp_d)
 ;
-
-
-
-
-ALTER TABLE {schema}.{final_table} ADD COLUMN {pkey} SERIAL PRIMARY KEY;
-ALTER TABLE {schema}.{final_table} ADD COLUMN geom_pt geometry(point,{srid});
-ALTER TABLE {schema}.{final_table} ADD COLUMN geom_poly geometry(multipolygon,{srid});
