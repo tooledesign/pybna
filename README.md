@@ -22,7 +22,7 @@ pyBNA is tested with Python 3.6. The following libraries are required:
 - geopandas
 - munch
 - overpass
-- omsnx
+- osmnx
 
 A requirements.txt file is provided for convenience. You can install these via
 pip:
