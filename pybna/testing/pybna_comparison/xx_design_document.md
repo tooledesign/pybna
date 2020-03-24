@@ -12,7 +12,7 @@ Our process should proceed as follows:
 - [x]  Import destinations from OSM using pybna
 - [x]  Manually calculate hs/ls destination counts for each block using website_connected_census_blocks (this represents the website condition, but using updated destination data since we don't have the destination sets used in the website BNA run)
 - [x]  Reconstruct the intersection layer using the intersection_from/intersection_to columns in website_neighborhood_ways.
-- [ ]  Run pybna on website_neighborhood_ways to create a connected blocks table for pybna.
+- [x]  Run pybna on website_neighborhood_ways to create a connected blocks table for pybna.
 - [ ]  Calculate hs/ls destination counts for each block and compare with counts generated in Step 2.
 - [ ]  Import new OSM network using pybna and run LTS
 - [ ]  Compare LTS in Step 6 with LTS from website in website_neighborhood_ways

@@ -45,7 +45,7 @@ bna:
                     forward: ft_int_str
                     backward: tf_int_str
         intersections:
-            table: "scratch.dummy_ints"
+            table: "scratch.dummy_ints" #where does this get used?
             geom: "geom"
             uid: "id"
             cluster_distance: 5
@@ -61,7 +61,7 @@ bna:
             id_column: node_id
 
     connectivity:
-        table: "website_connected_census_blocks_second"
+        table: "website_connected_census_blocks" #where does this get used? 
         source_column: "source_blockid10"
         target_column: "target_blockid10"
         max_distance: 2680
