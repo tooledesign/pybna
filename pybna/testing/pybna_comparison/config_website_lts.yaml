@@ -31,7 +31,7 @@ bna:
 
     network:
         roads:
-            table: "received.website_neighborhood_ways"
+            table: "received.updated_ways"
             geom: "geom"
             uid: "road_id"
             source_column: "intersection_from"
@@ -45,23 +45,23 @@ bna:
                     forward: ft_int_str
                     backward: tf_int_str
         intersections:
-            table: "scratch.dummy_ints" #where does this get used?
+            table: "scratch.updated_ints" #where does this get used?
             geom: "geom"
             uid: "id"
             cluster_distance: 5
         edges:
-            table: "website_net_edge"
+            table: "website_net_edge"  #force_net_build = True will replace this table.
             source_column: "source_node"
             target_column: "target_node"
             stress_column: "edge_stress"
             cost_column: "edge_cost"
             id_column: edge_id
         nodes:
-            table: "website_net_node"
+            table: "website_net_node" #force_net_build  = True will replace this as well.
             id_column: node_id
 
     connectivity:
-        table: "website_connected_census_blocks" #where does this get used? 
+        table: "website_connected_census_blocks_second_matrix" #where does this get used?
         source_column: "source_blockid10"
         target_column: "target_blockid10"
         max_distance: 2680
@@ -273,7 +273,7 @@ stress:
         intersection_tolerance: 5
         control:
             # control is required
-            table: website_ways_intersections
+            table: received.updated_ints
             geom: geom
             column:
                 name: "control"
@@ -282,7 +282,7 @@ stress:
                 rrfb: "rrfb"
                 hawk: "hawk"
         island:
-            table: website_ways_intersections
+            table: received.updated_ints
             geom: geom
             column:
                 name: "island"
