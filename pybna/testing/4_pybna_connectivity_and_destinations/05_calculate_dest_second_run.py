@@ -1,8 +1,11 @@
 
 import pybna
 
+config="/home/spencer/dev/pybna/pybna/testing/4_pybna_connectivity_and_destinations/config_website.yaml"
+# config="C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\4_pybna_connectivity_and_destinations\\config_website.yaml"
+
 # connectivity
-bna = pybna.pyBNA(config='C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\pybna_comparison\\config_website.yaml',
+bna = pybna.pyBNA(config=config,
                   force_net_build=False,
                   verbose=False,
                   debug=False,
@@ -11,7 +14,7 @@ bna = pybna.pyBNA(config='C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\py
                   user=None,
                   password=None)
 # use wrapper
-bna.score_destinations(output_table="automated.bna_score_destinations_second",
+bna.score_destinations(output_table="automated.pybna_scores",
                        scenario_id=None,                                       # no scenario ID
                        subtract=False,                                         # no scenario condition
                        with_geoms=True,                                        # inlcude geoms
