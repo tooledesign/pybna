@@ -6,3 +6,5 @@ psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborho
 psql -h 192.168.60.220 -U gis -d bna -c "CREATE INDEX madison_received_neighborhood_ways_geom_idx ON received.website_neighborhood_ways USING GIST(geom); ANALYZE received.website_neighborhood_ways"
 psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET ft_bike_in = 'path' WHERE ft_bike_in is null and functional = 'path'"
 psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET tf_bike_in = 'path' WHERE tf_bike_in is null and functional = 'path'"
+psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET tf_bike_in = 'track' WHERE tf_bike_in is null and functional = 'track'"
+psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET tf_bike_in = 'track' WHERE tf_bike_in is null and functional = 'track'"
