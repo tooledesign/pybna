@@ -3,8 +3,8 @@
 
 import pybna
 
-# calculate stress
-bna = pybna.Stress(config='C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\pybna_comparison\\config_website_lts.yaml',
+# calculate stress on downloaded OSM network using pybna tool
+bna = pybna.Stress(config='C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\5_LTS_on_imported_data\\config_website_lts.yaml',
                    create_lookups=True,
                    verbose=False)
 

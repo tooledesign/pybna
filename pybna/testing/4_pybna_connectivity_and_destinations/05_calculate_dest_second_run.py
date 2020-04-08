@@ -1,8 +1,8 @@
 
 import pybna
 
-config="/home/spencer/dev/pybna/pybna/testing/4_pybna_connectivity_and_destinations/config_website.yaml"
-# config="C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\4_pybna_connectivity_and_destinations\\config_website.yaml"
+#config="/home/spencer/dev/pybna/pybna/testing/4_pybna_connectivity_and_destinations/config_pybna.yaml"
+config="C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\4_pybna_connectivity_and_destinations\\config_pybna.yaml"
 
 # connectivity
 bna = pybna.pyBNA(config=config,

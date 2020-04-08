@@ -61,7 +61,7 @@ bna:
             id_column: node_id
 
     connectivity:
-        table: "website_connected_census_blocks_second_matrix" #where does this get used?
+        table: "pybna_connected_census_blocks_4_6_2020" #this is the connectivity output table
         source_column: "source_blockid10"
         target_column: "target_blockid10"
         max_distance: 2680

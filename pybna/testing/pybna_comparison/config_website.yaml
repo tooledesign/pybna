@@ -61,7 +61,7 @@ bna:
             id_column: node_id
 
     connectivity:
-        table: "website_connected_census_blocks" #where does this get used? 
+        table: "website_connected_census_blocks" #where does this get used?
         source_column: "source_blockid10"
         target_column: "target_blockid10"
         max_distance: 2680
