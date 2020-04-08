@@ -8,11 +8,11 @@ bna = pybna.Stress(config='C:\\Users\\dpatterson\\code\\pybna\\pybna\\testing\\6
                    create_lookups=True,
                    verbose=False)
 
-bna.segment_stress(table="received.website_ways_pybna_stress_scores",
+bna.segment_stress(table="automated.website_ways_through_pybna_for_lts_segment",
                     table_filter=None,
                     dry=None)
 
-bna.crossing_stress(table="received.website_crossing_pybna_stress_scores",
+bna.crossing_stress(table="automated.website_ways_through_pybna_for_lts_crossing",
                     angle=20,
                     table_filter=None,
                     dry=None)
