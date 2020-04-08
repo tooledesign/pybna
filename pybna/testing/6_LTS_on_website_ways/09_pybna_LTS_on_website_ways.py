@@ -14,5 +14,5 @@ bna.segment_stress(table="received.website_ways_pybna_stress_scores",
 
 bna.crossing_stress(table="received.website_crossing_pybna_stress_scores",
                     angle=20,
-                    table_filter=None,s
+                    table_filter=None,
                     dry=None)

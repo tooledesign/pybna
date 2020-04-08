@@ -264,7 +264,6 @@ class Stress(Conf):
                 subs["out_schema"] = sql.Identifier(schema)
                 subs["out_table"] = sql.Identifier("_".join([table,direction]))
                 self._run_sql_script("create_output.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
-
                 # call the various segment stress methods
                 self._segment_stress_shared(conn,subs,table_filter,dry=dry)
                 self._segment_stress_bike_lane(conn,subs,table_filter,dry=dry)
