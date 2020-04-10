@@ -40,7 +40,7 @@ bna:
             stress:
                 segment:
                     forward: ft_seg_stress_pybna # added new columns to compare against old scores
-                    backward: tf_seg_stress_pybna
+                    backward: tf_seg_stress_pybna # these are where stress scores are placed, will overwrite
                 crossing:
                     forward: ft_cross_stress_pybna
                     backward: tf_cross_stress_pybna
