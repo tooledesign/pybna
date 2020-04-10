@@ -1,4 +1,4 @@
-psql -h 192.168.60.220 -U gis -d california -c "DROP TABLE IF EXISTS received.website_neighborhood_ways"
+psql -h 192.168.60.220 -U gis -d bna -c "DROP TABLE IF EXISTS received.website_neighborhood_ways"
 ogr2ogr -lco GEOMETRY_NAME=geom -lco precision=NO  -f "PostgreSQL" PG:"host=192.168.60.220 port=5432 dbname=bna user=gis password=gis" "C:\Users\dpatterson\Downloads\neighborhood_ways (2)\neighborhood_ways.shp" -t_srs EPSG:26916 -nln received.website_neighborhood_ways -overwrite -progress --config PG_USE_COPY YES
 psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborhood_ways RENAME ogc_fid TO id"
 psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborhood_ways RENAME intersecti TO intersection_from"
@@ -6,5 +6,10 @@ psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborho
 psql -h 192.168.60.220 -U gis -d bna -c "CREATE INDEX madison_received_neighborhood_ways_geom_idx ON received.website_neighborhood_ways USING GIST(geom); ANALYZE received.website_neighborhood_ways"
 psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET ft_bike_in = 'path' WHERE ft_bike_in is null and functional = 'path'"
 psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET tf_bike_in = 'path' WHERE tf_bike_in is null and functional = 'path'"
+psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET ft_bike_in = 'track' WHERE ft_bike_in is null and functional = 'track'"
 psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET tf_bike_in = 'track' WHERE tf_bike_in is null and functional = 'track'"
-psql -h 192.168.60.220 -U gis -d bna -c "UPDATE received.website_neighborhood_ways SET tf_bike_in = 'track' WHERE tf_bike_in is null and functional = 'track'"
+psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborhood_ways ADD COLUMN ft_parking BOOLEAN DEFAULT NULL; UPDATE received.website_neighborhood_ways SET ft_parking = (SELECT CASE WHEN ft_park is not null then true else null end);"
+psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborhood_ways ADD COLUMN tf_parking BOOLEAN DEFAULT NULL; UPDATE received.website_neighborhood_ways SET tf_parking = (SELECT CASE WHEN tf_park is not null then true else null end);"
+psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborhood_ways DROP COLUMN ft_park, DROP COLUMN tf_park;"
+psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborhood_ways RENAME ft_parking TO ft_park; ALTER TABLE received.website_neighborhood_ways RENAME tf_parking TO tf_park"
+psql -h 192.168.60.220 -U gis -d bna -c "ALTER TABLE received.website_neighborhood_ways ADD COLUMN ft_park_width int, ADD COLUMN tf_park_width INT;"

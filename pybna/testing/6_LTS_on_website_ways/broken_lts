@@ -1,0 +1,454 @@
+CREATE TABLE "automated"."website_ways_through_pybna_for_lts_segment_break_forward" AS (
+    SELECT
+        "id",
+        "geom",
+        NULL::INTEGER AS lanes,
+        NULL::BOOLEAN AS marked_centerline,
+        NULL::INTEGER AS speed,
+        NULL::INTEGER AS effective_aadt,
+        NULL::BOOLEAN AS parking,
+        NULL::INTEGER AS parking_width,
+        NULL::INTEGER AS bike_lane_width,
+        NULL::INTEGER AS stress
+    FROM "automated"."website_pybna_lts_neighborhood_ways_break"
+    WHERE FALSE
+);
+
+-----------------------------------------------
+-- mixed traffic with all available data,
+-- also bike lanes of substandard width
+-- (uses tables in DB, based on Furth 2017 with
+-- some adjustments)
+-----------------------------------------------
+
+-- #reading given and assumed road characteristics;
+DROP TABLE IF EXISTS pg_temp.tmp_attrs;
+
+-- two way
+CREATE TEMP TABLE tmp_attrs AS (
+    SELECT
+        "id"::INTEGER AS id,
+        COALESCE("ft_lanes", CASE  WHEN functional IN ('primary','secondary') THEN 2 WHEN functional IN ('tertiary') THEN 1 ELSE 1 END )::INTEGER AS lanes,
+        COALESCE((NULL=NULL), CASE  WHEN functional IN ('primary','secondary','tertiary') THEN true ELSE false END )::BOOLEAN AS marked_centerline,
+        COALESCE("speed_limi", CASE  WHEN functional IN ('primary','secondary') THEN 40 WHEN functional = 'tertiary' THEN 30 WHEN functional IN ('unclassified','residential') THEN 25 ELSE 30 END )::INTEGER AS speed,
+        COALESCE(NULL, CASE  WHEN functional IN ('primary','secondary') THEN 20000 WHEN functional = 'tertiary' THEN 10000 WHEN functional IN ('unclassified','residential') THEN 500 ELSE 20000 END )::INTEGER AS effective_aadt
+    FROM
+        "automated"."website_pybna_lts_neighborhood_ways_break"
+    WHERE
+        ("ft_bike_in" IS NULL OR "ft_bike_in" NOT IN ('lane','buffered_lane','track','path'))
+        AND TRUE
+        AND ("one_way" IS NULL OR "one_way" NOT IN ('ft','tf'))
+);
+
+-- one way
+INSERT INTO pg_temp.tmp_attrs
+SELECT
+    "id"::INTEGER,
+    COALESCE("ft_lanes", CASE  WHEN functional IN ('primary','secondary') THEN 2 WHEN functional IN ('tertiary') THEN 1 ELSE 1 END )::INTEGER,
+    TRUE::BOOLEAN,
+    COALESCE("speed_limi", CASE  WHEN functional IN ('primary','secondary') THEN 40 WHEN functional = 'tertiary' THEN 30 WHEN functional IN ('unclassified','residential') THEN 25 ELSE 30 END )::INTEGER,
+    (COALESCE(NULL, CASE  WHEN functional IN ('primary','secondary') THEN 20000 WHEN functional = 'tertiary' THEN 10000 WHEN functional IN ('unclassified','residential') THEN 500 ELSE 20000 END )*1.67)::INTEGER
+FROM
+    "automated"."website_pybna_lts_neighborhood_ways_break"
+WHERE
+    ("ft_bike_in" IS NULL OR "ft_bike_in" NOT IN ('lane','buffered_lane','track','path'))
+    AND TRUE
+    AND ("one_way"='ft')
+;
+
+CREATE INDEX tidx_tmp_attrs_id ON pg_temp.tmp_attrs (id); ANALYZE pg_temp.tmp_attrs;
+
+
+-- #comparing against LTS tables;
+DROP TABLE IF EXISTS pg_temp.tmp_stress;
+CREATE TEMP TABLE pg_temp.tmp_stress AS (
+    SELECT DISTINCT ON (tmp_attrs.id)
+        tmp_attrs.id,
+        lts.stress
+    FROM
+        pg_temp.tmp_attrs,
+        "generated"."stress_shared" lts
+    WHERE
+        tmp_attrs.lanes <= lts.lanes
+        AND tmp_attrs.marked_centerline = lts.marked_centerline
+        AND tmp_attrs.speed <= lts.speed
+        AND tmp_attrs.effective_aadt <= lts.effective_aadt
+    ORDER BY
+        tmp_attrs.id,
+        lts.stress ASC
+);
+
+CREATE INDEX tidx_tmp_stress_id ON pg_temp.tmp_stress (id); ANALYZE pg_temp.tmp_stress;
+
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_forward" (
+    "id",
+    "geom",
+    lanes,
+    marked_centerline,
+    speed,
+    effective_aadt,
+    stress
+)
+SELECT
+    tmp_attrs.id,
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    tmp_attrs.lanes,
+    tmp_attrs.marked_centerline,
+    tmp_attrs.speed,
+    tmp_attrs.effective_aadt,
+    tmp_stress.stress
+FROM
+    pg_temp.tmp_attrs,
+    "automated"."website_pybna_lts_neighborhood_ways_break",
+    pg_temp.tmp_stress
+WHERE
+    tmp_attrs.id = "website_pybna_lts_neighborhood_ways_break"."id"
+    AND tmp_attrs.id = tmp_stress.id
+;
+
+-----------------------------------------------
+-- bike lanes with all avaialble data
+-- (uses tables in DB, based on Furth 2017 with
+-- some adjustments based on direction from prime)
+-----------------------------------------------
+
+-- #reading given and assumed road characteristics
+DROP TABLE IF EXISTS pg_temp.tmp_attrs;
+CREATE TEMP TABLE pg_temp.tmp_attrs AS (
+    SELECT
+        "id"::INTEGER AS id,
+        COALESCE("ft_lanes", CASE  WHEN functional IN ('primary','secondary') THEN 2 WHEN functional IN ('tertiary') THEN 1 ELSE 1 END )::INTEGER AS lanes,
+        ("one_way"='ft')::BOOLEAN AS oneway,
+        COALESCE(("ft_park"=true), CASE  WHEN TRUE THEN true END )::BOOLEAN AS parking,
+        COALESCE("ft_park_width", CASE  WHEN functional IN ('primary','secondary', 'tertiary') THEN 8 ELSE 0 END )::INTEGER AS parking_width,
+        COALESCE("ft_bike_01", CASE  WHEN functional IN ('primary','secondary', 'tertiary') AND ft_bike_in = 'buffered_lane' THEN 6 WHEN functional IN ('primary','secondary', 'tertiary') AND tf_bike_in = 'buffered_lane' THEN 6 WHEN functional IN ('primary','secondary', 'tertiary') AND ft_bike_in = 'bike_lane' AND ft_park = TRUE THEN 5 WHEN functional IN ('primary','secondary', 'tertiary') AND ft_bike_in = 'bike_lane' AND ft_park = FALSE THEN 4 WHEN functional IN ('primary','secondary', 'tertiary') AND tf_bike_in = 'bike_lane' AND tf_park = TRUE THEN 5 WHEN functional IN ('primary','secondary', 'tertiary') AND tf_bike_in = 'bike_lane' AND tf_park = FALSE THEN 4 ELSE 5 END )::INTEGER AS bike_lane_width,
+        COALESCE("speed_limi", CASE  WHEN functional IN ('primary','secondary') THEN 40 WHEN functional = 'tertiary' THEN 30 WHEN functional IN ('unclassified','residential') THEN 25 ELSE 30 END )::INTEGER AS speed
+    FROM
+        "automated"."website_pybna_lts_neighborhood_ways_break"
+    WHERE
+        ("ft_bike_in" IN ('lane','buffered_lane'))
+        AND TRUE
+);
+
+CREATE INDEX tidx_tmp_attrs_id ON pg_temp.tmp_attrs (id); ANALYZE pg_temp.tmp_attrs;
+
+-- #comparing against LTS tables;
+DROP TABLE IF EXISTS pg_temp.tmp_stress;
+CREATE TEMP TABLE pg_temp.tmp_stress AS (
+    SELECT DISTINCT ON (tmp_attrs.id)
+        tmp_attrs.id,
+        lts.stress
+    FROM
+        pg_temp.tmp_attrs,
+        "generated"."stress_bike_lane" lts
+    WHERE
+        tmp_attrs.lanes <= lts.lanes
+        AND (lts.oneway IS NULL OR tmp_attrs.oneway = lts.oneway)
+        AND tmp_attrs.parking = lts.parking
+        AND (tmp_attrs.parking_width * tmp_attrs.parking::INTEGER) + tmp_attrs.bike_lane_width >= lts.reach
+        AND tmp_attrs.speed <= lts.speed
+    ORDER BY
+        tmp_attrs.id,
+        lts.stress ASC
+);
+
+CREATE INDEX tidx_tmp_stress_id ON pg_temp.tmp_stress (id); ANALYZE pg_temp.tmp_stress;
+
+-- insert
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_forward" (
+    "id",
+    "geom",
+    lanes,
+    parking,
+    parking_width,
+    bike_lane_width,
+    speed,
+    stress
+)
+SELECT
+    tmp_attrs.id,
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    tmp_attrs.lanes,
+    tmp_attrs.parking,
+    tmp_attrs.parking_width,
+    tmp_attrs.bike_lane_width,
+    tmp_attrs.speed,
+    tmp_stress.stress
+FROM
+    pg_temp.tmp_attrs,
+    "automated"."website_pybna_lts_neighborhood_ways_break",
+    pg_temp.tmp_stress
+WHERE
+    tmp_attrs.id = "website_pybna_lts_neighborhood_ways_break"."id"
+    AND tmp_attrs.id = tmp_stress.id
+;
+
+-----------------------------------------------
+-- cycle tracks
+-- (assumes LTS = 1)
+-----------------------------------------------
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_forward" (
+    "id",
+    "geom",
+    stress
+)
+SELECT
+    "id",
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    1
+FROM "automated"."website_pybna_lts_neighborhood_ways_break"
+WHERE ("ft_bike_in"='track')
+;
+
+-----------------------------------------------
+-- paths
+-- (assumes LTS = 1)
+-----------------------------------------------
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_forward" (
+    "id",
+    "geom",
+    stress
+)
+SELECT
+    "id",
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    1
+FROM "automated"."website_pybna_lts_neighborhood_ways_break"
+WHERE ("ft_bike_in"='path')
+;
+
+UPDATE "automated"."website_pybna_lts_neighborhood_ways_break" SET "ft_seg_stress_pybna" = NULL;
+
+UPDATE "automated"."website_pybna_lts_neighborhood_ways_break" base
+SET "ft_seg_stress_pybna" = out.stress
+FROM "automated"."website_ways_through_pybna_for_lts_segment_break_forward" out
+WHERE base."id" = out."id"
+;
+
+CREATE TABLE "automated"."website_ways_through_pybna_for_lts_segment_break_backward" AS (
+    SELECT
+        "id",
+        "geom",
+        NULL::INTEGER AS lanes,
+        NULL::BOOLEAN AS marked_centerline,
+        NULL::INTEGER AS speed,
+        NULL::INTEGER AS effective_aadt,
+        NULL::BOOLEAN AS parking,
+        NULL::INTEGER AS parking_width,
+        NULL::INTEGER AS bike_lane_width,
+        NULL::INTEGER AS stress
+    FROM "automated"."website_pybna_lts_neighborhood_ways_break"
+    WHERE FALSE
+);
+
+-----------------------------------------------
+-- mixed traffic with all available data,
+-- also bike lanes of substandard width
+-- (uses tables in DB, based on Furth 2017 with
+-- some adjustments)
+-----------------------------------------------
+
+-- #reading given and assumed road characteristics;
+DROP TABLE IF EXISTS pg_temp.tmp_attrs;
+
+-- two way
+CREATE TEMP TABLE tmp_attrs AS (
+    SELECT
+        "id"::INTEGER AS id,
+        COALESCE("tf_lanes", CASE  WHEN functional IN ('primary','secondary') THEN 2 WHEN functional IN ('tertiary') THEN 1 ELSE 1 END )::INTEGER AS lanes,
+        COALESCE((NULL=NULL), CASE  WHEN functional IN ('primary','secondary','tertiary') THEN true ELSE false END )::BOOLEAN AS marked_centerline,
+        COALESCE("speed_limi", CASE  WHEN functional IN ('primary','secondary') THEN 40 WHEN functional = 'tertiary' THEN 30 WHEN functional IN ('unclassified','residential') THEN 25 ELSE 30 END )::INTEGER AS speed,
+        COALESCE(NULL, CASE  WHEN functional IN ('primary','secondary') THEN 20000 WHEN functional = 'tertiary' THEN 10000 WHEN functional IN ('unclassified','residential') THEN 500 ELSE 20000 END )::INTEGER AS effective_aadt
+    FROM
+        "automated"."website_pybna_lts_neighborhood_ways_break"
+    WHERE
+        ("tf_bike_in" IS NULL OR "tf_bike_in" NOT IN ('lane','buffered_lane','track','path'))
+        AND TRUE
+        AND ("one_way" IS NULL OR "one_way" NOT IN ('ft','tf'))
+);
+
+-- one way
+INSERT INTO pg_temp.tmp_attrs
+SELECT
+    "id"::INTEGER,
+    COALESCE("tf_lanes", CASE  WHEN functional IN ('primary','secondary') THEN 2 WHEN functional IN ('tertiary') THEN 1 ELSE 1 END )::INTEGER,
+    TRUE::BOOLEAN,
+    COALESCE("speed_limi", CASE  WHEN functional IN ('primary','secondary') THEN 40 WHEN functional = 'tertiary' THEN 30 WHEN functional IN ('unclassified','residential') THEN 25 ELSE 30 END )::INTEGER,
+    (COALESCE(NULL, CASE  WHEN functional IN ('primary','secondary') THEN 20000 WHEN functional = 'tertiary' THEN 10000 WHEN functional IN ('unclassified','residential') THEN 500 ELSE 20000 END )*1.67)::INTEGER
+FROM
+    "automated"."website_pybna_lts_neighborhood_ways_break"
+WHERE
+    ("tf_bike_in" IS NULL OR "tf_bike_in" NOT IN ('lane','buffered_lane','track','path'))
+    AND TRUE
+    AND ("one_way"='tf')
+;
+
+CREATE INDEX tidx_tmp_attrs_id ON pg_temp.tmp_attrs (id); ANALYZE pg_temp.tmp_attrs;
+
+
+-- #comparing against LTS tables;
+DROP TABLE IF EXISTS pg_temp.tmp_stress;
+CREATE TEMP TABLE pg_temp.tmp_stress AS (
+    SELECT DISTINCT ON (tmp_attrs.id)
+        tmp_attrs.id,
+        lts.stress
+    FROM
+        pg_temp.tmp_attrs,
+        "generated"."stress_shared" lts
+    WHERE
+        tmp_attrs.lanes <= lts.lanes
+        AND tmp_attrs.marked_centerline = lts.marked_centerline
+        AND tmp_attrs.speed <= lts.speed
+        AND tmp_attrs.effective_aadt <= lts.effective_aadt
+    ORDER BY
+        tmp_attrs.id,
+        lts.stress ASC
+);
+
+CREATE INDEX tidx_tmp_stress_id ON pg_temp.tmp_stress (id); ANALYZE pg_temp.tmp_stress;
+
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_backward" (
+    "id",
+    "geom",
+    lanes,
+    marked_centerline,
+    speed,
+    effective_aadt,
+    stress
+)
+SELECT
+    tmp_attrs.id,
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    tmp_attrs.lanes,
+    tmp_attrs.marked_centerline,
+    tmp_attrs.speed,
+    tmp_attrs.effective_aadt,
+    tmp_stress.stress
+FROM
+    pg_temp.tmp_attrs,
+    "automated"."website_pybna_lts_neighborhood_ways_break",
+    pg_temp.tmp_stress
+WHERE
+    tmp_attrs.id = "website_pybna_lts_neighborhood_ways_break"."id"
+    AND tmp_attrs.id = tmp_stress.id
+;
+
+-----------------------------------------------
+-- bike lanes with all avaialble data
+-- (uses tables in DB, based on Furth 2017 with
+-- some adjustments based on direction from prime)
+-----------------------------------------------
+
+-- #reading given and assumed road characteristics
+DROP TABLE IF EXISTS pg_temp.tmp_attrs;
+CREATE TEMP TABLE pg_temp.tmp_attrs AS (
+    SELECT
+        "id"::INTEGER AS id,
+        COALESCE("tf_lanes", CASE  WHEN functional IN ('primary','secondary') THEN 2 WHEN functional IN ('tertiary') THEN 1 ELSE 1 END )::INTEGER AS lanes,
+        ("one_way"='tf')::BOOLEAN AS oneway,
+        COALESCE(("tf_park"=true), CASE  WHEN TRUE THEN true END )::BOOLEAN AS parking,
+        COALESCE("tf_park_width", CASE  WHEN functional IN ('primary','secondary', 'tertiary') THEN 8 ELSE 0 END )::INTEGER AS parking_width,
+        COALESCE("tf_bike_01", CASE  WHEN functional IN ('primary','secondary', 'tertiary') AND ft_bike_in = 'buffered_lane' THEN 6 WHEN functional IN ('primary','secondary', 'tertiary') AND tf_bike_in = 'buffered_lane' THEN 6 WHEN functional IN ('primary','secondary', 'tertiary') AND ft_bike_in = 'bike_lane' AND ft_park = TRUE THEN 5 WHEN functional IN ('primary','secondary', 'tertiary') AND ft_bike_in = 'bike_lane' AND ft_park = FALSE THEN 4 WHEN functional IN ('primary','secondary', 'tertiary') AND tf_bike_in = 'bike_lane' AND tf_park = TRUE THEN 5 WHEN functional IN ('primary','secondary', 'tertiary') AND tf_bike_in = 'bike_lane' AND tf_park = FALSE THEN 4 ELSE 5 END )::INTEGER AS bike_lane_width,
+        COALESCE("speed_limi", CASE  WHEN functional IN ('primary','secondary') THEN 40 WHEN functional = 'tertiary' THEN 30 WHEN functional IN ('unclassified','residential') THEN 25 ELSE 30 END )::INTEGER AS speed
+    FROM
+        "automated"."website_pybna_lts_neighborhood_ways_break"
+    WHERE
+        ("tf_bike_in" IN ('lane','buffered_lane'))
+        AND TRUE
+);
+
+CREATE INDEX tidx_tmp_attrs_id ON pg_temp.tmp_attrs (id); ANALYZE pg_temp.tmp_attrs;
+
+-- #comparing against LTS tables;
+DROP TABLE IF EXISTS pg_temp.tmp_stress;
+CREATE TEMP TABLE pg_temp.tmp_stress AS (
+    SELECT DISTINCT ON (tmp_attrs.id)
+        tmp_attrs.id,
+        lts.stress
+    FROM
+        pg_temp.tmp_attrs,
+        "generated"."stress_bike_lane" lts
+    WHERE
+        tmp_attrs.lanes <= lts.lanes
+        AND (lts.oneway IS NULL OR tmp_attrs.oneway = lts.oneway)
+        AND tmp_attrs.parking = lts.parking
+        AND (tmp_attrs.parking_width * tmp_attrs.parking::INTEGER) + tmp_attrs.bike_lane_width >= lts.reach
+        AND tmp_attrs.speed <= lts.speed
+    ORDER BY
+        tmp_attrs.id,
+        lts.stress ASC
+);
+
+CREATE INDEX tidx_tmp_stress_id ON pg_temp.tmp_stress (id); ANALYZE pg_temp.tmp_stress;
+
+-- insert
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_backward" (
+    "id",
+    "geom",
+    lanes,
+    parking,
+    parking_width,
+    bike_lane_width,
+    speed,
+    stress
+)
+SELECT
+    tmp_attrs.id,
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    tmp_attrs.lanes,
+    tmp_attrs.parking,
+    tmp_attrs.parking_width,
+    tmp_attrs.bike_lane_width,
+    tmp_attrs.speed,
+    tmp_stress.stress
+FROM
+    pg_temp.tmp_attrs,
+    "automated"."website_pybna_lts_neighborhood_ways_break",
+    pg_temp.tmp_stress
+WHERE
+    tmp_attrs.id = "website_pybna_lts_neighborhood_ways_break"."id"
+    AND tmp_attrs.id = tmp_stress.id
+;
+
+-----------------------------------------------
+-- cycle tracks
+-- (assumes LTS = 1)
+-----------------------------------------------
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_backward" (
+    "id",
+    "geom",
+    stress
+)
+SELECT
+    "id",
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    1
+FROM "automated"."website_pybna_lts_neighborhood_ways_break"
+WHERE ("tf_bike_in"='track')
+;
+
+-----------------------------------------------
+-- paths
+-- (assumes LTS = 1)
+-----------------------------------------------
+INSERT INTO "automated"."website_ways_through_pybna_for_lts_segment_break_backward" (
+    "id",
+    "geom",
+    stress
+)
+SELECT
+    "id",
+    "website_pybna_lts_neighborhood_ways_break".geom,
+    1
+FROM "automated"."website_pybna_lts_neighborhood_ways_break"
+WHERE ("tf_bike_in"='path')
+;
+
+UPDATE "automated"."website_pybna_lts_neighborhood_ways_break" SET "tf_seg_stress_pybna" = NULL;
+
+UPDATE "automated"."website_pybna_lts_neighborhood_ways_break" base
+SET "tf_seg_stress_pybna" = out.stress
+FROM "automated"."website_ways_through_pybna_for_lts_segment_break_backward" out
+WHERE base."id" = out."id"
+;
+
