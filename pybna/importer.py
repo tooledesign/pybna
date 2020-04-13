@@ -377,9 +377,9 @@ class Importer(Conf):
             if true, saves the raw OSM import to the roads/ints schemas
         srid : int or str, optional
             projection to use
-        km : str, optional
+        km : bool, optional
             if true, units for measurements and speed limits are imported to
-            metric equivalents
+            metric
         overwrite : bool, optional
             whether to overwrite any existing tables
         """
