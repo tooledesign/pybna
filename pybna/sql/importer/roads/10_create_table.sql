@@ -7,7 +7,7 @@ CREATE TABLE {roads_schema}.{roads_table} (
     {roads_oneway_col} TEXT,
     {roads_source_col} INTEGER,
     {roads_target_col} INTEGER,
-    width_ft FLOAT,
+    width FLOAT,
     speed_limit INTEGER,
     ft_bike_infra TEXT,
     ft_bike_infra_width FLOAT,
