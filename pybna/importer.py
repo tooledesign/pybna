@@ -355,7 +355,7 @@ class Importer(Conf):
     def import_osm_network(self,roads_table=None,ints_table=None,
                            boundary_file=None,boundary_buffer=None,
                            osm_file=None,keep_holding_tables=False,srid=None,
-                           km=self.km,overwrite=False):
+                           km=None,overwrite=False):
         """
         Imports OSM ways/nodes and copies the data into the database with attributes
         needed for LTS scoring.
@@ -413,6 +413,8 @@ class Importer(Conf):
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
         crs = "epsg:{:d}".format(srid)
+        if km is None:
+            km = self.km
 
         # generate table names for holding tables
         osm_ways_table = "osm_ways_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
@@ -497,14 +499,11 @@ class Importer(Conf):
             name of the OSM nodes table
         osm_nodes_schema : str
             name of the OSM nodes schema
-<<<<<<< HEAD
         srid : int or str, optional
             projection to use
-=======
         km : str, optional
             if true, units for measurements and speed limits are imported to
             metric equivalents
->>>>>>> Allow for metric widths
         overwrite : bool, optional
             overwrite an existing table
         conn : psycopg2 connection object, optional
@@ -514,6 +513,8 @@ class Importer(Conf):
         if conn is None:
             conn = self.get_db_connection()
             commit = True
+        if km is None:
+            km = self.km
 
         subs = dict(self.sql_subs)
         subs["roads_table"] = sql.Identifier(roads_table)
@@ -526,12 +527,8 @@ class Importer(Conf):
         subs["osm_ways_schema"] = sql.Identifier(osm_ways_schema)
         subs["osm_nodes_table"] = sql.Identifier(osm_nodes_table)
         subs["osm_nodes_schema"] = sql.Identifier(osm_nodes_schema)
-<<<<<<< HEAD
         subs["srid"] = sql.Literal(srid)
-        if self.km:
-=======
         if km:
->>>>>>> Allow for metric widths
             subs["km_multiplier"] = sql.Literal(1)
             subs["m_multiplier"] = sql.Literal(1)
             subs["mi_multiplier"] = sql.Literal(1.609344)
