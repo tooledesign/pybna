@@ -53,7 +53,7 @@ CREATE TEMP TABLE tmp_speed_km_to_mph AS (
             (120,75),
             (130,80),
             (140,85)
-    ) AS t (mph, km)
+    ) AS t (km, mph)
 );
 
 DROP TABLE IF EXISTS tmp_raw_speed;
@@ -79,7 +79,7 @@ CREATE TEMP TABLE tmp_speed_conversion AS (
                 {mi_multiplier} * raw.speed
             )
             WHEN (raw.mph IS FALSE) AND ({km} IS FALSE) THEN COALESCE(
-                mph_to_km.km,
+                km_to_mph.mph,
                 {km_multiplier} * raw.speed
             )
             END AS speed
