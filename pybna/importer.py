@@ -463,7 +463,7 @@ class Importer(Conf):
 
         self._process_osm(
             roads_table,roads_schema,ints_table,ints_schema,osm_ways_table,
-            osm_ways_schema,osm_nodes_table,osm_nodes_schema,overwrite,conn
+            osm_ways_schema,osm_nodes_table,osm_nodes_schema,srid,overwrite,conn
         )
 
         conn.commit()
@@ -472,7 +472,7 @@ class Importer(Conf):
 
     def _process_osm(self,roads_table,roads_schema,ints_table,ints_schema,
                      osm_ways_table,osm_ways_schema,osm_nodes_table,
-                     osm_nodes_schema,overwrite=None,conn=None):
+                     osm_nodes_schema,srid,overwrite=None,conn=None):
         """
         Processes OSM import by running through the import scripts in the sql directory
 
@@ -494,6 +494,8 @@ class Importer(Conf):
             name of the OSM nodes table
         osm_nodes_schema : str
             name of the OSM nodes schema
+        srid : int or str, optional
+            projection to use
         overwrite : bool, optional
             overwrite an existing table
         conn : psycopg2 connection object, optional
@@ -515,6 +517,7 @@ class Importer(Conf):
         subs["osm_ways_schema"] = sql.Identifier(osm_ways_schema)
         subs["osm_nodes_table"] = sql.Identifier(osm_nodes_table)
         subs["osm_nodes_schema"] = sql.Identifier(osm_nodes_schema)
+        subs["srid"] = sql.Literal(srid)
         if self.km:
             subs["km_multiplier"] = sql.Literal(1)
             subs["mi_multiplier"] = sql.Literal(1.609344)
@@ -715,7 +718,7 @@ class Importer(Conf):
         # set up a list of dictionaries with info about each destination
         if destination_tags is None:
             destination_tags = self.get_destination_tags()
-            
+
         conn = self.get_db_connection()
         for d in destination_tags:
             table = d["table"]
