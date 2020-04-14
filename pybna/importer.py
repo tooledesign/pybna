@@ -355,7 +355,7 @@ class Importer(Conf):
     def import_osm_network(self,roads_table=None,ints_table=None,
                            boundary_file=None,boundary_buffer=None,
                            osm_file=None,keep_holding_tables=False,srid=None,
-                           overwrite=False):
+                           km=None,overwrite=False):
         """
         Imports OSM ways/nodes and copies the data into the database with attributes
         needed for LTS scoring.
@@ -377,6 +377,9 @@ class Importer(Conf):
             if true, saves the raw OSM import to the roads/ints schemas
         srid : int or str, optional
             projection to use
+        km : bool, optional
+            if true, units for measurements and speed limits are imported to
+            metric
         overwrite : bool, optional
             whether to overwrite any existing tables
         """
@@ -410,6 +413,8 @@ class Importer(Conf):
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
         crs = "epsg:{:d}".format(srid)
+        if km is None:
+            km = self.km
 
         # generate table names for holding tables
         osm_ways_table = "osm_ways_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
@@ -463,7 +468,7 @@ class Importer(Conf):
 
         self._process_osm(
             roads_table,roads_schema,ints_table,ints_schema,osm_ways_table,
-            osm_ways_schema,osm_nodes_table,osm_nodes_schema,srid,overwrite,conn
+            osm_ways_schema,osm_nodes_table,osm_nodes_schema,srid,km,overwrite,conn
         )
 
         conn.commit()
@@ -472,7 +477,7 @@ class Importer(Conf):
 
     def _process_osm(self,roads_table,roads_schema,ints_table,ints_schema,
                      osm_ways_table,osm_ways_schema,osm_nodes_table,
-                     osm_nodes_schema,srid,overwrite=None,conn=None):
+                     osm_nodes_schema,srid,km=None,overwrite=None,conn=None):
         """
         Processes OSM import by running through the import scripts in the sql directory
 
@@ -496,6 +501,9 @@ class Importer(Conf):
             name of the OSM nodes schema
         srid : int or str, optional
             projection to use
+        km : str, optional
+            if true, units for measurements and speed limits are imported to
+            metric equivalents
         overwrite : bool, optional
             overwrite an existing table
         conn : psycopg2 connection object, optional
@@ -505,6 +513,8 @@ class Importer(Conf):
         if conn is None:
             conn = self.get_db_connection()
             commit = True
+        if km is None:
+            km = self.km
 
         subs = dict(self.sql_subs)
         subs["roads_table"] = sql.Identifier(roads_table)
@@ -518,12 +528,18 @@ class Importer(Conf):
         subs["osm_nodes_table"] = sql.Identifier(osm_nodes_table)
         subs["osm_nodes_schema"] = sql.Identifier(osm_nodes_schema)
         subs["srid"] = sql.Literal(srid)
-        if self.km:
+        if km:
+            subs["km"] = sql.Literal(True)
             subs["km_multiplier"] = sql.Literal(1)
+            subs["m_multiplier"] = sql.Literal(1)
             subs["mi_multiplier"] = sql.Literal(1.609344)
+            subs["ft_multiplier"] = sql.Literal(0.3048)
         else:
+            subs["km"] = sql.Literal(False)
             subs["km_multiplier"] = sql.Literal(0.6213712)
+            subs["m_multiplier"] = sql.Literal(3.28084)
             subs["mi_multiplier"] = sql.Literal(1)
+            subs["ft_multiplier"] = sql.Literal(1)
 
         # process things in the db
         road_queries = [os.path.join(self.module_dir,"sql","importer","roads",f) for f in os.listdir(os.path.join(self.module_dir,"sql","importer","roads"))]

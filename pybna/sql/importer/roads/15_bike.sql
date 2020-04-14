@@ -169,64 +169,64 @@ CREATE TEMP TABLE tmp_bike_infra_raw AS (
         CASE        --ft_bike_infra_width
             -- feet
             WHEN osm."cycleway:right:width" LIKE '% ft'
-                THEN substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'ft' AND osm."cycleway:left:width" LIKE '% ft'
-                THEN substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:both:width" LIKE '% ft'
-                THEN substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:width" LIKE '% ft'
-                THEN substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
 
             -- meters
             WHEN osm."cycleway:right:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'ft' AND osm."cycleway:left:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:both:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
 
             -- no units (default=meters)
             WHEN COALESCE(osm."cycleway:right:width",'NaN') != 'NaN'
-                THEN 3.28084 * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'ft' AND osm."cycleway:left:width" IS NOT NULL
-                THEN 3.28084 * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN COALESCE(osm."cycleway:both:width",'NaN') != 'NaN'
-                THEN 3.28084 * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN COALESCE(osm."cycleway:width",'NaN') != 'NaN'
-                THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
         END AS ft_bike_infra_width,
         CASE        -- tf_bike_infra_width
             -- feet
             WHEN osm."cycleway:left:width" LIKE '% ft'
-                THEN substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'tf' AND osm."cycleway:right:width" LIKE '% ft'
-                THEN substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:both:width" LIKE '% ft'
-                THEN substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:width" LIKE '% ft'
-                THEN substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {ft_multiplier} * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
 
             -- meters
             WHEN osm."cycleway:left:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'tf' AND osm."cycleway:right:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:both:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN osm."cycleway:width" LIKE '% m'
-                THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
 
             -- no units (default=meters)
             WHEN COALESCE(osm."cycleway:left:width",'NaN') != 'NaN'
-                THEN 3.28084 * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:left:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN one_way_car = 'tf' AND osm."cycleway:right:width" IS NOT NULL
-                THEN 3.28084 * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:right:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN COALESCE(osm."cycleway:both:width",'NaN') != 'NaN'
-                THEN 3.28084 * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:both:width" from '\d+\.?\d?\d?')::FLOAT
             WHEN COALESCE(osm."cycleway:width",'NaN') != 'NaN'
-                THEN 3.28084 * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
+                THEN {m_multiplier} * substring("cycleway:width" from '\d+\.?\d?\d?')::FLOAT
         END AS tf_bike_infra_width
     FROM tmp_unnest osm
 );
