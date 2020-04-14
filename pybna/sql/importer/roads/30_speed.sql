@@ -96,11 +96,14 @@ CREATE TEMP TABLE tmp_speed AS (
     SELECT DISTINCT ON (id)
         id,
         speed
-    FROM tmp_raw_speed
+    FROM tmp_speed_conversion
     ORDER BY
         id,
         speed DESC
 );
 
 DROP TABLE tmp_unnest;
+DROP TABLE tmp_speed_mph_to_km;
+DROP TABLE tmp_speed_km_to_mph;
 DROP TABLE tmp_raw_speed;
+DROP TABLE tmp_speed_conversion;
