@@ -529,11 +529,13 @@ class Importer(Conf):
         subs["osm_nodes_schema"] = sql.Identifier(osm_nodes_schema)
         subs["srid"] = sql.Literal(srid)
         if km:
+            subs["km"] = sql.Literal(True)
             subs["km_multiplier"] = sql.Literal(1)
             subs["m_multiplier"] = sql.Literal(1)
             subs["mi_multiplier"] = sql.Literal(1.609344)
             subs["ft_multiplier"] = sql.Literal(0.3048)
         else:
+            subs["km"] = sql.Literal(False)
             subs["km_multiplier"] = sql.Literal(0.6213712)
             subs["m_multiplier"] = sql.Literal(3.28084)
             subs["mi_multiplier"] = sql.Literal(1)
