@@ -16,8 +16,8 @@ from .core import BACKWARD_DIRECTION
 
 
 class Stress(Conf):
-    def __init__(self, config=None, create_lookups=True,
-                 verbose=False):
+    def __init__(self,config=None,create_lookups=True,host=None,db_name=None,
+                 user=None,password=None,verbose=False):
         """
         Reads the config file, sets up a connection
 
@@ -27,6 +27,14 @@ class Stress(Conf):
             path to the config file, if not given use the default config.yaml
         create_lookups : bool, optional
             creates lookup tables in the db if none are found
+        host : str, optional
+            host to connect to
+        db_name : str, optional
+            database name
+        user : str, optional
+            database user
+        password : str, optional
+            database password
         verbose : bool, optional
             output useful messages
         """
@@ -37,10 +45,14 @@ class Stress(Conf):
             config = os.path.join(self.module_dir,"config.yaml")
         self.config = self.parse_config(yaml.safe_load(open(config)))
         print("Connecting to database")
-        host = self.config.db.host
-        db_name = self.config.db.dbname
-        user = self.config.db.user
-        password = self.config.db.password
+        if host is None:
+            host = self.config.db.host
+        if db_name is None:
+            db_name = self.config.db.dbname
+        if user is None:
+            user = self.config.db.user
+        if password is None:
+            password = self.config.db.password
         db_connection_string = " ".join([
             "dbname=" + db_name,
             "user=" + user,
