@@ -270,6 +270,19 @@ class Conf(DBUtils):
         else:
             assumed_centerline = sql.SQL("FALSE")
 
+        # low_parking
+        if "low_parking" in settings:
+            low_parking_column = sql.Identifier(settings["low_parking"]["name"])
+            low_parking_value = sql.Literal(settings["low_parking"]["val"])
+        else:
+            low_parking_column = sql.SQL("NULL")
+            low_parking_value = sql.SQL("NULL")
+        low_parking = sql.SQL("({}={})").format(low_parking_column,low_parking_value)
+        if "low_parking" in assumptions:
+            assumed_low_parking = self._build_case(assumptions["low_parking"])
+        else:
+            assumed_low_parking = sql.SQL("FALSE")
+
         # speed
         if "speed" in settings:
             speed = sql.Identifier(settings["speed"])
@@ -399,6 +412,8 @@ class Conf(DBUtils):
             "assumed_lanes": assumed_lanes,
             "centerline": centerline,
             "assumed_centerline": assumed_centerline,
+            "low_parking": low_parking,
+            "assumed_low_parking": assumed_low_parking,
             "speed": speed,
             "assumed_speed": assumed_speed,
             "aadt": aadt,

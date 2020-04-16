@@ -72,8 +72,17 @@ class Stress(Conf):
             print("Checking lookup tables")
         missing = self._missing_lookup_tables()
         if create_lookups and len(missing) > 0:
+            if "units" in self.config:
+                if self.config.units == "mi":
+                    km = False
+                elif self.config.units == "km":
+                    km = True
+                else:
+                    raise ValueError("Invalid units \"{}\" in config".format(self.config.units))
+            else:
+                km = False
             for t in missing:
-                self._create_lookup_table(*t)
+                self._create_lookup_table(*t,km=km)
 
         # add functions to db
         self._run_sql_script("bna_CompareAzimuths.sql",dict(),dirs=["sql","stress","db_functions"])
@@ -114,13 +123,13 @@ class Stress(Conf):
         return missing
 
 
-    def _create_lookup_table(self,lu_type,table,schema=None,fname=None):
+    def _create_lookup_table(self,lu_type,table,schema=None,fname=None,km=False):
         """
         Create a stress lookup table of the given type and name
 
         Parameters
         ----------
-        lu_type : {'shared', 'bike_lane', 'crossing'}
+        lu_type : ['shared', 'bike_lane', 'crossing']
             The type of lookup table to create
         table : str
             name of the table
@@ -128,7 +137,11 @@ class Stress(Conf):
             name of the schema
         fname : str, optional
             optional csv file to populate the table with (if empty uses default)
+        km : boolean, optional
+            if true, use metric lookup tables instead of imperial
         """
+        if schema is None:
+            schema = self.schema
         in_file = None
         if fname:
             if os.path.isfile(fname):
@@ -145,18 +158,25 @@ class Stress(Conf):
                 ("stress", "integer")
             ]
             if not in_file:
-                in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_shared.csv")
+                if km:
+                    in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_shared_km.xlsx")
+                else:
+                    in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_shared.xlsx")
         elif lu_type == "bike_lane":
             columns = (
                 ("lanes", "integer"),
                 ("oneway", "boolean"),
                 ("parking", "boolean"),
+                ("low_parking", "boolean"),
                 ("reach", "integer"),
                 ("speed", "integer"),
                 ("stress", "integer")
             )
             if not in_file:
-                in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_bike_lane.csv")
+                if km:
+                    in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_bike_lane_km.xlsx")
+                else:
+                    in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_bike_lane.xlsx")
         elif lu_type == "crossing":
             columns = (
                 ("control", "text"),
@@ -166,44 +186,35 @@ class Stress(Conf):
                 ("stress", "integer")
             )
             if not in_file:
-                in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_crossing.csv")
+                if km:
+                    in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_crossing_km.xlsx")
+                else:
+                    in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_crossing.xlsx")
         else:
             raise ValueError("Unrecognized lookup table %s" % lu_type)
 
-
+        in_table = pd.read_excel(in_file)
+        in_table = in_table.astype(str)
         conn = self.get_db_connection()
-        cur = conn.cursor()
-        if schema:
-            q = sql.SQL(" \
-                create table {}.{} (id serial primary key, \
-                " + ",".join(" ".join(c) for c in columns) + ")"
-            ).format(
-                sql.Identifier(schema),
-                sql.Identifier(table)
+        self.gdf_to_postgis(in_table,table,schema=schema,no_geom=True,conn=conn)
+        for col_name, col_type in columns:
+            subs = {
+                "schema": sql.Identifier(schema),
+                "table": sql.Identifier(table),
+                "col": sql.Identifier(col_name),
+                "type": sql.SQL(col_type)
+            }
+            self._run_sql(
+                """
+                    update {schema}.{table} set {col} = null where {col} IN ('NaN','nan');
+                    alter table {schema}.{table}
+                        alter column {col} type {type} using {col}::{type};
+                """,
+                subs,
+                conn=conn
             )
-        else:
-            q = sql.SQL(" \
-                create table {} (id serial primary key, \
-                " + ",".join(" ".join(c) for c in columns) + ")"
-            ).format(
-                sql.Identifier(table)
-            )
-
-        try:
-            cur.execute(q)
-        except Exception as e:
-            print("Error creating table {}".format(table))
-            raise e
-
-        if self.verbose:
-            print("Copying default stress thresholds into {}".format(table))
-        # f = StringIO.StringIO(in_file)
-        f = open(in_file)
-        cur.copy_from(f,table,columns=[c[0] for c in columns],sep=";",null="")
-        cur.close()
         conn.commit()
         conn.close()
-        f.close()
 
 
     def segment_stress(self,table=None,table_filter=None,dry=None):

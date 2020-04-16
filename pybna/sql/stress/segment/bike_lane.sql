@@ -13,6 +13,7 @@ CREATE TEMP TABLE pg_temp.tmp_attrs AS (
         {oneway}::BOOLEAN AS oneway,
         COALESCE({parking},{assumed_parking})::BOOLEAN AS parking,
         COALESCE({parking_width},{assumed_parking_width})::INTEGER AS parking_width,
+        COALESCE({low_parking},{assumed_low_parking})::BOOLEAN AS low_parking,
         COALESCE({bike_lane_width},{assumed_bike_lane_width})::INTEGER AS bike_lane_width,
         COALESCE({speed},{assumed_speed})::INTEGER AS speed
     FROM

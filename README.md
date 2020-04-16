@@ -23,6 +23,7 @@ pyBNA is tested with Python 3.6. The following libraries are required:
 - munch
 - overpass
 - osmnx
+- xlrd
 
 A requirements.txt file is provided for convenience. You can install these via
 pip:
