@@ -323,6 +323,8 @@ stress:
                   val: 30
                 - where: "functional_class IN ('unclassified','residential')"
                   val: 25
+                - where: "functional_class = 'living_street'"
+                  val: 20
                 - else: 30
             parking:
                 - where: "*"
@@ -350,6 +352,8 @@ stress:
                   val: 10000
                 - where: "functional_class IN ('unclassified','residential')"
                   val: 500
+                - where: "functional_class = 'living_street'"
+                  val: 100
                 - else: 20000
 
         crossing:
