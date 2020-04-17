@@ -10,7 +10,8 @@ from .dbutils import DBUtils
 import pandas as pd
 
 def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=None,
-                        password=None,shared_lookup=None,bike_lane_lookup=None):
+                        password=None,shared_lookup=None,bike_lane_lookup=None,
+                        km=False):
     """
     Uses the segments spreadsheet, lookup tables, and pyBNA logic to test
     various roadway characteristics for the LTS score. Saves results as a
@@ -34,6 +35,8 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
         stress lookup table for shared roadways
     bike_lane_lookup : str, optional
         stress lookup table for bike lanes
+    km : boolean, optional
+        run the tests in metric units
 
     Returns
     -------
@@ -47,7 +50,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
     if host is None:
         host = conf["db"]["host"]
     if db_name is None:
-        db_name = conf["db"]["db_name"]
+        db_name = conf["db"]["dbname"]
     if user is None:
         user = conf["db"]["user"]
     if password is None:
@@ -88,8 +91,10 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
     s = Stress(config=temppath,host=host,db_name=db_name,user=user,password=password)
 
     # read the spreadsheet and convert data types in db
-    segments = pd.read_excel(os.path.join(module_dir,"tests","segments.xlsx"))
-    a = pd.read_excel("/home/spencer/dev/pybna/pybna/tests/segments.xlsx")
+    if km:
+        segments = pd.read_excel(os.path.join(module_dir,"tests","segments_km.xlsx"))
+    else:
+        segments = pd.read_excel(os.path.join(module_dir,"tests","segments.xlsx"))
     conn = s.get_db_connection()
     s.gdf_to_postgis(segments,table,schema=schema,no_geom=True,conn=conn)
     subs = {"schema": sql.Identifier(schema), "table": sql.Identifier(table)}
@@ -103,7 +108,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
             update {schema}.{table} set lanes=null where lanes='NaN';
             update {schema}.{table} set parking=null where parking='NaN';
             update {schema}.{table} set park_width=null where park_width='NaN';
-            update {schema}.{table} set park_util=null where park_util='NaN';
+            update {schema}.{table} set low_parking=null where low_parking='NaN';
             alter table {schema}.{table} alter column centerline type boolean using centerline::boolean;
             alter table {schema}.{table} alter column aadt type integer using aadt::integer;
             alter table {schema}.{table} alter column parking type boolean using parking::boolean;
@@ -111,6 +116,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
             alter table {schema}.{table} alter column bike_width type integer using bike_width::integer;
             alter table {schema}.{table} alter column lanes type integer using lanes::integer;
             alter table {schema}.{table} alter column park_width type integer using park_width::integer;
+            alter table {schema}.{table} alter column low_parking type boolean using low_parking::boolean;
             alter table {schema}.{table} add column one_way text;
             alter table {schema}.{table} add column functional_class text;
             alter table {schema}.{table} add column calculated_stress integer;
@@ -128,7 +134,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
         """
             select
                 bike, speed, centerline, aadt, bike_width, lanes, parking,
-                park_width, park_util, calculated_stress
+                park_width, low_parking, calculated_stress
             from {schema}.{table}
             order by id
         """

@@ -259,6 +259,7 @@ stress:
             oneway: {name: "one_way", val: "ft"}    # given as a pair (column_name, value)
             # aadt: aadt
             # centerline: {name: "centerline", val: 1}  # given as a pair (column_name, value)
+            # low_parking: {name: "low_parking", val: TRUE}
             speed: speed_limit
             parking: {name: "ft_park", val: TRUE}
             # parking_width: ft_park_width
@@ -326,6 +327,12 @@ stress:
             parking:
                 - where: "*"
                   val: True
+            low_parking:
+                - where: "functional_class IN ('primary','secondary')"
+                  val: False
+                - where: "functional_class = 'tertiary'"
+                  val: False
+                - else: False
             parking_width:
                 - where: "*"
                   val: 8
