@@ -42,7 +42,16 @@ CREATE TEMP TABLE tmp_combined AS (
             ON osm.id = tmp_park_ft.id
         LEFT JOIN tmp_park_tf
             ON osm.id = tmp_park_tf.id
-    WHERE COALESCE(osm."bicycle",'') != 'no'
+    WHERE
+        COALESCE(osm."bicycle",'') NOT LIKE '%no%'
+        AND CASE
+                WHEN (osm.highway LIKE '%footway%' AND osm.footway LIKE '%crossing%')
+                    THEN (
+                        COALESCE(osm."bicycle",'') LIKE '%yes%'
+                        OR COALESCE(osm."bicycle",'') LIKE '%designated%'
+                    )
+                ELSE TRUE
+                END
 );
 
 INSERT INTO {roads_schema}.{roads_table}
