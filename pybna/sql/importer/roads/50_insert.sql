@@ -43,10 +43,13 @@ CREATE TEMP TABLE tmp_combined AS (
         LEFT JOIN tmp_park_tf
             ON osm.id = tmp_park_tf.id
     WHERE
-        COALESCE(osm."bicycle",'') != 'no'
+        COALESCE(osm."bicycle",'') NOT LIKE '%no%'
         AND CASE
-                WHEN (osm.highway = 'footway' AND osm.footway = 'crossing')
-                    THEN (osm."bicycle" IN ('yes','designated'))
+                WHEN (osm.highway LIKE '%footway%' AND osm.footway LIKE '%crossing%')
+                    THEN (
+                        COALESCE(osm."bicycle",'') LIKE '%yes%'
+                        OR COALESCE(osm."bicycle",'') LIKE '%designated%'
+                    )
                 ELSE TRUE
                 END
 );
