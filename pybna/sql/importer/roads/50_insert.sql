@@ -43,12 +43,24 @@ CREATE TEMP TABLE tmp_combined AS (
         LEFT JOIN tmp_park_tf
             ON osm.id = tmp_park_tf.id
     WHERE
-        COALESCE(osm."bicycle",'') NOT LIKE '%no%'
+        NOT 'no' = ANY(         -- checks for bicycle=no tag and excludes
+            regexp_split_to_array(
+                trim(COALESCE(osm."bicycle",''),'{{}}'),
+                ','
+            )
+        )
         AND CASE
-                WHEN (osm.highway LIKE '%footway%' AND osm.footway LIKE '%crossing%')
+                WHEN (
+                    'footway' = ANY(regexp_split_to_array(trim(osm.highway,'{{}}'),','))
+                    AND 'crossing' = ANY(regexp_split_to_array(trim(osm.footway,'{{}}'),','))
+                    )
                     THEN (
-                        COALESCE(osm."bicycle",'') LIKE '%yes%'
-                        OR COALESCE(osm."bicycle",'') LIKE '%designated%'
+                        ARRAY['yes','designated']
+                        &&
+                        regexp_split_to_array(
+                            trim(COALESCE(osm."bicycle",''),'{{}}'),
+                            ','
+                        )
                     )
                 ELSE TRUE
                 END
