@@ -226,20 +226,6 @@ def test_crossing_stress(out_file=None,config=None,host=None,db_name=None,user=N
     out_table = "out" + "".join(random.choice(string.ascii_lowercase) for i in range(7))
 
     # make a temporary config file with some strategic changes
-    conf["bna"]["network"]["roads"]["table"] = schema + "." + in_table
-    conf["bna"]["network"]["roads"]["uid"] = "id"
-    conf["stress"]["crossing"]["control"]["table"] = "xxxx.xxxx"
-    conf["stress"]["crossing"]["island"]["table"] = "xxxx.xxxx"
-    conf["stress"]["segment"]["forward"]["lanes"] = "lanes"
-    conf["stress"]["segment"]["forward"]["aadt"] = "aadt"
-    conf["stress"]["segment"]["forward"]["centerline"] = {"name":"centerline","val":True}
-    conf["stress"]["segment"]["forward"]["speed"] = "speed"
-    conf["stress"]["segment"]["forward"]["parking"] = {"name":"parking","val":True}
-    conf["stress"]["segment"]["forward"]["park_width"] = "park_width"
-    conf["stress"]["segment"]["forward"]["bike_infra"] = {"name":"bike","lane":"lane","buffered_lane":"buffered_lane","track":"track","path":"path"}
-    conf["stress"]["segment"]["forward"]["bike_lane_width"] = "bike_width"
-    conf["stress"]["segment"]["backward"] = dict(conf["stress"]["segment"]["forward"])
-    conf["bna"]["network"]["roads"]["stress"]["crossing"]["forward"] = "calculated_stress"
     if crossing_lookup:
         conf["stress"]["lookup_tables"]["crossing"] = crossing_lookup
 
