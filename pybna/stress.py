@@ -452,7 +452,9 @@ class Stress(Conf):
 
                 # execute the query
                 self._run_sql_script("create_output.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
+                self._run_sql_script("inputs.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
                 self._run_sql_script("crossing.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
+                self._run_sql_script("priority.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
 
                 # copy back to the base table
                 cross_subs["stress"] = sql.Identifier(self.config.bna.network.roads.stress.crossing[direction])
