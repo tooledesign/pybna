@@ -65,7 +65,10 @@ s.crossing_stress()
 # connectivity
 bna = pybna.pyBNA()
 bna.calculate_connectivity()
-bna.score("myschema.mytable")
+
+# scores
+bna.score("myschema.my_scores_table")
+bna.aggregate("myschema.my_aggregate_score_table")
 ```
 
 ## Importing data
@@ -92,7 +95,12 @@ bna.calculate_connectivity()
 
 Lastly, you can generate block-level scores with
 ```
-b.score("my_results_table")
+bna.score("myschema.my_scores_table")
+```
+
+and aggregate scores for the entire study area with
+```
+bna.aggregate("myschema.my_aggregate_score_table")
 ```
 
 ## Configuration file
