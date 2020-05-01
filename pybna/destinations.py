@@ -92,7 +92,7 @@ class Destinations(DBUtils):
                 )
 
 
-    def score_destinations(self,output_table,scenario_id=None,subtract=False,with_geoms=False,overwrite=False,dry=None):
+    def score(self,output_table,scenario_id=None,subtract=False,with_geoms=False,overwrite=False):
         """
         Creates a new db table of scores for each block
 
@@ -108,8 +108,6 @@ class Destinations(DBUtils):
             a subtraction of that scenario from all other scenarios
         overwrite : bool, optional
             overwrite a pre-existing table
-        dry : str, optional
-            a path to save SQL statements to instead of executing in DB
         """
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
@@ -124,9 +122,9 @@ class Destinations(DBUtils):
         else:
             subs["scenario_id"] = sql.Literal(scenario_id)
 
-        schema, output_table = self.parse_table_name(output_table)
+        schema, table = self.parse_table_name(output_table)
 
-        subs["scores_table"] = sql.Identifier(output_table)
+        subs["scores_table"] = sql.Identifier(table)
         if schema is None:
             schema = self.get_default_schema()
         subs["scores_schema"] = sql.Identifier(schema)
@@ -134,15 +132,14 @@ class Destinations(DBUtils):
         conn = self.get_db_connection()
         cur = conn.cursor()
 
-        if dry is None:
-            if overwrite:
-                self.drop_table(
-                    table=output_table,
-                    schema=schema,
-                    conn=conn
-                )
-            elif self.table_exists(output_table,subs["scores_schema"].as_string(conn)):
-                raise psycopg2.ProgrammingError("Table {}.{} already exists".format(subs["scores_schema"].as_string(conn),output_table))
+        if overwrite:
+            self.drop_table(
+                table=table,
+                schema=schema,
+                conn=conn
+            )
+        elif self.table_exists(output_table):
+            raise psycopg2.ProgrammingError("Table {} already exists".format(output_table))
 
         # create temporary filtered connectivity table
         if scenario_id is None:
@@ -190,14 +187,14 @@ class Destinations(DBUtils):
         print("Compiling destination data for all sources into output table")
         subs["columns"] = columns
         subs["tables"] = tables
-        self._run_sql_script("04_all_combined.sql",subs,["sql","destinations"],dry=dry,conn=conn)
+        self._run_sql_script("04_all_combined.sql",subs,["sql","destinations"],conn=conn)
 
         # finally set any category scores
         print("Calculating category scores")
         self.aggregate_subcategories(self.destinations["overall"],subs,conn=conn)
 
         if with_geoms:
-            self._copy_block_geoms(conn,subs,dry)
+            self._copy_block_geoms(conn,subs)
 
         conn.commit()
         conn.close()

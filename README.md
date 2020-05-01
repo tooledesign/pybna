@@ -65,7 +65,7 @@ s.crossing_stress()
 # connectivity
 bna = pybna.pyBNA()
 bna.calculate_connectivity()
-bna.score_destinations("myschema.mytable")
+bna.score("myschema.mytable")
 ```
 
 ## Importing data
@@ -92,7 +92,7 @@ bna.calculate_connectivity()
 
 Lastly, you can generate block-level scores with
 ```
-b.score_destinations("my_results_table")
+b.score("my_results_table")
 ```
 
 ## Configuration file
