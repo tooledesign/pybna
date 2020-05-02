@@ -701,7 +701,8 @@ class Importer(Conf):
         osm_file : str, optional
             an OSM XML file to use instead of downloading data from the network
         schema : str, optional
-            the schema to create the tables in (if not given, uses the DB default)
+            the schema to create the tables in (if not given, uses the DB default).
+            only used if the table is not schema-qualified in the config file
         boundary_file : str, optional
             a boundary file path. if not given uses the boundary specified in the config
         srid : int or str, optional
@@ -737,11 +738,13 @@ class Importer(Conf):
 
         conn = self.get_db_connection()
         for d in destination_tags:
-            table = d["table"]
-            if not overwrite and self.table_exists(table,schema):
+            output_schema, table = self.parse_table_name(d["table"])
+            if output_schema is None:
+                output_schema = schema
+            if not overwrite and self.table_exists(table,output_schema):
                 conn.rollback()
                 conn.close()
-                raise ValueError("Table %s.%s already exists" % (schema,table))
+                raise ValueError("Table %s.%s already exists" % (output_schema,table))
             tags = d["tags_query"]
             print("Copying {} to database".format(table))
             if osm_file is None:
@@ -772,21 +775,21 @@ class Importer(Conf):
             query_make_table_areas = sql.SQL(
                 "create table {}.{} (geom text,osmid bigint{})"
             ).format(
-                sql.Identifier(schema),
+                sql.Identifier(output_schema),
                 sql.Identifier(table_prefix+"_"+table+"_areas"),
                 query_attributes
             )
             query_make_table_ways = sql.SQL(
                 "create table {}.{} (geom text,osmid bigint{})"
             ).format(
-                sql.Identifier(schema),
+                sql.Identifier(output_schema),
                 sql.Identifier(table_prefix+"_"+table+"_ways"),
                 query_attributes
             )
             query_make_table_nodes = sql.SQL(
                 "create table {}.{} (geom text,osmid bigint{})"
             ).format(
-                sql.Identifier(schema),
+                sql.Identifier(output_schema),
                 sql.Identifier(table_prefix+"_"+table+"_nodes"),
                 query_attributes
             )
@@ -810,7 +813,7 @@ class Importer(Conf):
                     continue
                 else:
                     ids_already_processed.add(feature["id"])
-                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_areas")
+                    self._osm_destinations_table_insert(conn,attributes,feature,output_schema,table_prefix+"_"+table+"_areas")
             ids_already_processed = set()
             for feature in ways["features"]:
                 if feature["id"] in ids_already_processed:
@@ -819,7 +822,7 @@ class Importer(Conf):
                     continue
                 else:
                     ids_already_processed.add(feature["id"])
-                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_ways")
+                    self._osm_destinations_table_insert(conn,attributes,feature,output_schema,table_prefix+"_"+table+"_ways")
             ids_already_processed = set()
             for feature in nodes["features"]:
                 if feature["id"] in ids_already_processed:
@@ -828,11 +831,11 @@ class Importer(Conf):
                     continue
                 else:
                     ids_already_processed.add(feature["id"])
-                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_nodes")
+                    self._osm_destinations_table_insert(conn,attributes,feature,output_schema,table_prefix+"_"+table+"_nodes")
 
             # process in the db
             subs = {
-                "schema": sql.Identifier(schema),
+                "schema": sql.Identifier(output_schema),
                 "final_table": sql.Identifier(table),
                 "areas_table": sql.Identifier(table_prefix+"_"+table+"_areas"),
                 "ways_table": sql.Identifier(table_prefix+"_"+table+"_ways"),
@@ -843,7 +846,7 @@ class Importer(Conf):
             }
             qpath = os.path.join(self.module_dir,"sql","importer","process_destinations.sql")
             if overwrite:
-                self.drop_table(table,schema=schema,conn=conn)
+                self.drop_table(table,schema=output_schema,conn=conn)
             query = self.read_sql_from_file(qpath)
             q = sql.SQL(query).format(**subs)
             try:
@@ -857,9 +860,9 @@ class Importer(Conf):
                 raise e
 
             if not keep_intermediates:
-                self.drop_table(table_prefix+"_"+table+"_areas",schema=schema,conn=conn)
-                self.drop_table(table_prefix+"_"+table+"_ways",schema=schema,conn=conn)
-                self.drop_table(table_prefix+"_"+table+"_nodes",schema=schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_areas",schema=output_schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_ways",schema=output_schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_nodes",schema=output_schema,conn=conn)
 
         conn.commit()
         conn.close()
