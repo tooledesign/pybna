@@ -518,7 +518,7 @@ class DBUtils:
             conn.close()
 
 
-    def _run_sql_script(self, fname, subs, dirs, ret=False, dry=None, conn=None):
+    def _run_sql_script(self, fname, subs, dirs, ret=False, conn=None):
         """Pass substitutions into a sql script, and execute against server.
 
         fname : str
@@ -530,8 +530,6 @@ class DBUtils:
         ret : bool, optional
             if true, send cursor back to calling routine for further processing
             (requires a pre-existing connection to be passed)
-        dry : str
-            a path to save SQL statements to instead of executing in DB
         conn : psycopg2 connection object, optional
             A connection object to work with. if none, create a new one and close it at the end
         """
@@ -552,28 +550,20 @@ class DBUtils:
         raw = self.read_sql_from_file(fpath)
 
         q = sql.SQL(raw).format(**subs)
-        if dry is None:
-            cur = conn.cursor()
-            try:
-                cur.execute(q)
-            except Exception as e:
-                if conn.closed == 0:
-                    conn.rollback()
-                    conn.close()
-                raise e
-            if ret:
-                result = cur.fetchall()
-                cur.close()
-                return result
-            else:
-                cur.close()
+        cur = conn.cursor()
+        try:
+            cur.execute(q)
+        except Exception as e:
+            if conn.closed == 0:
+                conn.rollback()
+                conn.close()
+            raise e
+        if ret:
+            result = cur.fetchall()
+            cur.close()
+            return result
         else:
-            append = 'w'
-            if fpath and os.path.isfile(dry):
-                append = 'a'
-            with open(dry,append) as f:
-                f.write(q.as_string(conn))
-                f.write("\n")
+            cur.close()
 
         if close_conn:
             conn.commit()

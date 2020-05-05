@@ -263,17 +263,17 @@ class Stress(Conf):
                 subs = self.segment_subs[direction].copy()
                 subs["out_schema"] = sql.Identifier(schema)
                 subs["out_table"] = sql.Identifier("_".join([table,direction]))
-                self._run_sql_script("create_output.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
+                self._run_sql_script("create_output.sql",subs,dirs=["sql","stress","segment"],conn=conn)
 
                 # call the various segment stress methods
-                self._segment_stress_shared(conn,subs,table_filter,dry=dry)
-                self._segment_stress_bike_lane(conn,subs,table_filter,dry=dry)
-                self._segment_stress_track(conn,subs,table_filter,dry=dry)
-                self._segment_stress_path(conn,subs,table_filter,dry=dry)
+                self._segment_stress_shared(conn,subs,table_filter)
+                self._segment_stress_bike_lane(conn,subs,table_filter)
+                self._segment_stress_track(conn,subs,table_filter)
+                self._segment_stress_path(conn,subs,table_filter)
 
                 # copy back to the base table
                 subs["stress"] = sql.Identifier(self.config.bna.network.roads.stress.segment[direction])
-                self._run_sql_script("copy_to_base.sql",subs,dirs=["sql","stress"],conn=conn,dry=dry)
+                self._run_sql_script("copy_to_base.sql",subs,dirs=["sql","stress"],conn=conn)
 
         except Exception as e:
             if conn.closed == 0:
@@ -314,7 +314,7 @@ class Stress(Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("shared.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
+        self._run_sql_script("shared.sql",subs,dirs=["sql","stress","segment"],conn=conn)
 
 
     def _segment_stress_bike_lane(self,conn,subs,table_filter=None,dry=None):
@@ -347,7 +347,7 @@ class Stress(Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("bike_lane.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
+        self._run_sql_script("bike_lane.sql",subs,dirs=["sql","stress","segment"],conn=conn)
 
 
     def _segment_stress_track(self,conn,subs,table_filter=None,dry=None):
@@ -379,7 +379,7 @@ class Stress(Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("track.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
+        self._run_sql_script("track.sql",subs,dirs=["sql","stress","segment"],conn=conn)
 
 
     def _segment_stress_path(self,conn,subs,table_filter=None,dry=None):
@@ -409,7 +409,7 @@ class Stress(Conf):
         subs["filter"] = table_filter
 
         # execute the query
-        self._run_sql_script("path.sql",subs,dirs=["sql","stress","segment"],conn=conn,dry=dry)
+        self._run_sql_script("path.sql",subs,dirs=["sql","stress","segment"],conn=conn)
 
 
     def crossing_stress(self,table=None,angle=20,table_filter=None,dry=None):
@@ -451,14 +451,14 @@ class Stress(Conf):
                 cross_subs["line"] = sql.Identifier("_".join([direction,"ln"]))
 
                 # execute the query
-                self._run_sql_script("create_output.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
-                self._run_sql_script("inputs.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
-                self._run_sql_script("crossing.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
-                self._run_sql_script("priority.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn,dry=dry)
+                self._run_sql_script("create_output.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn)
+                self._run_sql_script("inputs.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn)
+                self._run_sql_script("crossing.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn)
+                self._run_sql_script("priority.sql",cross_subs,dirs=["sql","stress","crossing"],conn=conn)
 
                 # copy back to the base table
                 cross_subs["stress"] = sql.Identifier(self.config.bna.network.roads.stress.crossing[direction])
-                self._run_sql_script("copy_to_base.sql",cross_subs,dirs=["sql","stress"],conn=conn,dry=dry)
+                self._run_sql_script("copy_to_base.sql",cross_subs,dirs=["sql","stress"],conn=conn)
         except Exception as e:
             if conn.closed == 0:
                 conn.rollback()
