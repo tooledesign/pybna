@@ -23,14 +23,9 @@ class Connectivity(DBUtils):
         self.db_connection_string = None
 
 
-    def build_network(self,dry=None):
+    def build_network(self):
         """
         Builds the network in the DB using details from the BNA config file.
-
-        Parameters
-        ----------
-        dry : string
-            a path to save SQL statements to instead of executing in DB
         """
         if self.verbose:
             print("Building network in database")
@@ -43,13 +38,13 @@ class Connectivity(DBUtils):
         # run scripts
         conn = self.get_db_connection()
         print("Creating network tables")
-        self._run_sql_script("create_tables.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("create_tables.sql",subs,["sql","build_network"],conn=conn)
         print("Adding network nodes")
-        self._run_sql_script("insert_nodes.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("insert_nodes.sql",subs,["sql","build_network"],conn=conn)
         print("Adding network edges")
-        self._run_sql_script("insert_edges.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("insert_edges.sql",subs,["sql","build_network"],conn=conn)
         print("Finishing up network")
-        self._run_sql_script("cleanup.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("cleanup.sql",subs,["sql","build_network"],conn=conn)
 
         conn.commit()
         conn.close()
@@ -250,21 +245,21 @@ class Connectivity(DBUtils):
             cur = conn.cursor()
 
             # filter blocks
-            self._run_sql_script("10_filter_this_block.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-            self._run_sql_script("15_filter_other_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            self._run_sql_script("10_filter_this_block.sql",subs,["sql","connectivity","calculation"],conn=conn)
+            self._run_sql_script("15_filter_other_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
             if scenario_id is not None:
-                self._run_sql_script("17_remove_ls_connections_for_scenario.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-            self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-            self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                self._run_sql_script("17_remove_ls_connections_for_scenario.sql",subs,["sql","connectivity","calculation"],conn=conn)
+            self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
+            self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],conn=conn)
 
             # subset hs network
             subs["max_stress"] = sql.Literal(99)
             subs["net_table"] = sql.Identifier("tmp_hs_net")
             if scenario_id is None:
-                self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],conn=conn)
 
                 # get hs nodes
-                ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,dry=dry,conn=conn)
+                ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,conn=conn)
                 if dry is None:
                     hs_nodes = set(n[0] for n in ret)
                 else:
@@ -275,17 +270,17 @@ class Connectivity(DBUtils):
             # subset ls network
             subs["max_stress"] = sql.Literal(self.config.bna.connectivity.max_stress)
             subs["net_table"] = sql.Identifier("tmp_ls_net")
-            self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],conn=conn)
 
             # get ls nodes
-            ret = self._run_sql("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net",ret=True,dry=dry,conn=conn)
+            ret = self._run_sql("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net",ret=True,conn=conn)
             if dry is None:
                 ls_nodes = set(n[0] for n in ret)
             else:
                 ls_nodes = {-1}
 
             # retrieve nodes for this block and loop through
-            ret = self._run_sql_script("35_this_block_nodes.sql",subs,["sql","connectivity","calculation"],ret=True,dry=dry,conn=conn)
+            ret = self._run_sql_script("35_this_block_nodes.sql",subs,["sql","connectivity","calculation"],ret=True,conn=conn)
             if dry is not None:
                 ret = set()
 
@@ -312,7 +307,7 @@ class Connectivity(DBUtils):
                 cur2.close()
             else:
                 try:
-                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -320,7 +315,7 @@ class Connectivity(DBUtils):
                     continue
 
                 try:
-                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -339,7 +334,7 @@ class Connectivity(DBUtils):
                 cur2.close()
             else:
                 try:
-                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -347,7 +342,7 @@ class Connectivity(DBUtils):
                     continue
 
                 try:
-                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -356,11 +351,11 @@ class Connectivity(DBUtils):
 
             # build combined cost table and write to connectivity table
             try:
-                self._run_sql_script("70_combine_cost_matrices.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                self._run_sql_script("70_combine_cost_matrices.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 if scenario_id is None:
-                    self._run_sql_script("80_insert.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("80_insert.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 else:
-                    self._run_sql_script("80_insert_with_scenario.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("80_insert_with_scenario.sql",subs,["sql","connectivity","calculation"],conn=conn)
             except:
                 failure = True
                 failed_blocks.append(block_id)
@@ -512,6 +507,8 @@ class Connectivity(DBUtils):
 
             conn.close()
 
+            self.drop_scenario([scenario_id])
+
             # pass on to main _calculate_connectivity
             self._calculate_connectivity(
                 scenario_id=scenario_id,
@@ -542,6 +539,5 @@ class Connectivity(DBUtils):
         self._calculate_connectivity(
             origin_blocks=blocks,
             network_filter=network_filter,
-            append=append,
-            dry=dry
+            append=append
         )

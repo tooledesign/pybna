@@ -14,14 +14,13 @@ from psycopg2 import sql
 from tqdm import tqdm
 
 from .core import Core
-from .projects import Projects
 from .connectivity import Connectivity
 from .destinations import Destinations
 from .conf import Conf
 from .dbutils import DBUtils
 
 
-class pyBNA(Conf,Destinations,Connectivity,Projects,Core):
+class pyBNA(Conf,Destinations,Connectivity,Core):
     """Parent BNA class that glues together the subclasses"""
 
     def __init__(self, config=None, force_net_build=False,

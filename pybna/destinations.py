@@ -142,11 +142,11 @@ class Destinations(DBUtils):
 
         # create temporary filtered connectivity table
         if scenario_id is None:
-            self._run_sql_script("01_connectivity_table.sql",subs,["sql","destinations"],conn=conn)
+            self._run_sql_script("01_connectivity_table.sql",subs,["sql","scenarios"],conn=conn)
         elif subtract:
-            self._run_sql_script("01_connectivity_table_scenario_subtract.sql",subs,["sql","destinations"],conn=conn)
+            self._run_sql_script("01_connectivity_table_scenario_subtract.sql",subs,["sql","scenarios"],conn=conn)
         else:
-            self._run_sql_script("01_connectivity_table_scenario.sql",subs,["sql","destinations"],conn=conn)
+            self._run_sql_script("01_connectivity_table_scenario.sql",subs,["sql","scenarios"],conn=conn)
 
         # generate high and low stress counts for all categories
         print("Counting destinations for each block")
@@ -314,7 +314,7 @@ class Destinations(DBUtils):
         )
         subs["sidx_name"] = sql.Identifier("sidx_")+subs["scores_table"]
 
-        self._run_sql_script("05_add_geoms.sql",subs,["sql","destinations"],dry=dry,conn=conn)
+        self._run_sql_script("05_add_geoms.sql",subs,["sql","destinations"],conn=conn)
 
 
     def aggregate(self,output_table,scores_table,scenario_name="base",overwrite=False):
