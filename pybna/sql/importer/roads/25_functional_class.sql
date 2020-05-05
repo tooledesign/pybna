@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS tmp_unnest;
 CREATE TEMP TABLE tmp_unnest AS (
     SELECT
         osm.id,
+        bridge.*,
         highway.*,
         tracktype.*,
         footway.*,
@@ -9,6 +10,7 @@ CREATE TEMP TABLE tmp_unnest AS (
         bicycle.*
     FROM
         {osm_ways_schema}.{osm_ways_table} osm,
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.bridge,'{{NaN}}'))) || '}}')::TEXT[]) bridge,
         unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.highway,'{{NaN}}'))) || '}}')::TEXT[]) highway,
         unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.tracktype,'{{NaN}}'))) || '}}')::TEXT[]) tracktype,
         unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm.footway,'{{NaN}}'))) || '}}')::TEXT[]) footway,
