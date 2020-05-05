@@ -80,6 +80,11 @@ class Core(DBUtils):
 
         # create temporary filtered connectivity table
         if scenario_id is None:
+            try:
+                self.get_column_type(self.db_connectivity_table,"scenario")
+                subs["scenario_where"] = sql.SQL("WHERE scenario IS NULL")
+            except:
+                subs["scenario_where"] = sql.SQL("")
             self._run_sql_script("01_connectivity_table.sql",subs,["sql","scenarios"],conn=conn)
         elif subtract:
             self._run_sql_script("01_connectivity_table_scenario_subtract.sql",subs,["sql","scenarios"],conn=conn)
