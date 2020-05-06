@@ -5,6 +5,7 @@
 import os
 import yaml
 import psycopg2
+import sqlite3
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 import pandas as pd
@@ -652,3 +653,77 @@ class DBUtils:
             subs=subs,
             conn=conn
         )
+
+
+    def export_table(self,table,fpath,layer=None,geom="geom",pkey=None,nonspatial=False):
+        """
+        Exports the given table to a geopackage at the given path. Overwrites
+        any pre-existing tables so use with caution!
+
+        Parameters
+        ----------
+        table : text
+            the table in the database to export
+        fpath : text
+            the path to the geopackage file
+        geom : text
+            name of the geometry column
+        pkey : text, optional
+            the primary key column
+        nonspatial : bool, optional
+            if true, processes the table without spatial information
+        """
+        base, ext = os.path.splitext(fpath)
+        if not ext == ".gpkg":
+            raise ValueError("Output file should be a geopackage (.gpkg)")
+
+        if pkey is None:
+            pkey = self.get_pkid_col(table)
+
+        schema, table = self.parse_table_name(table)
+        if schema is None:
+            schema = get_schema(table)
+
+        if layer is None:
+            layer = table
+
+        # set up check for list columns
+        def is_iterable(ds):
+            if isinstance(
+                            ds.iloc[0],
+                            (list,tuple,dict)
+                         ):
+                return True
+            else:
+                return False
+
+        # load and export
+        conn = self.get_db_connection()
+        if nonspatial:
+            t = pd.read_sql(
+                sql.SQL("select * from {}.{}").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(table)
+                ).as_string(conn),
+                conn,
+                index_col=pkey
+            )
+            for col in t.columns:
+                if is_iterable(t[col]):
+                    t[col] = t[col].astype("str")
+            sqlite_conn = sqlite3.connect(fpath)
+            t.to_sql(layer,sqlite_conn)
+        else:
+            t = gpd.read_postgis(
+                sql.SQL("select * from {}.{}").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(table)
+                ).as_string(conn),
+                conn,
+                geom_col=geom,
+                index_col=pkey
+            )
+            for col in t.columns:
+                if is_iterable(t[col]):
+                    t[col] = t[col].astype("str")
+            t.to_file(fpath,layer=layer,driver="GPKG")

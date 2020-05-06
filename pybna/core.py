@@ -30,7 +30,7 @@ class Core(DBUtils):
 
 
     def travel_sheds(self,block_ids,out_table,composite=True,scenario_id=None,
-                     subtract=False,overwrite=False,dry=None):
+                     subtract=False,overwrite=False):
         """
         Creates a new DB table showing the high- and low-stress travel sheds
         for the block(s) identified by block_ids. If more than one block is
@@ -54,8 +54,6 @@ class Core(DBUtils):
             a subtraction of that scenario from all other scenarios
         overwrite : bool, optional
             whether to overwrite an existing table
-        dry : str, optional
-            a path to save SQL statements to instead of executing in DB
         """
         conn = self.get_db_connection()
 
@@ -63,7 +61,7 @@ class Core(DBUtils):
         if schema is None:
             schema = self.get_default_schema()
 
-        if overwrite and dry is None:
+        if overwrite:
             self.drop_table(out_table,conn=conn,schema=schema)
 
         # set global sql vars
@@ -99,3 +97,53 @@ class Core(DBUtils):
 
         conn.commit()
         conn.close()
+
+
+    def export(self,fpath):
+        """
+        Exports BNA tables to a geopackage. Overwrites any pre-existing tables
+        so use with caution!
+
+        Parameters
+        ----------
+        fpath : text
+            the path to the geopackage file
+        """
+        base, ext = os.path.splitext(fpath)
+        if not ext == ".gpkg":
+            raise ValueError("Output file should be a geopackage (.gpkg)")
+
+        # check for tables
+        for t in [
+                    self.config.bna.boundary,
+                    self.config.bna.blocks,
+                    self.config.bna.network.roads,
+                    self.config.bna.connectivity
+                 ]:
+            if not self.table_exists(t.table):
+                raise ValueError("No table at {}".format(t.table))
+        for d in self.destinations:
+            if "table" in d:
+                if not self.table_exists(d.table):
+                    raise ValueError("No table at {}".format(t.table))
+
+        # export
+        for t in [
+                    self.config.bna.boundary,
+                    self.config.bna.blocks,
+                    self.config.bna.network.roads
+                 ]:
+            schema, table = self.parse_table_name(t.table)
+            if "geom" in t:
+                self.export_table(t.table,fpath,geom=t.geom)
+            else:
+                self.export_table(t.table,fpath)
+
+        for d in self.destinations:
+            if "table" in d:
+                if "geom" in d:
+                    self.export_table(d.table,fpath,geom=t.geom)
+                else:
+                    self.export_table(d.table,fpath)
+
+        self.export_table(self.config.bna.connectivity.table,fpath,nonspatial=True)
