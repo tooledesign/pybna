@@ -397,7 +397,7 @@ class DBUtils:
                         pass
                     elif g1 in ["LineString","MultiLineString"] and g2 in ["LineString","MultiLineString"]:
                         pass
-                    elif g1 is ["Polygon","MultiPolygon"] and g2 in ["Polygon","MultiPolygon"]:
+                    elif g1 in ["Polygon","MultiPolygon"] and g2 in ["Polygon","MultiPolygon"]:
                         pass
                     else:
                         raise ValueError("Can't process more than one geometry type")
