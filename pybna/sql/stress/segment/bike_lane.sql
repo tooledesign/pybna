@@ -38,6 +38,7 @@ CREATE TEMP TABLE pg_temp.tmp_stress AS (
         tmp_attrs.lanes <= lts.lanes
         AND (lts.oneway IS NULL OR tmp_attrs.oneway = lts.oneway)
         AND tmp_attrs.parking = lts.parking
+        AND tmp_attrs.low_parking >= lts.low_parking
         AND (tmp_attrs.parking_width * tmp_attrs.parking::INTEGER) + tmp_attrs.bike_lane_width >= lts.reach
         AND tmp_attrs.speed <= lts.speed
     ORDER BY
