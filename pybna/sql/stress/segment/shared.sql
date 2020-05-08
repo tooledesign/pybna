@@ -59,6 +59,8 @@ CREATE TEMP TABLE pg_temp.tmp_stress AS (
         AND tmp_attrs.effective_aadt <= lts.effective_aadt
     ORDER BY
         tmp_attrs.id,
+        (tmp_attrs.lanes = lts.lanes) DESC, --ensures that we give priority to an exact match
+        (tmp_attrs.speed = lts.speed) DESC, --ensures that we give priority to an exact match
         lts.stress ASC
 );
 
