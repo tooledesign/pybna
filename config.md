@@ -108,6 +108,9 @@ name | Name of the attribute holding one way designation | X
 forward | Value indicating one way in the forward direction | X
 backward | Value indicating one way in the backward direction | X
 
+N.B. If there are values in the one-way column that don't match either the
+forward or backward value the road is considered to be two-way.
+
 `segment stress`
 
 Entry | Description | Required

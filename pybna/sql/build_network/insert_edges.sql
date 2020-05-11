@@ -174,11 +174,13 @@ WHERE
     AND e.target_road_id = target_node.road_id
     AND (
         e.source_road_dir IS NULL
+        OR e.source_road_dir NOT IN ({roads_oneway_fwd},{roads_oneway_bwd})
         OR (e.source_road_dir = {roads_oneway_fwd} AND e.int_id = e.source_int_to)
         OR (e.source_road_dir = {roads_oneway_bwd} AND e.int_id = e.source_int_from)
     )
     AND (
         e.target_road_dir IS NULL
+        OR e.source_road_dir NOT IN ({roads_oneway_fwd},{roads_oneway_bwd})
         OR (e.target_road_dir = {roads_oneway_fwd} AND e.int_id = e.target_int_from)
         OR (e.target_road_dir = {roads_oneway_bwd} AND e.int_id = e.target_int_to)
     );
