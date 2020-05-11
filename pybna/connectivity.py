@@ -1,4 +1,4 @@
-import os, string
+import os, string, warnings
 import psycopg2
 from psycopg2 import sql
 from tqdm import tqdm
@@ -23,12 +23,20 @@ class Connectivity(DBUtils):
         self.db_connection_string = None
 
 
-    def build_network(self):
+    def build_network(self,throw_error=False):
         """
         Builds the network in the DB using details from the BNA config file.
+
+        Parameters
+        ----------
+        throw_error : bool, optional
+            throws an error rather than raising a warning if checks uncover issues
         """
         if self.verbose:
             print("Building network in database")
+
+        # run checks
+        self.check_road_features(throw_error)
 
         # set up substitutions
         subs = dict(self.sql_subs)
@@ -541,3 +549,129 @@ class Connectivity(DBUtils):
             network_filter=network_filter,
             append=append
         )
+
+
+    def check_road_features(self,throw_error=False):
+        """
+        Checks road features for the following issues:
+            1) Empty geometries
+            2) Extremely small geometries
+            3) Source/target values not in intersections table
+            4) Empty source/target values
+            5) unusually high number of intersection legs (shared from/to values)
+
+        Parameters
+        ----------
+        throw_error : bool, optional
+            throws an error rather than raising a warning
+        """
+        conn = self.get_db_connection()
+
+        # null geoms
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table}
+                WHERE {roads_geom_col} IS NULL
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Null geometries found in roads table")
+            else:
+                warnings.warn("Null geometries found in roads table")
+
+        # short geoms
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table}
+                WHERE ST_Length({roads_geom_col}) <= 1
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Extremely short roads found in roads table")
+            else:
+                warnings.warn("Extremely short roads found in roads table")
+
+        # source/target not in ints table
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table} r
+                WHERE
+                    (
+                        {roads_source_col} IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM {ints_schema}.{ints_table} i
+                            WHERE i.{ints_id_col} = r.{roads_source_col}
+                        )
+                    )
+                    OR
+                    (
+                        {roads_target_col} IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM {ints_schema}.{ints_table} i
+                            WHERE i.{ints_id_col} = r.{roads_target_col}
+                        )
+                    )
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Source/target value not found in intersection table")
+            else:
+                warnings.warn("Source/target value not found in intersection table")
+
+        # empty source/target
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table}
+                WHERE
+                    {roads_source_col} IS NULL
+                    OR {roads_target_col} IS NULL
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Empty source or target value found")
+            else:
+                warnings.warn("Empty source or target value found")
+
+        # high number of legs
+        cur = self._run_sql(
+            """
+                SELECT {ints_id_col}
+                FROM
+                    {ints_schema}.{ints_table} i,
+                    {roads_schema}.{roads_table} r
+                WHERE
+                    i.{ints_id_col} IN (r.{roads_source_col},r.{roads_target_col})
+                GROUP BY {ints_id_col}
+                HAVING COUNT(*) > 8
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if len(cur) > 0:
+            if throw_error:
+                raise ValueError("Unusually high number of intersection legs found")
+            else:
+                warnings.warn("Unusually high number of intersection legs found")
