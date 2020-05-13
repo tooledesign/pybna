@@ -43,9 +43,9 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
     pandas DataFrame unless Excel output is indicated
     """
     if config is None:
-        module_dir = os.path.dirname(os.path.abspath(__file__))
         config = os.path.join(module_dir,"config.yaml")
     conf = yaml.safe_load(open(config))
+    module_dir = os.path.dirname(os.path.abspath(__file__))
 
     if host is None:
         host = conf["db"]["host"]
@@ -200,9 +200,9 @@ def test_crossing_stress(out_file=None,config=None,host=None,db_name=None,user=N
     pandas DataFrame unless Excel output is indicated
     """
     if config is None:
-        module_dir = os.path.dirname(os.path.abspath(__file__))
         config = os.path.join(module_dir,"config.yaml")
     conf = yaml.safe_load(open(config))
+    module_dir = os.path.dirname(os.path.abspath(__file__))
 
     if host is None:
         host = conf["db"]["host"]
