@@ -7,6 +7,7 @@ CREATE TABLE {out_schema}.{out_table} AS (
         NULL::INTEGER AS speed,
         NULL::INTEGER AS effective_aadt,
         NULL::BOOLEAN AS parking,
+        NULL::BOOLEAN AS low_parking,
         NULL::INTEGER AS parking_width,
         NULL::INTEGER AS bike_lane_width,
         NULL::INTEGER AS stress

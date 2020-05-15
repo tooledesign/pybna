@@ -77,6 +77,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
     conf["stress"]["segment"]["forward"]["centerline"] = {"name":"centerline","val":True}
     conf["stress"]["segment"]["forward"]["speed"] = "speed"
     conf["stress"]["segment"]["forward"]["parking"] = {"name":"parking","val":True}
+    conf["stress"]["segment"]["forward"]["low_parking"] = {"name":"low_parking","val":True}
     conf["stress"]["segment"]["forward"]["park_width"] = "park_width"
     conf["stress"]["segment"]["forward"]["bike_infra"] = {"name":"bike","lane":"lane","buffered_lane":"buffered_lane","track":"track","path":"path"}
     conf["stress"]["segment"]["forward"]["bike_lane_width"] = "bike_width"
