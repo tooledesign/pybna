@@ -154,6 +154,8 @@ class Stress(Conf):
                 ("lanes", "integer"),
                 ("marked_centerline", "boolean"),
                 ("speed", "integer"),
+                ("width", "integer"),
+                ("parking", "boolean"),
                 ("effective_aadt", "integer"),
                 ("stress", "integer")
             ]

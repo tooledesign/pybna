@@ -76,6 +76,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
     conf["stress"]["segment"]["forward"]["aadt"] = "aadt"
     conf["stress"]["segment"]["forward"]["centerline"] = {"name":"centerline","val":True}
     conf["stress"]["segment"]["forward"]["speed"] = "speed"
+    conf["stress"]["segment"]["forward"]["width"] = "width"
     conf["stress"]["segment"]["forward"]["parking"] = {"name":"parking","val":True}
     conf["stress"]["segment"]["forward"]["low_parking"] = {"name":"low_parking","val":True}
     conf["stress"]["segment"]["forward"]["park_width"] = "park_width"
@@ -109,6 +110,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
             update {schema}.{table} set centerline=null where centerline='NaN';
             update {schema}.{table} set aadt=null where aadt='NaN';
             update {schema}.{table} set speed=null where speed='NaN';
+            update {schema}.{table} set width=null where width='NaN';
             update {schema}.{table} set bike_width=null where bike_width='NaN';
             update {schema}.{table} set lanes=null where lanes='NaN';
             update {schema}.{table} set parking=null where parking='NaN';
@@ -118,6 +120,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
             alter table {schema}.{table} alter column aadt type integer using aadt::integer;
             alter table {schema}.{table} alter column parking type boolean using parking::boolean;
             alter table {schema}.{table} alter column speed type integer using speed::integer;
+            alter table {schema}.{table} alter column width type integer using width::integer;
             alter table {schema}.{table} alter column bike_width type integer using bike_width::integer;
             alter table {schema}.{table} alter column lanes type integer using lanes::integer;
             alter table {schema}.{table} alter column park_width type integer using park_width::integer;
@@ -138,8 +141,8 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
     q = sql.SQL(
         """
             select
-                bike, speed, centerline, aadt, bike_width, lanes, parking,
-                park_width, low_parking, calculated_stress
+                bike, speed, centerline, aadt, bike_width, lanes, width,
+                parking, park_width, low_parking, calculated_stress
             from {schema}.{table}
             order by id
         """

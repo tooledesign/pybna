@@ -262,6 +262,7 @@ stress:
             # low_parking: {name: "low_parking", val: TRUE}
             speed: speed_limit
             parking: {name: "ft_park", val: TRUE}
+            # width: width
             # low_parking: {name: "low_parking", val: TRUE}
             # parking_width: ft_park_width
             bike_infra: {name: "ft_bike_infra", lane: "lane", buffered_lane: "buffered_lane", track: "track", path: "path"}
@@ -271,9 +272,11 @@ stress:
             oneway: {name: "one_way", val: "tf"}
             speed: speed_limit
             parking: {name: "tf_park", val: TRUE}
+            # width: width
             # low_parking: {name: "low_parking", val: TRUE}
+            # parking_width: ft_park_width
             bike_infra: {name: "tf_bike_infra", lane: "lane", buffered_lane: "buffered_lane", track: "track", path: "path"}
-            # bike_lane_width: tf_bike_infra_width
+            bike_lane_width: tf_bike_infra_width
 
     crossing:
         intersection_tolerance: 5
@@ -328,6 +331,9 @@ stress:
                 - where: "functional_class = 'living_street'"
                   val: 20
                 - else: 30
+            width:
+                - where: "*"
+                  val: 50
             parking:
                 - where: "*"
                   val: True

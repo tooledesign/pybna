@@ -293,6 +293,16 @@ class Conf(DBUtils):
         else:
             assumed_speed = sql.SQL("NULL")
 
+        # width
+        if "width" in settings:
+            width = sql.Identifier(settings["width"])
+        else:
+            width = sql.SQL("NULL")
+        if "width" in assumptions:
+            assumed_width = self._build_case(assumptions["width"])
+        else:
+            assumed_width = sql.SQL("NULL")
+
         # oneway
         if "oneway" in settings:
             oneway_column = sql.Identifier(settings["oneway"]["name"])
@@ -416,6 +426,8 @@ class Conf(DBUtils):
             "assumed_low_parking": assumed_low_parking,
             "speed": speed,
             "assumed_speed": assumed_speed,
+            "width": width,
+            "assumed_width": assumed_width,
             "aadt": aadt,
             "assumed_aadt": assumed_aadt,
             "parking": parking,
