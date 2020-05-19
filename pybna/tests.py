@@ -70,6 +70,8 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
     # make a temporary config file with some strategic changes
     conf["bna"]["network"]["roads"]["table"] = schema + "." + table
     conf["bna"]["network"]["roads"]["uid"] = "id"
+    if km:
+        conf["units"] = "km"
     conf["stress"]["crossing"]["control"]["table"] = "xxxx.xxxx"
     conf["stress"]["crossing"]["island"]["table"] = "xxxx.xxxx"
     conf["stress"]["segment"]["forward"]["lanes"] = "lanes"
@@ -120,10 +122,7 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
             alter table {schema}.{table} alter column aadt type integer using aadt::integer;
             alter table {schema}.{table} alter column parking type boolean using parking::boolean;
             alter table {schema}.{table} alter column speed type integer using speed::integer;
-            alter table {schema}.{table} alter column width type integer using width::integer;
-            alter table {schema}.{table} alter column bike_width type integer using bike_width::integer;
             alter table {schema}.{table} alter column lanes type integer using lanes::integer;
-            alter table {schema}.{table} alter column park_width type integer using park_width::integer;
             alter table {schema}.{table} alter column low_parking type boolean using low_parking::boolean;
             alter table {schema}.{table} add column one_way text;
             alter table {schema}.{table} add column functional_class text;
@@ -134,6 +133,27 @@ def test_segment_stress(out_file=None,config=None,host=None,db_name=None,user=No
         subs,
         conn=conn
     )
+    if km:
+        s._run_sql(
+            """
+                alter table {schema}.{table} alter column width type float using width::float;
+                alter table {schema}.{table} alter column bike_width type float using bike_width::float;
+                alter table {schema}.{table} alter column park_width type float using park_width::float;
+            """,
+            subs,
+            conn=conn
+        )
+    else:
+        s._run_sql(
+            """
+                alter table {schema}.{table} alter column width type integer using width::integer;
+                alter table {schema}.{table} alter column bike_width type integer using bike_width::integer;
+                alter table {schema}.{table} alter column park_width type integer using park_width::integer;
+            """,
+            subs,
+            conn=conn
+        )
+
     conn.commit()
 
     # run stress calc and save back to pandas

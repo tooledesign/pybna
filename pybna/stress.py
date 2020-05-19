@@ -150,30 +150,52 @@ class Stress(Conf):
                 raise ValueError("File not found at %s" % fname)
 
         if lu_type == "shared":
-            columns = [
-                ("lanes", "integer"),
-                ("marked_centerline", "boolean"),
-                ("speed", "integer"),
-                ("width", "integer"),
-                ("parking", "boolean"),
-                ("effective_aadt", "integer"),
-                ("stress", "integer")
-            ]
+            if km:
+                columns = [
+                    ("lanes", "integer"),
+                    ("marked_centerline", "boolean"),
+                    ("speed", "integer"),
+                    ("width", "float"),
+                    ("parking", "boolean"),
+                    ("effective_aadt", "integer"),
+                    ("stress", "integer")
+                ]
+            else:
+                columns = [
+                    ("lanes", "integer"),
+                    ("marked_centerline", "boolean"),
+                    ("speed", "integer"),
+                    ("width", "integer"),
+                    ("parking", "boolean"),
+                    ("effective_aadt", "integer"),
+                    ("stress", "integer")
+                ]
             if not in_file:
                 if km:
                     in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_shared_km.xlsx")
                 else:
                     in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_shared.xlsx")
         elif lu_type == "bike_lane":
-            columns = (
-                ("lanes", "integer"),
-                ("oneway", "boolean"),
-                ("parking", "boolean"),
-                ("low_parking", "boolean"),
-                ("reach", "integer"),
-                ("speed", "integer"),
-                ("stress", "integer")
-            )
+            if km:
+                columns = (
+                    ("lanes", "integer"),
+                    ("oneway", "boolean"),
+                    ("parking", "boolean"),
+                    ("low_parking", "boolean"),
+                    ("reach", "float"),
+                    ("speed", "integer"),
+                    ("stress", "integer")
+                )
+            else:
+                columns = (
+                    ("lanes", "integer"),
+                    ("oneway", "boolean"),
+                    ("parking", "boolean"),
+                    ("low_parking", "boolean"),
+                    ("reach", "integer"),
+                    ("speed", "integer"),
+                    ("stress", "integer")
+                )
             if not in_file:
                 if km:
                     in_file = os.path.join(self.module_dir,"sql","stress","tables","stress_bike_lane_km.xlsx")
