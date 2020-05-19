@@ -59,10 +59,10 @@ bna:
             target_column: "target_vert"
             stress_column: "link_stress"
             cost_column: "link_cost"
-            id_column: link_id
+            uid: link_id
         nodes:
             table: "neighborhood_ways_net_vert"
-            id_column: vert_id
+            uid: vert_id
 
     connectivity:
         table: "neighborhood_connected_census_blocks"
