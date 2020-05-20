@@ -75,8 +75,8 @@ CREATE TEMP TABLE tmp_stops AS (
 );
 
 
-DROP INDEX tidx_osmid_roads;
-DROP INDEX tidx_osmid_import;
+DROP INDEX IF EXISTS tidx_osmid_roads;
+DROP INDEX IF EXISTS tidx_osmid_import;
 
 
 -- combine them all
@@ -118,8 +118,8 @@ CREATE TEMP TABLE tmp_controls AS (
         sort_order ASC
 );
 
-DROP TABLE tmp_signals;
-DROP TABLE tmp_hawks;
-DROP TABLE tmp_stops;
-DROP TABLE tmp_rrfbs;
-DROP TABLE tmp_controls_all;
+DROP TABLE IF EXISTS tmp_signals;
+DROP TABLE IF EXISTS tmp_hawks;
+DROP TABLE IF EXISTS tmp_stops;
+DROP TABLE IF EXISTS tmp_rrfbs;
+DROP TABLE IF EXISTS tmp_controls_all;
