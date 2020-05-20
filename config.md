@@ -239,3 +239,8 @@ osm_tags_query:
 
 The queries are applied as part of the `import_osm_destinations` method in
 pybna's [Importer](import.md#Destinations) class.
+
+### stress
+
+Information about the stress portion of the configuration file is provided in
+the `stress configuration` section of the [stress instructions](stress.md).

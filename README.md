@@ -80,6 +80,15 @@ OpenStreetMap.
 
 For more guidance on the import process, see our [import instructions](import.md).
 
+## Traffic Stress
+
+pyBNA has a module that can calculate traffic stress based on roadway
+characteristics in your roadway data. There's also the ability to apply
+assumptions for locations where data is not available.
+
+For more information about the traffic stress module, see the [traffic stress
+instructions](stress.md).
+
 ## Getting started
 
 First, import pybna and create a pyBNA object by pointing it to the config file.
@@ -117,3 +126,7 @@ Once you've completed the connectivity analysis, you can develop a low/high stre
 ```
 bna.travel_sheds([list, of, block, ids, here], my_travel_shed_table)
 ```
+
+## Scenarios
+
+pyBNA includes the capability to run scenarios as a way to visualize the connectivity impacts of a project or group of projects. More information on scenarios is available [here](scenarios.md).
