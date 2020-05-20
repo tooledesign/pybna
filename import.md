@@ -160,6 +160,14 @@ given in your config file.
 If you already downloaded an OSM extract locally you can refer to it instead of
 pulling data over the network with the `osm_file` option.
 
+**Note** that very large OSM files can result in memory errors (computer running
+out of memory). One strategy to avoid this would be to isolate only features
+with the tag `highway=*`. There are several options for filtering raw OSM data,
+such as Osmium:
+```
+osmium tags-filter -o ~/path/to/output/file ~/path/to/input/file nw/highway
+```
+
 # Destinations
 
 Destination data also comes from OpenStreetMap by default. The Importer uses the
