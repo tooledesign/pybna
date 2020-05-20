@@ -75,8 +75,8 @@ CREATE TEMP TABLE tmp_stops AS (
 );
 
 
-DROP INDEX IF EXISTS tidx_osmid_roads;
-DROP INDEX IF EXISTS tidx_osmid_import;
+DROP INDEX IF EXISTS {roads_schema}.tidx_osmid_roads;
+DROP INDEX IF EXISTS {osm_ways_schema}.tidx_osmid_import;
 
 
 -- combine them all
