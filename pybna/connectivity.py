@@ -657,7 +657,7 @@ class Connectivity(DBUtils):
         # high number of legs
         cur = self._run_sql(
             """
-                SELECT {ints_id_col}
+                SELECT i.{ints_id_col}
                 FROM
                     {ints_schema}.{ints_table} i,
                     {roads_schema}.{roads_table} r
