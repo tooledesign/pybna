@@ -23,12 +23,14 @@ class Connectivity(DBUtils):
         self.db_connection_string = None
 
 
-    def build_network(self,throw_error=False):
+    def build_network(self,skip_check=False,throw_error=False):
         """
         Builds the network in the DB using details from the BNA config file.
 
         Parameters
         ----------
+        skip_check : bool, optional
+            skips check for network issues
         throw_error : bool, optional
             throws an error rather than raising a warning if checks uncover issues
         """
@@ -36,7 +38,9 @@ class Connectivity(DBUtils):
             print("Building network in database")
 
         # run checks
-        self.check_road_features(throw_error)
+        if not skip_check:
+            print("Checking for network issues")
+            self.check_road_features(throw_error)
 
         # set up substitutions
         subs = dict(self.sql_subs)
