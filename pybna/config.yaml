@@ -320,7 +320,9 @@ stress:
                   val: 2
                 - where: "functional_class IN ('tertiary')"
                   val: 1
-                - else: 0
+                - where: "functional_class IN ('unclassified','residential','living_street')"
+                  val: 0
+                - else: 1
             speed:
                 - where: "functional_class IN ('primary','secondary')"
                   val: 40
@@ -352,7 +354,9 @@ stress:
             centerline:
                 - where: "functional_class IN ('primary','secondary','tertiary')"
                   val: True
-                - else: False
+                - where: "functional_class IN ('unclassified','residential','living_street')"
+                  val: False
+                - else: True
             aadt:
                 - where: "functional_class IN ('primary','secondary')"
                   val: 20000

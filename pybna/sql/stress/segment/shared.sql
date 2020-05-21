@@ -13,7 +13,10 @@ CREATE TEMP TABLE tmp_attrs AS (
     SELECT
         {id_column}::INTEGER AS id,
         COALESCE({lanes},{assumed_lanes})::INTEGER AS lanes,
-        COALESCE({centerline},{assumed_centerline})::BOOLEAN AS marked_centerline,
+        CASE
+            WHEN COALESCE({lanes},{assumed_lanes})::INTEGER > 0 THEN TRUE
+            ELSE COALESCE({centerline},{assumed_centerline})::BOOLEAN
+            END AS marked_centerline,
         COALESCE({speed},{assumed_speed})::INTEGER AS speed,
         COALESCE({width},{assumed_width})::INTEGER AS width,
         COALESCE({parking},{assumed_parking})::BOOLEAN AS parking,
@@ -31,7 +34,10 @@ INSERT INTO pg_temp.tmp_attrs
 SELECT
     {id_column}::INTEGER,
     COALESCE({lanes},{assumed_lanes})::INTEGER,
-    TRUE::BOOLEAN,
+    CASE
+        WHEN COALESCE({lanes},{assumed_lanes})::INTEGER > 0 THEN TRUE
+        ELSE COALESCE({centerline},{assumed_centerline})::BOOLEAN
+        END AS marked_centerline,
     COALESCE({speed},{assumed_speed})::INTEGER,
     COALESCE({width},{assumed_width})::INTEGER,
     COALESCE({parking},{assumed_parking})::BOOLEAN,
