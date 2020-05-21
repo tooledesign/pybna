@@ -663,7 +663,7 @@ class Connectivity(DBUtils):
                     {roads_schema}.{roads_table} r
                 WHERE
                     i.{ints_id_col} IN (r.{roads_source_col},r.{roads_target_col})
-                GROUP BY {ints_id_col}
+                GROUP BY i.{ints_id_col}
                 HAVING COUNT(*) > 8
             """,
             subs=self.sql_subs,
