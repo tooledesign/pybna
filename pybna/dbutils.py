@@ -682,7 +682,7 @@ class DBUtils:
 
         schema, table = self.parse_table_name(table)
         if schema is None:
-            schema = get_schema(table)
+            schema = self.get_schema(table)
 
         if layer is None:
             layer = table
