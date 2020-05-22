@@ -24,11 +24,6 @@ class Core(DBUtils):
         self.sql_subs = None
 
 
-    def score(self):
-        """Calculate network score."""
-        pass
-
-
     def travel_sheds(self,block_ids,out_table,composite=True,scenario_id=None,
                      subtract=False,overwrite=False):
         """
