@@ -1,4 +1,4 @@
-import os, string
+import os, string, warnings
 import psycopg2
 from psycopg2 import sql
 from tqdm import tqdm
@@ -23,15 +23,24 @@ class Connectivity(DBUtils):
         self.db_connection_string = None
 
 
-    def build_network(self,dry=None):
+    def build_network(self,skip_check=False,throw_error=False):
         """
         Builds the network in the DB using details from the BNA config file.
 
-        args:
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        skip_check : bool, optional
+            skips check for network issues
+        throw_error : bool, optional
+            throws an error rather than raising a warning if checks uncover issues
         """
         if self.verbose:
             print("Building network in database")
+
+        # run checks
+        if not skip_check:
+            print("Checking for network issues")
+            self.check_road_features(throw_error)
 
         # set up substitutions
         subs = dict(self.sql_subs)
@@ -41,13 +50,13 @@ class Connectivity(DBUtils):
         # run scripts
         conn = self.get_db_connection()
         print("Creating network tables")
-        self._run_sql_script("create_tables.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("create_tables.sql",subs,["sql","build_network"],conn=conn)
         print("Adding network nodes")
-        self._run_sql_script("insert_nodes.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("insert_nodes.sql",subs,["sql","build_network"],conn=conn)
         print("Adding network edges")
-        self._run_sql_script("insert_edges.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("insert_edges.sql",subs,["sql","build_network"],conn=conn)
         print("Finishing up network")
-        self._run_sql_script("cleanup.sql",subs,["sql","build_network"],dry=dry,conn=conn)
+        self._run_sql_script("cleanup.sql",subs,["sql","build_network"],conn=conn)
 
         conn.commit()
         conn.close()
@@ -170,18 +179,27 @@ class Connectivity(DBUtils):
         """
         Organizes and calls SQL scripts for calculating connectivity.
 
-        args
-        scenario_id -- the id of the scenario for which connectivity is calculated
+        Parameters
+        ----------
+        scenario_id
+            the id of the scenario for which connectivity is calculated
             (none means the scores represent the base condition)
-        origin_blocks -- list of block IDs to use as origins. if empty use all blocks.
-        destination_blocks -- list of block IDs to use as destinations. if empty use all blocks.
-        network_filter -- filter to be applied to the road network when routing
-        road_ids -- list of road_ids to be flipped to low stress (requires scenario_id)
-        append -- append to existing db table instead of creating a new one
-        subtract -- (requires scenario_id) if true the calculated scores for
+        origin_blocks : list, optional
+            list of block IDs to use as origins. if empty use all blocks.
+        destination_blocks : list, optional
+            list of block IDs to use as destinations. if empty use all blocks.
+        network_filter : str, optional
+            filter to be applied to the road network when routing
+        road_ids : list, optional
+            list of road_ids to be flipped to low stress (requires scenario_id)
+        append : bool
+            append to existing db table instead of creating a new one
+        subtract : bool
+            (requires scenario_id) if true the calculated scores for
             the scenario are flagged as a subtraction of that scenario from the
             finished network
-        dry -- a path to save SQL statements to instead of executing in DB
+        dry : str
+            a path to save SQL statements to instead of executing in DB
         """
         if scenario_id is None and subtract:
             raise ValueError("Subtract flag can only be used with a scenario")
@@ -239,21 +257,21 @@ class Connectivity(DBUtils):
             cur = conn.cursor()
 
             # filter blocks
-            self._run_sql_script("10_filter_this_block.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-            self._run_sql_script("15_filter_other_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            self._run_sql_script("10_filter_this_block.sql",subs,["sql","connectivity","calculation"],conn=conn)
+            self._run_sql_script("15_filter_other_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
             if scenario_id is not None:
-                self._run_sql_script("17_remove_ls_connections_for_scenario.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-            self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
-            self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                self._run_sql_script("17_remove_ls_connections_for_scenario.sql",subs,["sql","connectivity","calculation"],conn=conn)
+            self._run_sql_script("20_assign_nodes_to_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
+            self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],conn=conn)
 
             # subset hs network
             subs["max_stress"] = sql.Literal(99)
             subs["net_table"] = sql.Identifier("tmp_hs_net")
             if scenario_id is None:
-                self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],conn=conn)
 
                 # get hs nodes
-                ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,dry=dry,conn=conn)
+                ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,conn=conn)
                 if dry is None:
                     hs_nodes = set(n[0] for n in ret)
                 else:
@@ -264,17 +282,17 @@ class Connectivity(DBUtils):
             # subset ls network
             subs["max_stress"] = sql.Literal(self.config.bna.connectivity.max_stress)
             subs["net_table"] = sql.Identifier("tmp_ls_net")
-            self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+            self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],conn=conn)
 
             # get ls nodes
-            ret = self._run_sql("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net",ret=True,dry=dry,conn=conn)
+            ret = self._run_sql("select distinct source from tmp_ls_net union select distinct target from tmp_ls_net",ret=True,conn=conn)
             if dry is None:
                 ls_nodes = set(n[0] for n in ret)
             else:
                 ls_nodes = {-1}
 
             # retrieve nodes for this block and loop through
-            ret = self._run_sql_script("35_this_block_nodes.sql",subs,["sql","connectivity","calculation"],ret=True,dry=dry,conn=conn)
+            ret = self._run_sql_script("35_this_block_nodes.sql",subs,["sql","connectivity","calculation"],ret=True,conn=conn)
             if dry is not None:
                 ret = set()
 
@@ -301,7 +319,7 @@ class Connectivity(DBUtils):
                 cur2.close()
             else:
                 try:
-                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -309,7 +327,7 @@ class Connectivity(DBUtils):
                     continue
 
                 try:
-                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -328,7 +346,7 @@ class Connectivity(DBUtils):
                 cur2.close()
             else:
                 try:
-                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("40_distance_table.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -336,7 +354,7 @@ class Connectivity(DBUtils):
                     continue
 
                 try:
-                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("60_cost_to_blocks.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 except:
                     failure = True
                     failed_blocks.append(block_id)
@@ -345,11 +363,11 @@ class Connectivity(DBUtils):
 
             # build combined cost table and write to connectivity table
             try:
-                self._run_sql_script("70_combine_cost_matrices.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                self._run_sql_script("70_combine_cost_matrices.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 if scenario_id is None:
-                    self._run_sql_script("80_insert.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("80_insert.sql",subs,["sql","connectivity","calculation"],conn=conn)
                 else:
-                    self._run_sql_script("80_insert_with_scenario.sql",subs,["sql","connectivity","calculation"],dry=dry,conn=conn)
+                    self._run_sql_script("80_insert_with_scenario.sql",subs,["sql","connectivity","calculation"],conn=conn)
             except:
                 failure = True
                 failed_blocks.append(block_id)
@@ -375,10 +393,13 @@ class Connectivity(DBUtils):
         Removes the scenario(s) from the connectivity table. If no scenario_id
         is given, remove all scenarios.
 
-        args
-        scenario_ids -- list of scenarios to delete
+        Parameters
+        ----------
+        scenario_ids : list, optional
+            list of scenarios to delete
             (if none calculate for all scenarios)
-        conn -- a DB connection
+        conn : psycopg2 connection object
+            a DB connection
         """
         close_conn = False
         if conn is None:
@@ -424,17 +445,26 @@ class Connectivity(DBUtils):
         Wrapper for connectivity calculations on a given scenario, only to be
         used once the base scenario has been run.
 
-        args
-        scenario_column -- the column in the roads table indicating a scenario
-        scenario_ids -- list of scenario for which connectivity is calculated
+        Parameters
+        ----------
+        scenario_column : str
+            the column in the roads table indicating a scenario
+        scenario_ids : list, optional
+            list of scenario for which connectivity is calculated
             (if none calculate for all scenarios)
-        datatype -- the column type to use for creating the scenario column in the db
-        origin_blocks -- list of block IDs to use as origins. if empty use all blocks.
-        destination_blocks -- list of block IDs to use as destinations. if empty use all blocks.
-        network_filter -- filter to be applied to the road network when routing
-        subtract -- if true the calculated scores for the scenario represent
+        datatype : str, optional
+            the column type to use for creating the scenario column in the db
+        origin_blocks : list, optional
+            list of block IDs to use as origins. if empty use all blocks.
+        destination_blocks : list, optional
+            list of block IDs to use as destinations. if empty use all blocks.
+        network_filter : str, optional
+            filter to be applied to the road network when routing
+        subtract : bool, optional
+            if true the calculated scores for the scenario represent
             a subtraction of that scenario from all other scenarios
-        dry -- a path to save SQL statements to instead of executing in DB
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         if not self.table_exists(self.db_connectivity_table):
             raise ValueError("Connectivity table {} for the base scenario not found".format(self.db_connectivity_table))
@@ -489,6 +519,8 @@ class Connectivity(DBUtils):
 
             conn.close()
 
+            self.drop_scenario([scenario_id])
+
             # pass on to main _calculate_connectivity
             self._calculate_connectivity(
                 scenario_id=scenario_id,
@@ -505,15 +537,145 @@ class Connectivity(DBUtils):
         """
         Wrapper for connectivity calculations on the base scenario
 
-        args
-        blocks -- list of block IDs to use as origins. if empty use all blocks.
-        network_filter -- filter to be applied to the road network when routing
-        append -- append to existing db table instead of creating a new one
-        dry -- a path to save SQL statements to instead of executing in DB
+        Parameters
+        ----------
+        blocks : list, optional
+            list of block IDs to use as origins. if empty use all blocks.
+        network_filter : str, optional
+            filter to be applied to the road network when routing
+        append : bool, optional
+            append to existing db table instead of creating a new one
+        dry : str, optional
+            a path to save SQL statements to instead of executing in DB
         """
         self._calculate_connectivity(
             origin_blocks=blocks,
             network_filter=network_filter,
-            append=append,
-            dry=dry
+            append=append
         )
+
+
+    def check_road_features(self,throw_error=False):
+        """
+        Checks road features for the following issues:
+            1) Empty geometries
+            2) Extremely small geometries
+            3) Source/target values not in intersections table
+            4) Empty source/target values
+            5) unusually high number of intersection legs (shared from/to values)
+
+        Parameters
+        ----------
+        throw_error : bool, optional
+            throws an error rather than raising a warning
+        """
+        conn = self.get_db_connection()
+
+        # null geoms
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table}
+                WHERE {roads_geom_col} IS NULL
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Null geometries found in roads table")
+            else:
+                warnings.warn("Null geometries found in roads table")
+
+        # short geoms
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table}
+                WHERE ST_Length({roads_geom_col}) <= 1
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Extremely short roads found in roads table")
+            else:
+                warnings.warn("Extremely short roads found in roads table")
+
+        # source/target not in ints table
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table} r
+                WHERE
+                    (
+                        {roads_source_col} IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM {ints_schema}.{ints_table} i
+                            WHERE i.{ints_id_col} = r.{roads_source_col}
+                        )
+                    )
+                    OR
+                    (
+                        {roads_target_col} IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM {ints_schema}.{ints_table} i
+                            WHERE i.{ints_id_col} = r.{roads_target_col}
+                        )
+                    )
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Source/target value not found in intersection table")
+            else:
+                warnings.warn("Source/target value not found in intersection table")
+
+        # empty source/target
+        cur = self._run_sql(
+            """
+                SELECT COUNT(*)
+                FROM {roads_schema}.{roads_table}
+                WHERE
+                    {roads_source_col} IS NULL
+                    OR {roads_target_col} IS NULL
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if cur[0][0] > 0:
+            if throw_error:
+                raise ValueError("Empty source or target value found")
+            else:
+                warnings.warn("Empty source or target value found")
+
+        # high number of legs
+        cur = self._run_sql(
+            """
+                SELECT i.{ints_id_col}
+                FROM
+                    {ints_schema}.{ints_table} i,
+                    {roads_schema}.{roads_table} r
+                WHERE
+                    i.{ints_id_col} IN (r.{roads_source_col},r.{roads_target_col})
+                GROUP BY i.{ints_id_col}
+                HAVING COUNT(*) > 8
+            """,
+            subs=self.sql_subs,
+            ret=True,
+            conn=conn
+        )
+        if len(cur) > 0:
+            if throw_error:
+                raise ValueError("Unusually high number of intersection legs found")
+            else:
+                warnings.warn("Unusually high number of intersection legs found")

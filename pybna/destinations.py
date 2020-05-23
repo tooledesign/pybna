@@ -29,10 +29,14 @@ class Destinations(DBUtils):
         """
         Wrapper function that registers destinations and then assigns maxscore
 
-        args
-        category -- a destination category to register. None -> re-register all destinations
-        workspace_schema -- schema to save interim working tables to
-        destinations -- a list of destinations (if none, use the config file)
+        Parameters
+        ----------
+        category : str, optional
+            a destination category to register. None -> re-register all destinations
+        workspace_schema : str, optional
+            schema to save interim working tables to
+        destinations : list, optional
+            a list of destinations (if none, use the config file)
         """
         if category is None and destinations is None:
             if self.verbose:
@@ -63,10 +67,14 @@ class Destinations(DBUtils):
         """
         Retrieve the destinations identified in the config file and register them.
 
-        args
-        destinations -- a list of destinations
-        category -- a destination category to register. None -> re-register all destinations
-        workspace_schema -- schema to save interim working tables to
+        Parameters
+        ----------
+        destinations : list
+            a list of destinations
+        category : str, optional
+            a destination category to register. None -> re-register all destinations
+        workspace_schema : str, optional
+            schema to save interim working tables to
         """
         for v in destinations:
             config = self.parse_config(v)
@@ -84,18 +92,22 @@ class Destinations(DBUtils):
                 )
 
 
-    def score_destinations(self,output_table,scenario_id=None,subtract=False,with_geoms=False,overwrite=False,dry=None):
+    def score(self,output_table,scenario_id=None,subtract=False,with_geoms=False,overwrite=False):
         """
         Creates a new db table of scores for each block
 
-        args:
-        output_table -- table to create (optionally schema-qualified)
-        scenario_id -- the id of the scenario for which scores are calculated
+        Parameters
+        ----------
+        output_table : str
+            table to create (optionally schema-qualified)
+        scenario_id
+            the id of the scenario for which scores are calculated
             (none means the scores represent the base condition)
-        subtract -- if true the calculated scores for the scenario represent
+        subtract : bool, optional
+            if true the calculated scores for the scenario represent
             a subtraction of that scenario from all other scenarios
-        overwrite -- overwrite a pre-existing table
-        dry -- a path to save SQL statements to instead of executing in DB
+        overwrite : bool, optional
+            overwrite a pre-existing table
         """
         # make a copy of sql substitutes
         subs = dict(self.sql_subs)
@@ -110,33 +122,31 @@ class Destinations(DBUtils):
         else:
             subs["scenario_id"] = sql.Literal(scenario_id)
 
-        schema, output_table = self.parse_table_name(output_table)
+        schema, table = self.parse_table_name(output_table)
 
-        subs["scores_table"] = sql.Identifier(output_table)
+        subs["scores_table"] = sql.Identifier(table)
         if schema is None:
             schema = self.get_default_schema()
         subs["scores_schema"] = sql.Identifier(schema)
 
         conn = self.get_db_connection()
-        cur = conn.cursor()
 
-        if dry is None:
-            if overwrite:
-                self.drop_table(
-                    table=output_table,
-                    schema=schema,
-                    conn=conn
-                )
-            elif self.table_exists(output_table,subs["scores_schema"].as_string(conn)):
-                raise psycopg2.ProgrammingError("Table {}.{} already exists".format(subs["scores_schema"].as_string(conn),output_table))
+        if overwrite:
+            self.drop_table(
+                table=table,
+                schema=schema,
+                conn=conn
+            )
+        elif self.table_exists(output_table):
+            raise psycopg2.ProgrammingError("Table {} already exists".format(output_table))
 
         # create temporary filtered connectivity table
         if scenario_id is None:
-            self._run_sql_script("01_connectivity_table.sql",subs,["sql","destinations"],conn=conn)
+            self._run_sql_script("01_connectivity_table.sql",subs,["sql","scenarios"],conn=conn)
         elif subtract:
-            self._run_sql_script("01_connectivity_table_scenario_subtract.sql",subs,["sql","destinations"],conn=conn)
+            self._run_sql_script("01_connectivity_table_scenario_subtract.sql",subs,["sql","scenarios"],conn=conn)
         else:
-            self._run_sql_script("01_connectivity_table_scenario.sql",subs,["sql","destinations"],conn=conn)
+            self._run_sql_script("01_connectivity_table_scenario.sql",subs,["sql","scenarios"],conn=conn)
 
         # generate high and low stress counts for all categories
         print("Counting destinations for each block")
@@ -176,14 +186,14 @@ class Destinations(DBUtils):
         print("Compiling destination data for all sources into output table")
         subs["columns"] = columns
         subs["tables"] = tables
-        self._run_sql_script("04_all_combined.sql",subs,["sql","destinations"],dry=dry,conn=conn)
+        self._run_sql_script("04_all_combined.sql",subs,["sql","destinations"],conn=conn)
 
         # finally set any category scores
         print("Calculating category scores")
         self.aggregate_subcategories(self.destinations["overall"],subs,conn=conn)
 
         if with_geoms:
-            self._copy_block_geoms(conn,subs,dry)
+            self._copy_block_geoms(conn,subs)
 
         conn.commit()
         conn.close()
@@ -195,10 +205,14 @@ class Destinations(DBUtils):
         using the weights defined in the config file.
         Will first calculate any subcategories which themselves have subcategories.
 
-        args
-        destination -- the destination to calculate subcategory scores for
-        subs -- list of SQL substitutions from the parent method
-        conn -- psycopg2 connection object from the parent method
+        Parameters
+        ----------
+        destination : str
+            the destination to calculate subcategory scores for
+        subs : dict
+            list of SQL substitutions from the parent method
+        conn : psycopg2 connection object
+            psycopg2 connection object from the parent method
         """
         if "subcats" in destination.config:
             for subcat in destination.config.subcats:
@@ -283,9 +297,12 @@ class Destinations(DBUtils):
         Copies the geometries from the block table to the output table of destination
         scores.
 
-        args
-        conn -- psycopg2 connection object from the parent method
-        subs -- list of SQL substitutions from the parent method
+        Parameters
+        ----------
+        conn : psycopg2 connection object
+            psycopg2 connection object from the parent method
+        subs : dict
+            list of SQL substitutions from the parent method
         """
         # get geometry type from block table
         subs["type"] = sql.SQL(
@@ -297,4 +314,95 @@ class Destinations(DBUtils):
         )
         subs["sidx_name"] = sql.Identifier("sidx_")+subs["scores_table"]
 
-        self._run_sql_script("05_add_geoms.sql",subs,["sql","destinations"],dry=dry,conn=conn)
+        self._run_sql_script("05_add_geoms.sql",subs,["sql","destinations"],conn=conn)
+
+
+    def aggregate(self,output_table,scores_table,scenario_name="base",overwrite=False):
+        """
+        Creates a new db table of aggregate scores for the entire area
+
+        Parameters
+        ----------
+        output_table : str
+            table to create (optionally schema-qualified)
+        scores_table : str
+            table holding block scores (optionally schema-qualified)
+        scenario_name : str, optional
+            scenario name to be included with these scores
+        overwrite : bool, optional
+            overwrite a pre-existing table
+        """
+        # make a copy of sql substitutes
+        subs = dict(self.sql_subs)
+
+        # scores_table
+        if not self.table_exists(scores_table):
+            raise ValueError("Could not find table {}".format(scores_table))
+        scores_schema, scores_table = self.parse_table_name(scores_table)
+        subs["scores_table"] = sql.Identifier(scores_table)
+        if scores_schema is None:
+            scores_schema = self.get_schema(scores_table)
+        subs["scores_schema"] = sql.Identifier(scores_schema)
+
+        # output_table
+        agg_schema, agg_table = self.parse_table_name(output_table)
+        subs["agg_table"] = sql.Identifier(agg_table)
+        if agg_schema is None:
+            agg_schema = self.get_default_schema()
+        subs["agg_schema"] = sql.Identifier(agg_schema)
+
+        # scenario_name
+        subs["scenario_name"] = sql.Literal(scenario_name)
+
+        # get connection
+        conn = self.get_db_connection()
+
+        new_table = False
+        if overwrite:
+            self.drop_table(
+                table=agg_table,
+                schema=agg_schema,
+                conn=conn
+            )
+            self._run_sql_script("01_make_table.sql",subs,["sql","aggregate"],conn=conn)
+            new_table = True
+        elif not self.table_exists(output_table):
+            self._run_sql_script("01_make_table.sql",subs,["sql","aggregate"],conn=conn)
+            new_table = True
+        else:
+            q = sql.SQL("""
+                delete from {agg_schema}.{agg_table} where scenario = {scenario_name};
+            """).format(**subs)
+            self._run_sql(q.as_string(conn),conn=conn)
+        q = sql.SQL("""
+            insert into {agg_schema}.{agg_table} (scenario) select {scenario_name};
+        """).format(**subs)
+        self._run_sql(q.as_string(conn),conn=conn)
+        self._run_sql_script("05_block_multipliers.sql",subs,["sql","aggregate"],conn=conn)
+        self._aggregate_category_score(self.destinations["overall"],subs,new_table,conn)
+
+        conn.commit()
+        conn.close()
+
+    def _aggregate_category_score(self,destination,subs,add_columns,conn):
+        """
+        Iteratively calculates aggregate category scores.
+        Will first calculate any subcategories which themselves have subcategories.
+
+        Parameters
+        ----------
+        destination : str
+            the destination to calculate subcategory scores for
+        subs : dict
+            list of SQL substitutions from the parent method
+        conn : psycopg2 connection object
+            psycopg2 connection object from the parent method
+        """
+        if "subcats" in destination.config:
+            for subcat in destination.config.subcats:
+                self._aggregate_category_score(self.destinations[subcat["name"]],subs,add_columns,conn)
+
+        subs["scores_column"] = sql.Identifier(destination.config.name + "_score")
+        if add_columns:
+            self._run_sql_script("10_add_column.sql",subs,["sql","aggregate"],conn=conn)
+        self._run_sql_script("15_aggregate.sql",subs,["sql","aggregate"],conn=conn)

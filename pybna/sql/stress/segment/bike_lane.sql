@@ -13,6 +13,7 @@ CREATE TEMP TABLE pg_temp.tmp_attrs AS (
         {oneway}::BOOLEAN AS oneway,
         COALESCE({parking},{assumed_parking})::BOOLEAN AS parking,
         COALESCE({parking_width},{assumed_parking_width})::INTEGER AS parking_width,
+        COALESCE({low_parking},{assumed_low_parking})::BOOLEAN AS low_parking,
         COALESCE({bike_lane_width},{assumed_bike_lane_width})::INTEGER AS bike_lane_width,
         COALESCE({speed},{assumed_speed})::INTEGER AS speed
     FROM
@@ -37,6 +38,7 @@ CREATE TEMP TABLE pg_temp.tmp_stress AS (
         tmp_attrs.lanes <= lts.lanes
         AND (lts.oneway IS NULL OR tmp_attrs.oneway = lts.oneway)
         AND tmp_attrs.parking = lts.parking
+        AND tmp_attrs.low_parking >= lts.low_parking
         AND (tmp_attrs.parking_width * tmp_attrs.parking::INTEGER) + tmp_attrs.bike_lane_width >= lts.reach
         AND tmp_attrs.speed <= lts.speed
     ORDER BY
@@ -52,6 +54,7 @@ INSERT INTO {out_schema}.{out_table} (
     {geom},
     lanes,
     parking,
+    low_parking,
     parking_width,
     bike_lane_width,
     speed,
@@ -62,6 +65,7 @@ SELECT
     {in_table}.geom,
     tmp_attrs.lanes,
     tmp_attrs.parking,
+    tmp_attrs.low_parking,
     tmp_attrs.parking_width,
     tmp_attrs.bike_lane_width,
     tmp_attrs.speed,

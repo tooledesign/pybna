@@ -31,14 +31,22 @@ class Importer(Conf):
         """
         Reads the config file and sets up a connection to the database
 
-        args
-        config -- path to the config file
-        verbose -- output useful messages
-        debug -- set to debug mode
-        host -- hostname or address (overrides the config file if given)
-        db -- name of database on server (overrides the config file if given)
-        user -- username to connect to database (overrides the config file if given)
-        password -- password to connect to database (overrides the config file if given)
+        Parameters
+        ----------
+        config : str, optional
+            path to the config file
+        verbose : bool, optional
+            output useful messages
+        debug : bool, optional
+            set to debug mode
+        host : str, optional
+            hostname or address (overrides the config file if given)
+        db : str, optional
+            name of database on server (overrides the config file if given)
+        user : str, optional
+            username to connect to database (overrides the config file if given)
+        password : str, optional
+            password to connect to database (overrides the config file if given)
         """
         Conf.__init__(self)
         self.verbose = verbose
@@ -88,11 +96,16 @@ class Importer(Conf):
         Takes a shapefile input and saves it to the DB as the boundary file
         (reprojecting to the appropriate srid)
 
-        args
-        fpath -- path to the shapefile
-        srid -- projection to use (if not given uses srid defined in config)
-        table -- table to write to (if empty use config)
-        overwrite -- overwrite an existing table
+        Parameters
+        ----------
+        fpath : str
+            path to the shapefile
+        srid : int or string, optional
+            projection to use (if not given uses srid defined in config)
+        table : str, optional
+            table to write to (if empty use config)
+        overwrite : bool, optional
+            overwrite an existing table
         """
         # process inputs
         if not os.path.isfile(fpath):
@@ -120,7 +133,8 @@ class Importer(Conf):
 
 
     def import_census_blocks(self,fips=None,url=None,fpath=None,table=None,
-                             keep_case=False,columns=None,id=None,geom=None,
+                             keep_case=False,keep_water=False,
+                             columns=None,id=None,geom=None,
                              srid=None,boundary_file=None,overwrite=False):
         """
         Retrieves census block features and saves them to the
@@ -129,18 +143,32 @@ class Importer(Conf):
         file that can be automatically opened by geopandas' read_file method
         (zipped shapefile, shapefile, geojson, etc.)
 
-        args
-        fips -- the two digit fips code that identifies the state
-        url -- url to download a file from
-        fpath -- path to a file
-        table -- the table name to save blocks to (if none use config) (must be schema-qualified)
-        keep_case -- whether to prevent column names from being converted to lower case
-        columns -- list of columns in the dataset to keep (if none keeps all)
-        id -- name for the id/primary key column (if none use config)
-        geom -- name for the geometry column (if none use config)
-        srid -- projection to use (if not given uses srid defined in config)
-        boundary_file -- path to the boundary file (if not given reads it from the DB as defined in config)
-        overwrite -- deletes an existing table
+        Parameters
+        ----------
+        fips
+            the two digit fips code that identifies the state
+        url : str
+            url to download a file from
+        fpath : str
+            path to a file
+        table : str, optional
+            the table name to save blocks to (if none use config) (must be schema-qualified)
+        keep_case : bool, optional
+            whether to prevent column names from being converted to lower case
+        keep_water : bool, optional
+            whether to omit census blocks that are associated with water only areas
+        columns : list, optional
+            list of columns in the dataset to keep (if none keeps all)
+        id : str, optional
+            name for the id/primary key column (if none use config)
+        geom : str, optional
+            name for the geometry column (if none use config)
+        srid : int or str, optional
+            projection to use (if not given uses srid defined in config)
+        boundary_file : str, optional
+            path to the boundary file (if not given reads it from the DB as defined in config)
+        overwrite : bool, optional
+            deletes an existing table
         """
         # check inputs
         if fips is None and url is None and fpath is None:
@@ -210,6 +238,11 @@ class Importer(Conf):
         print("Filtering blocks to boundary")
         blocks = blocks[blocks.intersects(boundary.unary_union)]
 
+        # filter out blocks associated with water
+        if keep_water is False:
+            print("Filtering out water")
+            blocks = blocks[blocks.blockce.str[0] != '0']
+
         # copy data to db
         print("Copying blocks to database")
         self.gdf_to_postgis(
@@ -230,17 +263,26 @@ class Importer(Conf):
         designated jobs table in the DB. Can take a two letter state abbreviation
         to download directly from the US Census, or can take a URL or file path
 
-        args
-        table -- the table name to save blocks to
-        state -- the two letter state abbreviation
-        url_main -- url to download the "main" file from
-        url_aux -- url to download the "aux" file from
-        fpath_main -- path to the "main" file
-        fpath_aux -- path to the "aux" file
-        overwrite -- deletes an existing table
-
+        Current example URLs are
         https://lehd.ces.census.gov/data/lodes/LODES7/wy/od/wy_od_aux_JT00_2013.csv.gz
         https://lehd.ces.census.gov/data/lodes/LODES7/wy/od/wy_od_main_JT00_2014.csv.gz
+
+        Parameters
+        ----------
+        table : str
+            the table name to save blocks to
+        state : str
+            the two letter state abbreviation
+        url_main : str
+            url to download the "main" file from
+        url_aux : str
+            url to download the "aux" file from
+        fpath_main : str
+            path to the "main" file
+        fpath_aux : str
+            path to the "aux" file
+        overwrite : bool, optional
+            deletes an existing table
         """
         # check inputs
         if int(url_main is None) + int(url_aux is None) == 1:
@@ -271,7 +313,7 @@ class Importer(Conf):
         # copy the shapefile to temporary directory and load into geopandas
         if not state is None:
             print("Loading data for state {}".format(state.upper()))
-            year = 2014
+            year = 2020
             success = False
             while not success:
                 if year < 2010:
@@ -313,21 +355,33 @@ class Importer(Conf):
     def import_osm_network(self,roads_table=None,ints_table=None,
                            boundary_file=None,boundary_buffer=None,
                            osm_file=None,keep_holding_tables=False,srid=None,
-                           overwrite=False):
+                           km=None,overwrite=False):
         """
         Imports OSM ways/nodes and copies the data into the database with attributes
         needed for LTS scoring.
 
-        args
-        roads_table -- name of the table to save the OSM ways to (if none use config) (must be schema-qualified)
-        ints_table -- name of the table to save the OSM intersections to (if none use config) (must be schema-qualified)
-        boundary_file -- a boundary file path. if not given uses the boundary file specified in the config
-        boundary_buffer -- distance (in units of the boundary) outside of the
+        Parameters
+        ----------
+        roads_table : str, optional
+            name of the table to save the OSM ways to (if none use config) (must be schema-qualified)
+        ints_table : str, optional
+            name of the table to save the OSM intersections to (if none use config) (must be schema-qualified)
+        boundary_file : str, optional
+            a boundary file path. if not given uses the boundary file specified in the config
+        boundary_buffer : str, optional
+            distance (in units of the boundary) outside of the
             boundary to pull network features (if none use max_distance from config)
-        osm_file -- an OSM XML file to use instead of pulling data from the network
-        keep_holding_tables -- if true, saves the raw OSM import to the roads/ints schemas
-        srid -- projection to use
-        overwrite -- whether to overwrite any existing tables
+        osm_file : str, optional
+            an OSM XML file to use instead of pulling data from the network
+        keep_holding_tables : bool, optional
+            if true, saves the raw OSM import to the roads/ints schemas
+        srid : int or str, optional
+            projection to use
+        km : bool, optional
+            if true, units for measurements and speed limits are imported to
+            metric
+        overwrite : bool, optional
+            whether to overwrite any existing tables
         """
         if roads_table is None:
             if "table" in self.config.bna.network.roads:
@@ -359,6 +413,8 @@ class Importer(Conf):
             else:
                 raise ValueError("SRID must be specified as an arg or in the config file")
         crs = "epsg:{:d}".format(srid)
+        if km is None:
+            km = self.km
 
         # generate table names for holding tables
         osm_ways_table = "osm_ways_"+"".join(random.choice(string.ascii_lowercase) for i in range(7))
@@ -412,7 +468,7 @@ class Importer(Conf):
 
         self._process_osm(
             roads_table,roads_schema,ints_table,ints_schema,osm_ways_table,
-            osm_ways_schema,osm_nodes_table,osm_nodes_schema,overwrite,conn
+            osm_ways_schema,osm_nodes_table,osm_nodes_schema,srid,km,overwrite,conn
         )
 
         conn.commit()
@@ -421,25 +477,44 @@ class Importer(Conf):
 
     def _process_osm(self,roads_table,roads_schema,ints_table,ints_schema,
                      osm_ways_table,osm_ways_schema,osm_nodes_table,
-                     osm_nodes_schema,overwrite=None,conn=None):
+                     osm_nodes_schema,srid,km=None,overwrite=None,conn=None):
         """
         Processes OSM import by running through the import scripts in the sql directory
 
-        args:
-        roads_table -- name of the roads table
-        roads_schema -- name of the roads schema
-        ints_table -- name of the intersections table
-        ints_schema -- name of the intersections schema
-        osm_ways_table -- name of the OSM ways table
-        osm_ways_schema -- name of the OSM ways schema
-        osm_nodes_table -- name of the OSM nodes table
-        osm_nodes_schema -- name of the OSM nodes schema
-        conn -- a connection object (if none a new connection is created)
+        Parameters
+        ----------
+        roads_table : str
+            name of the roads table
+        roads_schema : str
+            name of the roads schema
+        ints_table : str
+            name of the intersections table
+        ints_schema : str
+            name of the intersections schema
+        osm_ways_table : str
+            name of the OSM ways table
+        osm_ways_schema : str
+            name of the OSM ways schema
+        osm_nodes_table : str
+            name of the OSM nodes table
+        osm_nodes_schema : str
+            name of the OSM nodes schema
+        srid : int or str, optional
+            projection to use
+        km : str, optional
+            if true, units for measurements and speed limits are imported to
+            metric equivalents
+        overwrite : bool, optional
+            overwrite an existing table
+        conn : psycopg2 connection object, optional
+            a connection object (if none a new connection is created)
         """
         commit = False
         if conn is None:
             conn = self.get_db_connection()
             commit = True
+        if km is None:
+            km = self.km
 
         subs = dict(self.sql_subs)
         subs["roads_table"] = sql.Identifier(roads_table)
@@ -452,12 +527,19 @@ class Importer(Conf):
         subs["osm_ways_schema"] = sql.Identifier(osm_ways_schema)
         subs["osm_nodes_table"] = sql.Identifier(osm_nodes_table)
         subs["osm_nodes_schema"] = sql.Identifier(osm_nodes_schema)
-        if self.km:
+        subs["srid"] = sql.Literal(srid)
+        if km:
+            subs["km"] = sql.Literal(True)
             subs["km_multiplier"] = sql.Literal(1)
+            subs["m_multiplier"] = sql.Literal(1)
             subs["mi_multiplier"] = sql.Literal(1.609344)
+            subs["ft_multiplier"] = sql.Literal(0.3048)
         else:
+            subs["km"] = sql.Literal(False)
             subs["km_multiplier"] = sql.Literal(0.6213712)
+            subs["m_multiplier"] = sql.Literal(3.28084)
             subs["mi_multiplier"] = sql.Literal(1)
+            subs["ft_multiplier"] = sql.Literal(1)
 
         # process things in the db
         road_queries = [os.path.join(self.module_dir,"sql","importer","roads",f) for f in os.listdir(os.path.join(self.module_dir,"sql","importer","roads"))]
@@ -489,9 +571,12 @@ class Importer(Conf):
         """
         Submits an Overpass API query and returns a geodataframe of results
 
-        args
-        boundary -- shapely geometry representing the boundary for pulling the network
-        osm_file -- an OSM XML file to use instead of downloading data from the network
+        Parameters
+        ----------
+        boundary : shapely geometry object
+            shapely geometry representing the boundary for pulling the network
+        osm_file : str, optional
+            an OSM XML file to use instead of downloading data from the network
         """
         # https://osmnx.readthedocs.io/en/stable/osmnx.html#osmnx.save_load.graph_to_gdfs
         node_tags = [
@@ -611,14 +696,23 @@ class Importer(Conf):
         """
         Processes OSM destinations and copies the data into the database.
 
-        args
-        osm_file -- an OSM XML file to use instead of downloading data from the network
-        schema -- the schema to create the tables in (if not given, uses the DB default)
-        boundary_file -- a boundary file path. if not given uses the boundary specified in the config
-        srid -- projection to use
-        destination_tags -- list of destination tags to be used instead of the default
-        overwrite -- whether to overwrite any existing tables
-        keep_intermediates -- saves the intermediate tables used to generate the final tables
+        Parameters
+        ----------
+        osm_file : str, optional
+            an OSM XML file to use instead of downloading data from the network
+        schema : str, optional
+            the schema to create the tables in (if not given, uses the DB default).
+            only used if the table is not schema-qualified in the config file
+        boundary_file : str, optional
+            a boundary file path. if not given uses the boundary specified in the config
+        srid : int or str, optional
+            projection to use
+        destination_tags : list, optional
+            list of destination tags to be used instead of the default
+        overwrite : bool, optional
+            whether to overwrite any existing tables
+        keep_intermediates : bool, optional
+            saves the intermediate tables used to generate the final tables
         """
         if osm_file and not with_osmium:
             raise ValueError("Importing destinations from an OSM extract requires the osmium library")
@@ -640,63 +734,17 @@ class Importer(Conf):
 
         # set up a list of dictionaries with info about each destination
         if destination_tags is None:
-            destination_tags = [
-                {"table":"bna_colleges","tags_query": ["['amenity'='college']"]},
-                {
-                    "table":"bna_community_centers",
-                    "tags_query": [
-                        "['amenity'='community_centre']",
-                        "['amenity'='community_center']"
-                    ]
-                },
-                {"table":"bna_dentists","tags_query": ["['amenity'='dentist']"]},
-                {
-                    "table":"bna_doctors",
-                    "tags_query": [
-                        "['amenity'='doctors']",
-                        "['amenity'='doctor']",
-                        "['amenity'='clinic']"
-                    ]
-                },
-                {
-                    "table":"bna_hospitals",
-                    "tags_query": [
-                        "['amenity'='hospital']",
-                        "['amenity'='hospitals']"
-                    ]
-                },
-                {
-                    "table":"bna_parks",
-                    "tags_query": [
-                        "['amenity'='park']",
-                        "['leisure'='park']",
-                        "['leisure'='nature_reserve']",
-                        "['leisure'='playground']"
-                    ]
-                },
-                {"table":"bna_pharmacies","tags_query": ["['amenity'='pharmacy']"]},
-                {"table":"bna_retail","tags_query": ["['landuse'='retail']"]},
-                {"table":"bna_schools","tags_query": ["['amenity'='school']"]},
-                {"table":"bna_social_services","tags_query": ["['amenity'='social_facility']"]},
-                {"table":"bna_supermarkets","tags_query": ["['shop'='supermarket']"]},
-                {
-                    "table":"bna_transit",
-                    "tags_query": [
-                        "['amenity'='bus_station']",
-                        "['railway'='station']",
-                        "['public_transport'='station']"
-                    ]
-                },
-                {"table":"bna_universities","tags_query": ["['amenity'='university']"]}
-            ]
+            destination_tags = self.get_destination_tags()
 
         conn = self.get_db_connection()
         for d in destination_tags:
-            table = d["table"]
-            if not overwrite and self.table_exists(table,schema):
+            output_schema, table = self.parse_table_name(d["table"])
+            if output_schema is None:
+                output_schema = schema
+            if not overwrite and self.table_exists(table,output_schema):
                 conn.rollback()
                 conn.close()
-                raise ValueError("Table %s.%s already exists" % (schema,table))
+                raise ValueError("Table %s.%s already exists" % (output_schema,table))
             tags = d["tags_query"]
             print("Copying {} to database".format(table))
             if osm_file is None:
@@ -727,21 +775,21 @@ class Importer(Conf):
             query_make_table_areas = sql.SQL(
                 "create table {}.{} (geom text,osmid bigint{})"
             ).format(
-                sql.Identifier(schema),
+                sql.Identifier(output_schema),
                 sql.Identifier(table_prefix+"_"+table+"_areas"),
                 query_attributes
             )
             query_make_table_ways = sql.SQL(
                 "create table {}.{} (geom text,osmid bigint{})"
             ).format(
-                sql.Identifier(schema),
+                sql.Identifier(output_schema),
                 sql.Identifier(table_prefix+"_"+table+"_ways"),
                 query_attributes
             )
             query_make_table_nodes = sql.SQL(
                 "create table {}.{} (geom text,osmid bigint{})"
             ).format(
-                sql.Identifier(schema),
+                sql.Identifier(output_schema),
                 sql.Identifier(table_prefix+"_"+table+"_nodes"),
                 query_attributes
             )
@@ -765,7 +813,7 @@ class Importer(Conf):
                     continue
                 else:
                     ids_already_processed.add(feature["id"])
-                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_areas")
+                    self._osm_destinations_table_insert(conn,attributes,feature,output_schema,table_prefix+"_"+table+"_areas")
             ids_already_processed = set()
             for feature in ways["features"]:
                 if feature["id"] in ids_already_processed:
@@ -774,7 +822,7 @@ class Importer(Conf):
                     continue
                 else:
                     ids_already_processed.add(feature["id"])
-                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_ways")
+                    self._osm_destinations_table_insert(conn,attributes,feature,output_schema,table_prefix+"_"+table+"_ways")
             ids_already_processed = set()
             for feature in nodes["features"]:
                 if feature["id"] in ids_already_processed:
@@ -783,11 +831,11 @@ class Importer(Conf):
                     continue
                 else:
                     ids_already_processed.add(feature["id"])
-                    self._osm_destinations_table_insert(conn,attributes,feature,schema,table_prefix+"_"+table+"_nodes")
+                    self._osm_destinations_table_insert(conn,attributes,feature,output_schema,table_prefix+"_"+table+"_nodes")
 
             # process in the db
             subs = {
-                "schema": sql.Identifier(schema),
+                "schema": sql.Identifier(output_schema),
                 "final_table": sql.Identifier(table),
                 "areas_table": sql.Identifier(table_prefix+"_"+table+"_areas"),
                 "ways_table": sql.Identifier(table_prefix+"_"+table+"_ways"),
@@ -798,7 +846,7 @@ class Importer(Conf):
             }
             qpath = os.path.join(self.module_dir,"sql","importer","process_destinations.sql")
             if overwrite:
-                self.drop_table(table,schema=schema,conn=conn)
+                self.drop_table(table,schema=output_schema,conn=conn)
             query = self.read_sql_from_file(qpath)
             q = sql.SQL(query).format(**subs)
             try:
@@ -812,9 +860,9 @@ class Importer(Conf):
                 raise e
 
             if not keep_intermediates:
-                self.drop_table(table_prefix+"_"+table+"_areas",schema=schema,conn=conn)
-                self.drop_table(table_prefix+"_"+table+"_ways",schema=schema,conn=conn)
-                self.drop_table(table_prefix+"_"+table+"_nodes",schema=schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_areas",schema=output_schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_ways",schema=output_schema,conn=conn)
+                self.drop_table(table_prefix+"_"+table+"_nodes",schema=output_schema,conn=conn)
 
         conn.commit()
         conn.close()
@@ -854,12 +902,18 @@ class Importer(Conf):
         """
         Submits an Overpass API query and returns a geojson of results
 
-        args
-        min_lon -- Minimum longitude
-        min_lat -- Minimum latitude
-        max_lon -- Maximum longitude
-        max_lat -- Maximum latitude
-        tags -- list of osm tags to use for filtering this destination type
+        Parameters
+        ----------
+        min_lon : int or float
+            Minimum longitude
+        min_lat : int or float
+            Minimum latitude
+        max_lon : int or float
+            Maximum longitude
+        max_lat : int or float
+            Maximum latitude
+        tags : list
+            list of osm tags to use for filtering this destination type
 
         returns
         geojson of ways, geojson of nodes
@@ -879,13 +933,20 @@ class Importer(Conf):
         """
         Extracts destinations from an OSM file and returns a geojson of results
 
-        args
-        min_lon -- Minimum longitude
-        min_lat -- Minimum latitude
-        max_lon -- Maximum longitude
-        max_lat -- Maximum latitude
-        osm_file -- an OSM XML file to use instead of downloading data from the network
-        tags -- list of osm tags to use for filtering this destination type
+        Parameters
+        ----------
+        min_lon : int or float
+            Minimum longitude
+        min_lat : int or float
+            Minimum latitude
+        max_lon : int or float
+            Maximum longitude
+        max_lat : int or float
+            Maximum latitude
+        osm_file : str
+            an OSM XML file to use instead of downloading data from the network
+        tags : list
+            list of osm tags to use for filtering this destination type
 
         returns
         geojson of areas, geojson of nodes
@@ -904,9 +965,12 @@ class Importer(Conf):
         the file. If not, reads the config and loads the boundary from the
         table indicated in the config.
 
-        args
-        boundary_file -- path to a file
-        srid -- projection to use for the geodataframe (if none use the projection of the source data)
+        Parameters
+        ----------
+        boundary_file : str, optional
+            path to a file
+        srid : int or str, optional
+            projection to use for the geodataframe (if none use the projection of the source data)
 
         returns
         geodataframe object

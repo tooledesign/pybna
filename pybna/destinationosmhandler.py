@@ -12,8 +12,10 @@ class DestinationOSMHandler(osmium.SimpleHandler):
 
     def __init__(self,tag_list):
         """
-        args
-        tag_list -- list of tags to compare features against
+        Parameters
+        ----------
+        tag_list : list
+            list of tags to compare features against
         """
         self.nodes_json = list()
         self.areas_json = list()

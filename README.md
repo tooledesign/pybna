@@ -22,7 +22,8 @@ pyBNA is tested with Python 3.6. The following libraries are required:
 - geopandas
 - munch
 - overpass
-- omsnx
+- osmnx
+- xlrd
 
 A requirements.txt file is provided for convenience. You can install these via
 pip:
@@ -64,7 +65,10 @@ s.crossing_stress()
 # connectivity
 bna = pybna.pyBNA()
 bna.calculate_connectivity()
-bna.score_destinations("myschema.mytable")
+
+# scores
+bna.score("myschema.my_scores_table")
+bna.aggregate("myschema.my_aggregate_score_table")
 ```
 
 ## Importing data
@@ -75,6 +79,15 @@ Census 2010 data. Street network and bicycle facility data is imported from
 OpenStreetMap.
 
 For more guidance on the import process, see our [import instructions](import.md).
+
+## Traffic Stress
+
+pyBNA has a module that can calculate traffic stress based on roadway
+characteristics in your roadway data. There's also the ability to apply
+assumptions for locations where data is not available.
+
+For more information about the traffic stress module, see the [traffic stress
+instructions](stress.md).
 
 ## Getting started
 
@@ -91,7 +104,12 @@ bna.calculate_connectivity()
 
 Lastly, you can generate block-level scores with
 ```
-b.score_destinations("my_results_table")
+bna.score("myschema.my_scores_table")
+```
+
+and aggregate scores for the entire study area with
+```
+bna.aggregate("myschema.my_aggregate_score_table")
 ```
 
 ## Configuration file
@@ -108,3 +126,7 @@ Once you've completed the connectivity analysis, you can develop a low/high stre
 ```
 bna.travel_sheds([list, of, block, ids, here], my_travel_shed_table)
 ```
+
+## Scenarios
+
+pyBNA includes the capability to run scenarios as a way to visualize the connectivity impacts of a project or group of projects. More information on scenarios is available [here](scenarios.md).

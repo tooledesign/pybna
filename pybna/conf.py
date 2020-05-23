@@ -11,7 +11,7 @@ from .core import BACKWARD_DIRECTION
 
 
 class Conf(DBUtils):
-    """pyBNA Connectivity class"""
+    """pyBNA configuration class"""
 
     def __init__(self):
         DBUtils.__init__(self,"")
@@ -23,8 +23,10 @@ class Conf(DBUtils):
         Reads through the giant dictionary loaded from YAML and converts into
         munches that can be accessed with dot-notation
 
-        args:
-        config -- a dictionary of configuration options
+        Parameters
+        ----------
+        config : dict
+            a dictionary of configuration options
 
         returns:
         Munch
@@ -226,8 +228,10 @@ class Conf(DBUtils):
         Builds commonly-shared segment-oriented SQL substitutions from the
         entries in the config file
 
-        args:
-        direction -- the direction to generate substitutions for
+        Parameters
+        ----------
+        direction : str
+            the direction to generate substitutions for
 
         returns:
         a dictionary holding SQL objects
@@ -266,6 +270,19 @@ class Conf(DBUtils):
         else:
             assumed_centerline = sql.SQL("FALSE")
 
+        # low_parking
+        if "low_parking" in settings:
+            low_parking_column = sql.Identifier(settings["low_parking"]["name"])
+            low_parking_value = sql.Literal(settings["low_parking"]["val"])
+        else:
+            low_parking_column = sql.SQL("NULL")
+            low_parking_value = sql.SQL("NULL")
+        low_parking = sql.SQL("({}={})").format(low_parking_column,low_parking_value)
+        if "low_parking" in assumptions:
+            assumed_low_parking = self._build_case(assumptions["low_parking"])
+        else:
+            assumed_low_parking = sql.SQL("FALSE")
+
         # speed
         if "speed" in settings:
             speed = sql.Identifier(settings["speed"])
@@ -275,6 +292,16 @@ class Conf(DBUtils):
             assumed_speed = self._build_case(assumptions["speed"])
         else:
             assumed_speed = sql.SQL("NULL")
+
+        # width
+        if "width" in settings:
+            width = sql.Identifier(settings["width"])
+        else:
+            width = sql.SQL("NULL")
+        if "width" in assumptions:
+            assumed_width = self._build_case(assumptions["width"])
+        else:
+            assumed_width = sql.SQL("NULL")
 
         # oneway
         if "oneway" in settings:
@@ -395,8 +422,12 @@ class Conf(DBUtils):
             "assumed_lanes": assumed_lanes,
             "centerline": centerline,
             "assumed_centerline": assumed_centerline,
+            "low_parking": low_parking,
+            "assumed_low_parking": assumed_low_parking,
             "speed": speed,
             "assumed_speed": assumed_speed,
+            "width": width,
+            "assumed_width": assumed_width,
             "aadt": aadt,
             "assumed_aadt": assumed_aadt,
             "parking": parking,
@@ -428,8 +459,10 @@ class Conf(DBUtils):
         Builds crossing SQL substitutions from the entries in the config
         file
 
-        args:
-        direction -- the direction to generate substitutions for
+        Parameters
+        ----------
+        direction : str
+            the direction to generate substitutions for
 
         returns:
         a dictionary holding SQL objects
@@ -657,3 +690,43 @@ class Conf(DBUtils):
             case += sql.SQL(" ELSE ") + sql.Literal(vals[-1]["else"])
         case += sql.SQL(" END ")
         return case
+
+
+    def get_destination_tags(self):
+        """
+        Compiles a list of dictionaries that describe the tables and OSM tags
+        for destinations in the config file.
+
+        returns:
+        a list of dictionaries
+        """
+        tags = []
+        for destination in self.config.bna.destinations:
+            tags.extend(self._get_destination_tags(destination))
+        return tags
+
+
+    def _get_destination_tags(self,node):
+        """
+        Helper method to be used in recursing destinations for OSM tags.
+        Returns a list of dictionaries with the table and OSM tags for the given
+        node in the destinations. If the node has subcats, appends these to the
+        result.
+
+        Parameters
+        ----------
+        node : dict
+            A destination type in the config file
+
+        returns:
+        a list of dictionaries
+        """
+        tags = []
+        if "subcats" in node:
+            for destination in node["subcats"]:
+                tags.extend(self._get_destination_tags(destination))
+
+        if "table" in node and "osm_tags_query" in node:
+            tags.append({"table":node["table"],"tags_query":node["osm_tags_query"]})
+
+        return tags

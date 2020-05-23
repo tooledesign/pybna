@@ -160,13 +160,22 @@ given in your config file.
 If you already downloaded an OSM extract locally you can refer to it instead of
 pulling data over the network with the `osm_file` option.
 
+**Note** that very large OSM files can result in memory errors (computer running
+out of memory). One strategy to avoid this would be to isolate only features
+with the tag `highway=*`. There are several options for filtering raw OSM data,
+such as Osmium:
+```
+osmium tags-filter -o ~/path/to/output/file ~/path/to/input/file nw/highway
+```
+
 # Destinations
 
 Destination data also comes from OpenStreetMap by default. The Importer uses the
-default destination categories and definitions for the BNA, but you can provide
-your own instructions for extracting OSM destinations using the
-`destination_tags` option. To do this, you'll need to create a dictionary of
-table names and OSM tags that mimics the default baked into the code.
+destination tags defined in the [configuration file](config.md#destinations),
+but you can provide separate instructions for extracting OSM destinations using
+the `destination_tags` option. To do this, you'll need to create a dictionary of
+table names and OSM tags that mimics the format encoded in the configuration
+file.
 
 Importing destinations can be done with:
 ```

@@ -7,5 +7,5 @@ CREATE TEMP TABLE tmp_flip_stress AS (
     FROM {edges_schema}.{edges_table}
     WHERE
         source_road_id = ANY({low_stress_road_ids})
-        AND target_road_id = ANY({low_stress_road_ids})
+        OR target_road_id = ANY({low_stress_road_ids})
 );

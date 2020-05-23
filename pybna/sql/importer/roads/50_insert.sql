@@ -42,6 +42,28 @@ CREATE TEMP TABLE tmp_combined AS (
             ON osm.id = tmp_park_ft.id
         LEFT JOIN tmp_park_tf
             ON osm.id = tmp_park_tf.id
+    WHERE
+        NOT 'no' = ANY(         -- checks for bicycle=no tag and excludes
+            regexp_split_to_array(
+                trim(COALESCE(osm."bicycle",''),'{{}}'),
+                ','
+            )
+        )
+        AND CASE
+                WHEN (
+                    'footway' = ANY(regexp_split_to_array(trim(osm.highway,'{{}}'),','))
+                    AND 'crossing' = ANY(regexp_split_to_array(trim(osm.footway,'{{}}'),','))
+                    )
+                    THEN (
+                        ARRAY['yes','designated']
+                        &&
+                        regexp_split_to_array(
+                            trim(COALESCE(osm."bicycle",''),'{{}}'),
+                            ','
+                        )
+                    )
+                ELSE TRUE
+                END
 );
 
 INSERT INTO {roads_schema}.{roads_table}

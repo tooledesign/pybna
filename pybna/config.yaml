@@ -8,7 +8,11 @@
 # unusual circumstance
 #############################################
 srid: 3857
-units: mi # units for speed limit, either km (metric) or mi (imperial), default is "mi" if not given
+units: mi # units for speed limit, width, etc.
+          # Either km (metric) or mi (imperial), default is "mi" if not given.
+          # Note this only affects OSM importing and the units used for
+          # LTS lookups. Any distances given in the rest of this config file
+          # are in the units of the map projection
 
 db:
     user: "gis"
@@ -48,17 +52,17 @@ bna:
             table: "neighborhood_ways_intersections"
             geom: "geom"
             uid: "int_id"
-            cluster_distance: 5
+            cluster_distance: 1
         edges:
             table: "neighborhood_ways_net_link"
             source_column: "source_vert"
             target_column: "target_vert"
             stress_column: "link_stress"
             cost_column: "link_cost"
-            id_column: link_id
+            uid: link_id
         nodes:
             table: "neighborhood_ways_net_vert"
-            id_column: vert_id
+            uid: vert_id
 
     connectivity:
         table: "neighborhood_connected_census_blocks"
@@ -98,6 +102,8 @@ bna:
             breaks: {1: 30, 2: 20, 3: 20}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='school']"
           - name: colleges
             weight: 10
             table: bna_colleges
@@ -106,6 +112,8 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='college']"
           - name: universities
             weight: 20
             table: bna_universities
@@ -114,6 +122,8 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='university']"
       - name: core_services
         weight: 20
         subcats:
@@ -125,6 +135,10 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='doctors']"
+                - "['amenity'='doctor']"
+                - "['amenity'='clinic']"
           - name: dentists
             weight: 10
             table: bna_dentists
@@ -133,6 +147,8 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='dentist']"
           - name: hospitals
             weight: 20
             table: bna_hospitals
@@ -141,6 +157,9 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='hospital']"
+                - "['amenity'='hospitals']"
           - name: pharmacies
             weight: 10
             table: bna_pharmacies
@@ -149,6 +168,8 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='pharmacy']"
           - name: supermarkets
             weight: 25
             table: bna_supermarkets
@@ -157,6 +178,8 @@ bna:
             breaks: {1: 60, 2: 20}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['shop'='supermarket']"
           - name: social_services
             weight: 15
             table: bna_social_services
@@ -165,6 +188,8 @@ bna:
             breaks: {1: 70}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='social_facility']"
       - name: recreation
         weight: 15
         subcats:
@@ -176,6 +201,11 @@ bna:
             breaks: {1: 30, 2: 20, 3: 20}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='park']"
+                - "['leisure'='park']"
+                - "['leisure'='nature_reserve']"
+                - "['leisure'='playground']"
         #   - name: trails
         #     weight: 35
         #     table: bna_paths
@@ -191,6 +221,9 @@ bna:
             breaks: {1: 40, 2: 20, 3: 10}
             uid: id
             geom: geom_pt
+            osm_tags_query:
+                - "['amenity'='community_centre']"
+                - "['amenity'='community_center']"
       - name: retail
         weight: 15
         table: bna_retail
@@ -199,6 +232,8 @@ bna:
         breaks: {1: 40, 2: 20, 3: 10}
         uid: id
         geom: geom_pt
+        osm_tags_query:
+            - "['landuse'='retail']"
       - name: transit
         weight: 15
         table: bna_transit
@@ -207,6 +242,10 @@ bna:
         breaks: {1: 60}
         uid: id
         geom: geom_pt
+        osm_tags_query:
+            - "['amenity'='bus_station']"
+            - "['railway'='station']"
+            - "['public_transport'='station']"
 
 stress:
     lookup_tables:
@@ -220,8 +259,11 @@ stress:
             oneway: {name: "one_way", val: "ft"}    # given as a pair (column_name, value)
             # aadt: aadt
             # centerline: {name: "centerline", val: 1}  # given as a pair (column_name, value)
+            # low_parking: {name: "low_parking", val: TRUE}
             speed: speed_limit
             parking: {name: "ft_park", val: TRUE}
+            # width: width
+            # low_parking: {name: "low_parking", val: TRUE}
             # parking_width: ft_park_width
             bike_infra: {name: "ft_bike_infra", lane: "lane", buffered_lane: "buffered_lane", track: "track", path: "path"}
             bike_lane_width: ft_bike_infra_width
@@ -230,8 +272,11 @@ stress:
             oneway: {name: "one_way", val: "tf"}
             speed: speed_limit
             parking: {name: "tf_park", val: TRUE}
+            # width: width
+            # low_parking: {name: "low_parking", val: TRUE}
+            # parking_width: ft_park_width
             bike_infra: {name: "tf_bike_infra", lane: "lane", buffered_lane: "buffered_lane", track: "track", path: "path"}
-            # bike_lane_width: tf_bike_infra_width
+            bike_lane_width: tf_bike_infra_width
 
     crossing:
         intersection_tolerance: 5
@@ -275,7 +320,9 @@ stress:
                   val: 2
                 - where: "functional_class IN ('tertiary')"
                   val: 1
-                - else: 0
+                - where: "functional_class IN ('unclassified','residential','living_street')"
+                  val: 0
+                - else: 1
             speed:
                 - where: "functional_class IN ('primary','secondary')"
                   val: 40
@@ -283,10 +330,21 @@ stress:
                   val: 30
                 - where: "functional_class IN ('unclassified','residential')"
                   val: 25
+                - where: "functional_class = 'living_street'"
+                  val: 20
                 - else: 30
+            width:
+                - where: "*"
+                  val: 50
             parking:
                 - where: "*"
                   val: True
+            low_parking:
+                - where: "functional_class IN ('primary','secondary')"
+                  val: False
+                - where: "functional_class = 'tertiary'"
+                  val: False
+                - else: False
             parking_width:
                 - where: "*"
                   val: 8
@@ -296,7 +354,9 @@ stress:
             centerline:
                 - where: "functional_class IN ('primary','secondary','tertiary')"
                   val: True
-                - else: False
+                - where: "functional_class IN ('unclassified','residential','living_street')"
+                  val: False
+                - else: True
             aadt:
                 - where: "functional_class IN ('primary','secondary')"
                   val: 20000
@@ -304,6 +364,8 @@ stress:
                   val: 10000
                 - where: "functional_class IN ('unclassified','residential')"
                   val: 500
+                - where: "functional_class = 'living_street'"
+                  val: 100
                 - else: 20000
 
         crossing:
