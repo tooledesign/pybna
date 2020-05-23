@@ -53,9 +53,15 @@ class DestinationCategory(DBUtils):
                     id_column = self.get_pkid_col(table,schema=schema)
 
                 if "geom" in config:
-                    geom_col = config.geom
+                    if isinstance(config.geom, str):
+                        geom_col = sql.Identifier(config.geom)
+                    else:
+                        cols = [sql.Identifier(c) for c in config.geom]
+                        geom_col = sql.SQL("COALESCE(") \
+                                    + sql.SQL(",").join([sql.Identifier(c) for c in config.geom]) \
+                                    + sql.SQL(")")
                 else:
-                    geom_col = "geom"
+                    geom_col = sql.SQL("geom")
 
                 if "filter" in config:
                     filter = sql.SQL(config.filter)
@@ -81,7 +87,7 @@ class DestinationCategory(DBUtils):
                 }
 
                 if config["method"] == "count":
-                    self.sql_subs["destinations_geom_col"] = sql.Identifier(geom_col)
+                    self.sql_subs["destinations_geom_col"] = geom_col
                 elif config["method"] == "percentage":
                     self.sql_subs["val"] = sql.Identifier(config["datafield"])
                 else:
