@@ -27,9 +27,11 @@ with open(ver_path) as ver_file:
 setup(
     name="pybna",
     version=main_ns["__version__"],
+    author="Spencer Gardner",
+    url="https://github.com/tooledesign/pybna",
     description="A library for measuring bike network connectivity using PeopleForBikes' Bicycle Network Analysis methodology",
     long_description=read('README.md'),
-    long_description_content_type="markdown",
+    long_description_content_type="text/markdown",
     packages=find_packages(include=["pybna","pybna.*"]),
     package_data={"": package_files(root,[".csv",".xlsx",".sql",".yaml"])},
     install_requires=[
