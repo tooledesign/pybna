@@ -6,5 +6,5 @@ geopandas
 osmnx
 overpass
 xlrd
-# openpyxl not required but recommended
-# osmium not required but recommended
+openpyxl # not required but recommended
+osmium # not required but recommended
