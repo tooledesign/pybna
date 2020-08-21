@@ -238,10 +238,13 @@ class Importer(Conf):
         print("Filtering blocks to boundary")
         blocks = blocks[blocks.intersects(boundary.unary_union)]
 
-        # filter out blocks associated with water
+        # filter out blocks associated with water based on the water blocks file
         if keep_water is False:
             print("Filtering out water")
-            blocks = blocks[blocks.blockce.str[0] != '0']
+            water_file = os.path.join(self.module_dir,"sql","importer","water_blocks.zip")
+            water = pd.read_csv(water_file,dtype="object")
+            blocks[~blocks.blockid10.isin(water.GEOID10)]
+            # blocks = blocks[blocks.blockce.str[0] != '0']
 
         # copy data to db
         print("Copying blocks to database")

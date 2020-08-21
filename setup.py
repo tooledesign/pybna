@@ -33,7 +33,7 @@ setup(
     long_description=read('README.md'),
     long_description_content_type="text/markdown",
     packages=find_packages(include=["pybna","pybna.*"]),
-    package_data={"": package_files(root,[".csv",".xlsx",".sql",".yaml"])},
+    package_data={"": package_files(root,[".csv",".xlsx",".sql",".yaml",".zip"])},
     install_requires=[
         "pandas",
         "geopandas",
