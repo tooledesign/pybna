@@ -2,7 +2,7 @@
 # The Config class houses methods for dealing with the config file
 ###################################################################
 import os
-import collections
+from collections import Mapping
 from psycopg2 import sql
 from munch import Munch
 from .dbutils import DBUtils
@@ -31,7 +31,7 @@ class Conf(DBUtils):
         returns:
         Munch
         """
-        if isinstance(config, collections.Mapping):
+        if isinstance(config, Mapping):
             for key, value in config.items():
                 config[key] = self.parse_config(value)
             return Munch(config)
