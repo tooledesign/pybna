@@ -2,7 +2,8 @@
 # This is a class that provides utilities for working with the
 # database
 ###################################################################
-import os
+import os, warnings
+warnings.simplefilter("always")
 import yaml
 import psycopg2
 import sqlite3
@@ -708,11 +709,14 @@ class DBUtils:
                 conn,
                 index_col=pkey
             )
-            for col in t.columns:
-                if is_iterable(t[col]):
-                    t[col] = t[col].astype("str")
-            sqlite_conn = sqlite3.connect(fpath)
-            t.to_sql(layer,sqlite_conn)
+            if len(t) == 0:
+                warnings.warn("Empty table {}.{}".format(schema,table))
+            else:
+                for col in t.columns:
+                    if is_iterable(t[col]):
+                        t[col] = t[col].astype("str")
+                sqlite_conn = sqlite3.connect(fpath)
+                t.to_sql(layer,sqlite_conn)
         else:
             t = gpd.read_postgis(
                 sql.SQL("select * from {}.{}").format(
@@ -723,7 +727,10 @@ class DBUtils:
                 geom_col=geom,
                 index_col=pkey
             )
-            for col in t.columns:
-                if is_iterable(t[col]):
-                    t[col] = t[col].astype("str")
-            t.to_file(fpath,layer=layer,driver="GPKG")
+            if len(t) == 0:
+                warnings.warn("Empty table {}.{}".format(schema,table))
+            else:
+                for col in t.columns:
+                    if is_iterable(t[col]):
+                        t[col] = t[col].astype("str")
+                t.to_file(fpath,layer=layer,driver="GPKG")
