@@ -493,7 +493,8 @@ class Connectivity(DBUtils):
                     where {roads_scenario_col} is not null \
                 ",
                 subs=subs,
-                ret=True
+                ret=True,
+                conn=conn
             )
             scenario_ids = [row[0] for row in ret]
             conn.close()
