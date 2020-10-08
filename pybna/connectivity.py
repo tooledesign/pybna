@@ -485,6 +485,7 @@ class Connectivity(DBUtils):
 
         # iterate scenarios
         if scenario_ids is None:
+            conn = self.get_db_connection()
             ret = self._run_sql(
                 " \
                     select distinct {roads_scenario_col} \
@@ -495,6 +496,8 @@ class Connectivity(DBUtils):
                 ret=True
             )
             scenario_ids = [row[0] for row in ret]
+            conn.close()
+            del conn
         if not hasattr(scenario_ids,"__iter__"):
             scenario_ids = [scenario_ids]
 
