@@ -712,6 +712,7 @@ class Connectivity(DBUtils):
         subs["output_table"] = sql.Identifier(table)
         subs["roads_scenario_col"] = sql.Identifier(scenario_column)
         subs["scenario_id"] = sql.Literal(scenario_id)
+        subs["edges_index"] = sql.Identifier("sidx_"+table)
 
         conn = self.get_db_connection()
         if overwrite:

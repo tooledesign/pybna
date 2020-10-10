@@ -14,3 +14,6 @@ CREATE TABLE {output_schema}.{output_table} AS (
         LEFT JOIN tmp_flip_stress
             ON link.{edges_id_col} = tmp_flip_stress.id
 );
+
+ALTER TABLE {output_schema}.{output_table} ADD PRIMARY KEY ({edges_id_col});
+CREATE INDEX {edges_index} ON {output_schema}.{output_table} USING GIST ({edges_geom_col});
