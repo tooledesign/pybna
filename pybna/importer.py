@@ -681,11 +681,18 @@ class Importer(Conf):
         else:
             ox.config(useful_tags_node=node_tags,useful_tags_way=way_tags)
         if osm_file:
-            G = ox.graph_from_file(
-                osm_file,
-                simplify=True,
-                retain_all=False
-            )
+            if version.parse(ox.__version__) < version.parse("0.13.0"):
+                G = ox.graph_from_file(
+                    osm_file,
+                    simplify=True,
+                    retain_all=False
+                )
+            else:
+                G = ox.graph_from_xml(
+                    osm_file,
+                    simplify=True,
+                    retain_all=False
+                )
         else:
             G = ox.graph_from_polygon(
                 boundary,network_type='all',simplify=True,retain_all=False,
