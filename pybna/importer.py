@@ -12,6 +12,7 @@ import random
 import string
 from shapely.geometry import shape, box
 from geojson import FeatureCollection
+from packaging import version
 
 try:
     with_osmium = True
@@ -675,7 +676,10 @@ class Importer(Conf):
             "width:lanes:backward"
         ]
 
-        ox.config(useful_tags_node=node_tags,useful_tags_path=way_tags)
+        if version.parse(ox.__version__) < version.parse("0.14.1"):
+            ox.config(useful_tags_node=node_tags,useful_tags_path=way_tags)
+        else:
+            ox.config(useful_tags_node=node_tags,useful_tags_way=way_tags)
         if osm_file:
             G = ox.graph_from_file(
                 osm_file,

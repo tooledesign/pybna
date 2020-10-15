@@ -35,6 +35,7 @@ setup(
     packages=find_packages(include=["pybna","pybna.*"]),
     package_data={"": package_files(root,[".csv",".xlsx",".sql",".yaml",".zip"])},
     install_requires=[
+        "packaging",
         "pandas",
         "geopandas",
         "psycopg2-binary",
