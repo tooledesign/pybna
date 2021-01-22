@@ -55,7 +55,8 @@ class Importer(Conf):
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
         if config is None:
             config = os.path.join(self.module_dir,"config.yaml")
-        self.config = self.parse_config(yaml.safe_load(open(config)))
+        with open(config) as config_yaml:
+            self.config = self.parse_config(yaml.safe_load(config_yaml))
         print("Connecting to database")
         if host is None:
             host = self.config.db.host
