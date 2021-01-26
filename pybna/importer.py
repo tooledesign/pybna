@@ -697,7 +697,7 @@ class Importer(Conf):
         else:
             G = ox.graph_from_polygon(
                 boundary,network_type='all',simplify=True,retain_all=False,
-                truncate_by_edge=False,timeout=180,clean_periphery=True,
+                truncate_by_edge=False,clean_periphery=True,
                 custom_filter=None
             )
         G = ox.get_undirected(G)
