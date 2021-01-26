@@ -60,7 +60,9 @@ class pyBNA(Conf,Destinations,Connectivity,Core):
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
         if config is None:
             config = os.path.join(self.module_dir,"config.yaml")
-        self.config = self.parse_config(yaml.safe_load(open(config)))
+
+        with open(config) as f:
+            self.config = self.parse_config(yaml.safe_load(f))
         self.config["bna"]["connectivity"]["max_detour"] = float(100 + self.config["bna"]["connectivity"]["max_detour"])/100
         self.db_connectivity_table = self.config["bna"]["connectivity"]["table"]
         self.net_config = self.config["bna"]["network"]
