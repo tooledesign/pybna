@@ -1,5 +1,3 @@
-ALTER TABLE {osm_nodes_schema}.{osm_nodes_table} ALTER COLUMN osmid TYPE BIGINT USING osmid::BIGINT;
-
 -- add any missing columns to raw OSM
 ALTER TABLE {osm_nodes_schema}.{osm_nodes_table} ADD COLUMN IF NOT EXISTS "access" TEXT;
 ALTER TABLE {osm_nodes_schema}.{osm_nodes_table} ADD COLUMN IF NOT EXISTS "amenity" TEXT;

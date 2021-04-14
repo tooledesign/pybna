@@ -12,6 +12,7 @@ import random
 import string
 from shapely.geometry import shape, box
 from geojson import FeatureCollection
+from packaging import version
 
 try:
     with_osmium = True
@@ -238,10 +239,13 @@ class Importer(Conf):
         print("Filtering blocks to boundary")
         blocks = blocks[blocks.intersects(boundary.unary_union)]
 
-        # filter out blocks associated with water
+        # filter out blocks associated with water based on the water blocks file
         if keep_water is False:
             print("Filtering out water")
-            blocks = blocks[blocks.blockce.str[0] != '0']
+            water_file = os.path.join(self.module_dir,"sql","importer","water_blocks.zip")
+            water = pd.read_csv(water_file,dtype="object")
+            blocks[~blocks.blockid10.isin(water.GEOID10)]
+            # blocks = blocks[blocks.blockce.str[0] != '0']
 
         # copy data to db
         print("Copying blocks to database")
@@ -672,17 +676,27 @@ class Importer(Conf):
             "width:lanes:backward"
         ]
 
-        ox.config(useful_tags_node=node_tags,useful_tags_path=way_tags)
+        if version.parse(ox.__version__) < version.parse("0.14.1"):
+            ox.config(useful_tags_node=node_tags,useful_tags_path=way_tags)
+        else:
+            ox.config(useful_tags_node=node_tags,useful_tags_way=way_tags)
         if osm_file:
-            G = ox.graph_from_file(
-                osm_file,
-                simplify=True,
-                retain_all=False
-            )
+            if version.parse(ox.__version__) < version.parse("0.13.0"):
+                G = ox.graph_from_file(
+                    osm_file,
+                    simplify=True,
+                    retain_all=False
+                )
+            else:
+                G = ox.graph_from_xml(
+                    osm_file,
+                    simplify=True,
+                    retain_all=False
+                )
         else:
             G = ox.graph_from_polygon(
                 boundary,network_type='all',simplify=True,retain_all=False,
-                truncate_by_edge=False,timeout=180,clean_periphery=True,
+                truncate_by_edge=False,clean_periphery=True,
                 custom_filter=None
             )
         G = ox.get_undirected(G)

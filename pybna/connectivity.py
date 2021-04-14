@@ -1,4 +1,5 @@
 import os, string, warnings
+warnings.simplefilter("always")
 import psycopg2
 from psycopg2 import sql
 from tqdm import tqdm
@@ -484,6 +485,7 @@ class Connectivity(DBUtils):
 
         # iterate scenarios
         if scenario_ids is None:
+            conn = self.get_db_connection()
             ret = self._run_sql(
                 " \
                     select distinct {roads_scenario_col} \
@@ -491,9 +493,12 @@ class Connectivity(DBUtils):
                     where {roads_scenario_col} is not null \
                 ",
                 subs=subs,
-                ret=True
+                ret=True,
+                conn=conn
             )
             scenario_ids = [row[0] for row in ret]
+            conn.close()
+            del conn
         if not hasattr(scenario_ids,"__iter__"):
             scenario_ids = [scenario_ids]
 
@@ -679,3 +684,42 @@ class Connectivity(DBUtils):
                 raise ValueError("Unusually high number of intersection legs found")
             else:
                 warnings.warn("Unusually high number of intersection legs found")
+
+
+    def save_scenario_edges(self,scenario_column,scenario_id,table,overwrite=False):
+        """
+        Saves the edge table resulting from the given scenario to the location
+        given by table.
+
+        Parameters
+        ----------
+        scenario_column : text
+            Column in the roads table that defines the scenario
+        scenario_id : text
+            Name of the scenario
+        table : text
+            Schema-qualified name of the table
+        overwrite : boolean
+            Overwrite an existing table
+        """
+        schema, table = self.parse_table_name(table)
+        if schema is None:
+            schema = self.get_default_schema()
+
+        subs = dict(self.sql_subs)
+
+        subs["output_schema"] = sql.Identifier(schema)
+        subs["output_table"] = sql.Identifier(table)
+        subs["roads_scenario_col"] = sql.Identifier(scenario_column)
+        subs["scenario_id"] = sql.Literal(scenario_id)
+        subs["edges_index"] = sql.Identifier("sidx_"+table)
+
+        conn = self.get_db_connection()
+        if overwrite:
+            self.drop_table(table,schema=schema,conn=conn)
+        road_ids = self._run_sql_script("get_affected_road_ids.sql",subs,["sql","connectivity","scenarios"],ret=True,conn=conn)
+        subs["low_stress_road_ids"] = sql.Literal(road_ids)
+        self._run_sql_script("25_flip_low_stress.sql",subs,["sql","connectivity","calculation"],conn=conn)
+        self._run_sql_script("scenario_edges.sql",subs,["sql","scenarios"],conn=conn)
+        conn.commit()
+        conn.close()
