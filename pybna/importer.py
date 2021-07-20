@@ -695,7 +695,7 @@ class Importer(Conf):
                 )
         else:
             G = ox.graph_from_polygon(
-                boundary,network_type='all',simplify=True,retain_all=False,
+                boundary,network_type='all',simplify=True,retain_all=True,
                 truncate_by_edge=False,clean_periphery=True,
                 custom_filter=None
             )
