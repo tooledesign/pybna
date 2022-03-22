@@ -563,6 +563,8 @@ class Importer(Conf):
             cur = conn.cursor()
             query = self.read_sql_from_file(fquery)
             q = sql.SQL(query).format(**subs)
+            if self.verbose:
+                print(q)
             cur.execute(q)
             cur.close()
 
