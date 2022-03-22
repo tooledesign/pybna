@@ -560,11 +560,11 @@ class Importer(Conf):
             self.drop_table(ints_table,schema=ints_schema,conn=conn)
 
         for fquery in queries:
+            if self.verbose:
+                print(fquery)
             cur = conn.cursor()
             query = self.read_sql_from_file(fquery)
             q = sql.SQL(query).format(**subs)
-            if self.verbose:
-                print(q)
             cur.execute(q)
             cur.close()
 
