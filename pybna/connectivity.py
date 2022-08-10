@@ -268,17 +268,14 @@ class Connectivity(DBUtils):
             # subset hs network
             subs["max_stress"] = sql.Literal(99)
             subs["net_table"] = sql.Identifier("tmp_hs_net")
-            if scenario_id is None:
-                self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],conn=conn)
+            self._run_sql_script("30_network_subset.sql",subs,["sql","connectivity","calculation"],conn=conn)
 
-                # get hs nodes
-                ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,conn=conn)
-                if dry is None:
-                    hs_nodes = set(n[0] for n in ret)
-                else:
-                    hs_nodes = {-1}
+            # get hs nodes
+            ret = self._run_sql("select distinct source from tmp_hs_net union select distinct target from tmp_hs_net",ret=True,conn=conn)
+            if dry is None:
+                hs_nodes = set(n[0] for n in ret)
             else:
-                hs_nodes = set()
+                hs_nodes = {-1}
 
             # subset ls network
             subs["max_stress"] = sql.Literal(self.config.bna.connectivity.max_stress)
@@ -314,7 +311,7 @@ class Connectivity(DBUtils):
             subs["distance_table"] = sql.Identifier("tmp_hs_distance")
             subs["cost_to_blocks"] = sql.Identifier("tmp_hs_cost_to_blocks")
 
-            if len(hs_node_ids) == 0 or scenario_id is not None:
+            if len(hs_node_ids) == 0:
                 cur2 = conn.cursor()
                 cur2.execute("create temp table tmp_hs_cost_to_blocks (id int, agg_cost float)")
                 cur2.close()
