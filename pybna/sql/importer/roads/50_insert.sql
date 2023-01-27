@@ -24,12 +24,12 @@ CREATE TEMP TABLE tmp_combined AS (
         tmp_park_tf.tf_park
     FROM
         {osm_ways_schema}.{osm_ways_table} osm
-        JOIN tmp_name
+        JOIN tmp_func
+            ON osm.id = tmp_func.id
+        LEFT JOIN tmp_name
             ON osm.id = tmp_name.id
         LEFT JOIN tmp_ref
             ON osm.id = tmp_ref.id
-        LEFT JOIN tmp_func
-            ON osm.id = tmp_func.id
         LEFT JOIN tmp_oneway
             ON osm.id = tmp_oneway.id
         LEFT JOIN tmp_width
