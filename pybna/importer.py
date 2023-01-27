@@ -657,6 +657,7 @@ class Importer(Conf):
             "parking:lane:both:width",
             "public_transport",
             "railway",
+            "ref",
             "segregated",
             "service",
             "shop",
