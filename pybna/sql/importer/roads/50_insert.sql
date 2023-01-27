@@ -77,6 +77,8 @@ SELECT
     id,
     geom,
     osmid,
+    name,
+    ref,
     functional_class,
     path_id,   --path_id
     oneway,
