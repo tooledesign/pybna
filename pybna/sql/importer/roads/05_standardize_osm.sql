@@ -33,6 +33,7 @@ ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "leisure
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "maxspeed" TEXT;
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "motorcar" TEXT;
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "name" TEXT;
+ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "ref" TEXT;
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "oneway" TEXT;
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "oneway:bicycle" TEXT;
 ALTER TABLE {osm_ways_schema}.{osm_ways_table} ADD COLUMN IF NOT EXISTS "operator" TEXT;

@@ -686,13 +686,13 @@ class Importer(Conf):
                 G = ox.graph_from_file(
                     osm_file,
                     simplify=True,
-                    retain_all=False
+                    retain_all=True
                 )
             else:
                 G = ox.graph_from_xml(
                     osm_file,
                     simplify=True,
-                    retain_all=False
+                    retain_all=True
                 )
         else:
             G = ox.graph_from_polygon(
