@@ -2,6 +2,8 @@ CREATE TABLE {roads_schema}.{roads_table} (
     {roads_id_col} INTEGER PRIMARY KEY,
     {roads_geom_col} geometry(linestring,{srid}),
     osmid BIGINT[],
+    name TEXT[],
+    ref TEXT[],
     functional_class TEXT,
     path_id INTEGER,
     {roads_oneway_col} TEXT,

@@ -4,6 +4,8 @@ CREATE TEMP TABLE tmp_combined AS (
         osm.id,
         osm.geom,
         osm.osmid,
+        tmp_name.name,
+        tmp_ref.ref,
         tmp_func.functional_class,
         NULL::INTEGER AS path_id,   --path_id
         tmp_oneway.oneway,
@@ -24,6 +26,10 @@ CREATE TEMP TABLE tmp_combined AS (
         {osm_ways_schema}.{osm_ways_table} osm
         JOIN tmp_func
             ON osm.id = tmp_func.id
+        LEFT JOIN tmp_name
+            ON osm.id = tmp_name.id
+        LEFT JOIN tmp_ref
+            ON osm.id = tmp_ref.id
         LEFT JOIN tmp_oneway
             ON osm.id = tmp_oneway.id
         LEFT JOIN tmp_width
@@ -71,6 +77,8 @@ SELECT
     id,
     geom,
     osmid,
+    name,
+    ref,
     functional_class,
     path_id,   --path_id
     oneway,
