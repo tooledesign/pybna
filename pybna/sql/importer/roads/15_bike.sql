@@ -18,19 +18,59 @@ CREATE TEMP TABLE tmp_unnest AS (
         "cycleway:both:width".*
     FROM
         {osm_ways_schema}.{osm_ways_table} osm,
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:left",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:right",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."oneway:bicycle",'{{NaN}}'))) || '}}')::TEXT[]) "oneway:bicycle",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:both",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:left:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:right:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both:buffer",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:both:buffer",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:width",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:left:width",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:right:width",
-        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both:width",'{{NaN}}'))) || '}}')::TEXT[]) "cycleway:both:width"
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway",'{{NaN}}'))) || '}}')::TEXT[]) AS "cycleway",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:left",'{{NaN}}'))) || '}}')::TEXT[]) AS "cycleway:left",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:right",'{{NaN}}'))) || '}}')::TEXT[]) AS "cycleway:right",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."oneway:bicycle",'{{NaN}}'))) || '}}')::TEXT[]) AS "oneway:bicycle",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(osm."cycleway:both",'{{NaN}}'))) || '}}')::TEXT[]) AS "cycleway:both",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:buffer" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:buffer", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:buffer" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:buffer"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:buffer",
+       	unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:left:buffer" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:left:buffer", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:left:buffer" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:left:buffer"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:left:buffer",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:right:buffer" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:right:buffer", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:right:buffer" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:right:buffer"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:right:buffer",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:both:buffer" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:both:buffer", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:both:buffer" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:both:buffer"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:both:buffer",
+       	unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:width" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:width", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:width" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:width"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:width",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:left:width" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:left:width", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:left:width" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:left:width"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:left:width",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:right:width" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:right:width", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:right:width" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:right:width"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:right:width",
+        unnest(('{{' || trim(both '{{' from trim(both '}}' from COALESCE(CASE WHEN osm."cycleway:both:width" ~ '^[0-9]+[''][0-9]+' THEN split_part(osm."cycleway:both:width", '''', 1) || ' ft'
+        																						WHEN osm."cycleway:both:width" ~ '^[0-9]+[\"][0-9]+' THEN Null
+        																						ELSE osm."cycleway:both:width"
+        																						END,
+        																						'{{NaN}}'))) || '}}')::TEXT[])
+        																		AS "cycleway:both:width"
 );
 
 -- ft_bike_infra
