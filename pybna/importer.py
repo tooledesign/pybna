@@ -934,8 +934,8 @@ class Importer(Conf):
         geojson of ways, geojson of nodes
         """
         query_root = ["({},{},{},{}){}".format(min_lat,min_lon,max_lat,max_lon,tag) for tag in tags]
-        way_query = "way" + ";way".join(query_root) + ";"
-        node_query = "node" + ";node".join(query_root) + ";"
+        way_query = "(way" + ";way".join(query_root) + ";);"
+        node_query = "(node" + ";node".join(query_root) + ";);"
 
         api = overpass.API(timeout=600)
         ways = api.get(way_query,verbosity="geom")
