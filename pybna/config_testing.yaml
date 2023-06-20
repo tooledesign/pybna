@@ -23,8 +23,8 @@ bna:
 
     blocks:
         table: "generated.neighborhood_census_blocks"
-        uid: "blockid10"
-        population: "pop10"
+        uid: "blockid20"
+        population: "pop20"
         geom: "geom"
         roads_tolerance: 15     # determines whether a road is considered "connected" to a block
         min_road_length: 30     # determines whether a road is considered "connected" to a block
@@ -62,8 +62,8 @@ bna:
 
     connectivity:
         table: "neighborhood_connected_census_blocks"
-        source_column: "source_blockid10"
-        target_column: "target_blockid10"
+        source_column: "source_blockid20"
+        target_column: "target_blockid20"
         max_distance: 2680
         max_detour: 25      # given as a whole number percentage (i.e. 25 == 25%)
         detour_agnostic_threshold: 400  # under this distance, detour is ignored
@@ -74,10 +74,10 @@ bna:
         weight: 15
         table: neighborhood_census_blocks
         method: percentage
-        datafield: pop10
+        datafield: pop20
         maxpoints: 100
         breaks: {0.03: 10, 0.2: 40, 0.5: 80}
-        uid: blockid10
+        uid: blockid20
         # filter: "filter language here"
       - name: opportunity
         weight: 20
@@ -89,7 +89,7 @@ bna:
             datafield: jobs
             maxpoints: 100
             breaks: {0.03: 10, 0.2: 40, 0.5: 80}
-            uid: blockid10
+            uid: blockid20
           - name: schools
             weight: 35
             table: bna_schools
