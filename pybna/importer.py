@@ -239,6 +239,9 @@ class Importer(Conf):
         print("Filtering blocks to boundary")
         blocks = blocks[blocks.intersects(boundary.unary_union)]
 
+        # rename geoid field to uid
+        blocks = blocks.rename(columns={"geoid20": id})
+
         # filter out blocks associated with water based on area of land
         if keep_water is False:
             print("Filtering out water")
