@@ -317,7 +317,7 @@ class Importer(Conf):
         # copy the shapefile to temporary directory and load into geopandas
         if not state is None:
             print("Loading data for state {}".format(state.upper()))
-            year = 2020
+            year = 2022
             success = False
             while not success:
                 if year < 2010:
