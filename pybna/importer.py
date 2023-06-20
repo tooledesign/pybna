@@ -229,7 +229,7 @@ class Importer(Conf):
         if not url is None:
             src = url
         if not fips is None:
-            src = "http://www2.census.gov/geo/tiger/TIGER2010BLKPOPHU/tabblock2010_" + fips + "_pophu.zip"
+            src = "https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_" + fips + "_tabblock20.zip"
         print("Loading data from {}".format(src))
         blocks = gpd.read_file(src)
         blocks = blocks.to_crs("epsg:{:d}".format(srid))
@@ -239,13 +239,10 @@ class Importer(Conf):
         print("Filtering blocks to boundary")
         blocks = blocks[blocks.intersects(boundary.unary_union)]
 
-        # filter out blocks associated with water based on the water blocks file
+        # filter out blocks associated with water based on area of land
         if keep_water is False:
             print("Filtering out water")
-            water_file = os.path.join(self.module_dir,"sql","importer","water_blocks.zip")
-            water = pd.read_csv(water_file,dtype="object")
-            blocks[~blocks.blockid10.isin(water.GEOID10)]
-            # blocks = blocks[blocks.blockce.str[0] != '0']
+            blocks = blocks[blocks["aland20"] > 0]
 
         # copy data to db
         print("Copying blocks to database")
@@ -268,8 +265,8 @@ class Importer(Conf):
         to download directly from the US Census, or can take a URL or file path
 
         Current example URLs are
-        https://lehd.ces.census.gov/data/lodes/LODES7/wy/od/wy_od_aux_JT00_2013.csv.gz
-        https://lehd.ces.census.gov/data/lodes/LODES7/wy/od/wy_od_main_JT00_2014.csv.gz
+        https://lehd.ces.census.gov/data/lodes/LODES8/wy/od/wy_od_aux_JT00_2020.csv.gz
+        https://lehd.ces.census.gov/data/lodes/LODES8/wy/od/wy_od_main_JT00_2020.csv.gz
 
         Parameters
         ----------
@@ -323,8 +320,8 @@ class Importer(Conf):
                 if year < 2010:
                     raise ValueError("Could not find jobs data for state {}".format(state))
                 try:
-                    src_main = "https://lehd.ces.census.gov/data/lodes/LODES7/"+state+"/od/"+state+"_od_main_JT00_"+str(year)+".csv.gz"
-                    src_aux = "https://lehd.ces.census.gov/data/lodes/LODES7/"+state+"/od/"+state+"_od_aux_JT00_"+str(year)+".csv.gz"
+                    src_main = "https://lehd.ces.census.gov/data/lodes/LODES8/"+state+"/od/"+state+"_od_main_JT00_"+str(year)+".csv.gz"
+                    src_aux = "https://lehd.ces.census.gov/data/lodes/LODES8/"+state+"/od/"+state+"_od_aux_JT00_"+str(year)+".csv.gz"
                     jobs_main = pd.read_csv(src_main)
                     jobs_aux = pd.read_csv(src_aux)
                     success = True
@@ -345,12 +342,12 @@ class Importer(Conf):
 
         # copy data to db
         jobs_main = jobs_main[["w_geocode","S000"]]
-        jobs_main.columns = ["blockid10","jobs"]
+        jobs_main.columns = ["blockid20","jobs"]
         jobs_aux = jobs_aux[["w_geocode","S000"]]
-        jobs_aux.columns = ["blockid10","jobs"]
-        jobs = jobs_main.append(jobs_aux,ignore_index=True)
-        jobs = jobs.groupby(["blockid10"],as_index=False).sum()
-        jobs["blockid10"] = jobs["blockid10"].astype("str").str.rjust(15,"0")
+        jobs_aux.columns = ["blockid20","jobs"]
+        jobs = pd.concat(objs=[jobs_main, jobs_aux], ignore_index=True)
+        jobs = jobs.groupby(["blockid20"],as_index=False).sum()
+        jobs["blockid20"] = jobs["blockid20"].astype("str").str.rjust(15,"0")
 
         print("Copying jobs to database")
         self.gdf_to_postgis(jobs,table,schema,overwrite=overwrite,no_geom=True)
