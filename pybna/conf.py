@@ -2,7 +2,7 @@
 # The Config class houses methods for dealing with the config file
 ###################################################################
 import os
-from collections import Mapping
+from collections.abc import Mapping
 from psycopg2 import sql
 from munch import Munch
 from .dbutils import DBUtils
