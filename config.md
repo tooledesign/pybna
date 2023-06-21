@@ -44,8 +44,8 @@ geom | Name of the geometry column |
 ```
     blocks:
         table: "generated.neighborhood_census_blocks"
-        uid: "blockid10"
-        population: "pop10"
+        uid: "blockid20"
+        population: "pop20"
         geom: "geom"
         roads_tolerance: 15
         min_road_length: 30  
